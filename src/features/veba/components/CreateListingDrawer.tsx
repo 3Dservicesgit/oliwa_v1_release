@@ -6,12 +6,14 @@
  * availability, visibility, and notes work identically to ListOnVebaDrawer.
  */
 
-import React, { useState } from "react";
-import { createVebaListing } from "../../../api/services/veba.service";
+import React, { useCallback, useEffect, useState } from "react";
+import { createVebaListing, uploadAssetPhoto } from "../../../api/services/veba.service";
 import { useAuth } from "../../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
+import { AssetPhotoUpload } from "./AssetPhotoUpload";
 import type {
   CreateVebaListingRequest,
+  ClientDevice,
   ListingVisibility,
   PricingBasis,
 } from "../../../api/types";
@@ -20,9 +22,11 @@ interface CreateListingDrawerProps {
   open: boolean;
   onClose: () => void;
   onCreated?: () => void;
+  /** When provided, pre-fills the asset fields from a client device. */
+  prefillDevice?: ClientDevice;
 }
 
-export function CreateListingDrawer({ open, onClose, onCreated }: CreateListingDrawerProps) {
+export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }: CreateListingDrawerProps) {
   const { state: authState } = useAuth();
 
   // Asset identification
@@ -31,6 +35,16 @@ export function CreateListingDrawer({ open, onClose, onCreated }: CreateListingD
   const [assetClass, setAssetClass] = useState("");
   const [ownerOrg, setOwnerOrg] = useState("");
   const [country, setCountry] = useState("");
+
+  // Pre-fill from device when drawer opens via MyAssetCard
+  useEffect(() => {
+    if (!open || !prefillDevice) return;
+    setAssetUid(prefillDevice.device_imei);
+    setDisplayName(prefillDevice.device_name || "");
+    setAssetClass(prefillDevice.car_type || "");
+    setOwnerOrg(prefillDevice.client_name || "");
+    setCountry("");
+  }, [open, prefillDevice]);
 
   // Pricing
   const [dailyRate, setDailyRate] = useState("");
@@ -43,6 +57,9 @@ export function CreateListingDrawer({ open, onClose, onCreated }: CreateListingD
   const [availabilityEnd, setAvailabilityEnd] = useState("");
   const [geographicScope, setGeographicScope] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
+
+  // Photo
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
 
   // Visibility & notes
   const [visibility, setVisibility] = useState<ListingVisibility>("public");
@@ -58,9 +75,15 @@ export function CreateListingDrawer({ open, onClose, onCreated }: CreateListingD
     setAssetUid(""); setDisplayName(""); setAssetClass(""); setOwnerOrg(""); setCountry("");
     setDailyRate(""); setCurrency("UGX"); setPricingBasis("per_day"); setHourlyRate("");
     setAvailabilityStart(""); setAvailabilityEnd(""); setGeographicScope(""); setOperatorIncluded(false);
-    setVisibility("public"); setNotes(""); setValidationError(null);
+    setVisibility("public"); setNotes(""); setPendingPhoto(null); setValidationError(null);
     listMutation.reset();
   };
+
+  /** Called by AssetPhotoUpload when user selects a file (no asset_uid yet). */
+  const handlePhotoSelected = useCallback((_photoUrl: string) => {
+    // For create flow we don't upload immediately — we stash the File and
+    // upload after the listing is created (so we have the asset_uid).
+  }, []);
 
   const handleClose = () => { resetForm(); onClose(); };
 
@@ -119,6 +142,17 @@ export function CreateListingDrawer({ open, onClose, onCreated }: CreateListingD
 
     try {
       await listMutation.mutate(payload);
+
+      // Upload photo after listing creation (now the asset_uid has a listing).
+      if (pendingPhoto && assetUid.trim()) {
+        try {
+          await uploadAssetPhoto(assetUid.trim(), pendingPhoto);
+        } catch {
+          // Non-blocking — listing was created, photo just failed.
+          console.warn("Photo upload failed after listing creation");
+        }
+      }
+
       onCreated?.();
       handleClose();
     } catch {
@@ -193,6 +227,50 @@ export function CreateListingDrawer({ open, onClose, onCreated }: CreateListingD
                   placeholder="e.g. UG" maxLength={4} disabled={busy} className={inp} />
               </label>
             </div>
+          </div>
+
+          {/* Photo */}
+          <div className="bg-white border border-[#E9EDEF] rounded-xl p-3">
+            <div className="text-[11px] font-extrabold text-[#111B21] mb-2">Asset photo</div>
+            {pendingPhoto ? (
+              <div className="relative group">
+                <img
+                  src={URL.createObjectURL(pendingPhoto)}
+                  alt="Preview"
+                  className="w-full h-40 object-cover rounded-lg border border-[#E9EDEF]"
+                />
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button type="button" onClick={() => setPendingPhoto(null)} disabled={busy}
+                    className="px-2 py-1 text-[10px] font-extrabold rounded-md bg-white/90 text-[#B00020] border border-[#FFD6D6] hover:bg-white cursor-pointer">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className={[
+                "flex flex-col items-center justify-center gap-1.5 px-4 py-6 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
+                "border-[#E9EDEF] bg-[#F8F9FA] hover:border-[#128C7E] hover:bg-[#E9F7F4]",
+                busy && "opacity-50 cursor-not-allowed",
+              ].filter(Boolean).join(" ")}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#667781]">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                <span className="text-[12px] font-medium text-[#667781]">Click to add a photo</span>
+                <span className="text-[10px] text-[#8696A0]">JPG, PNG, or WebP — max 5 MB</span>
+                <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" disabled={busy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      if (f.size > 5 * 1024 * 1024) { setValidationError("Photo exceeds 5 MB limit."); return; }
+                      setPendingPhoto(f);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
           </div>
 
           {/* Pricing */}

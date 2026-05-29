@@ -4,9 +4,10 @@
  * listing object and calls PUT /update.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { updateVebaListing } from "../../../api/services/veba.service";
 import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
+import { AssetPhotoUpload } from "./AssetPhotoUpload";
 import type {
   VebaListing,
   ListingVisibility,
@@ -137,6 +138,14 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
 
         {/* Body */}
         <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4">
+          {/* Photo */}
+          <AssetPhotoUpload
+            assetUid={listing.asset_uid}
+            currentPhotoUrl={listing.asset_summary?.photo_url}
+            onUploaded={useCallback(() => onUpdated?.(), [onUpdated])}
+            disabled={updateMut.isRunning}
+          />
+
           {/* Pricing */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl p-3">
             <div className="text-[11px] font-extrabold text-[#111B21] mb-2">Pricing</div>

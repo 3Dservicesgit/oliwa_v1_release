@@ -26,7 +26,8 @@ import { AegisDashboardPage }   from "../features/aegis";
 import { NocBridgePage }        from "../features/noc-bridge";
 import { OpsWarRoomPage }       from "../features/ops-war-room";
 import { GatehousePage }        from "../features/gatehouse";
-import { ProtocolPage }         from "../features/protocol";
+import { GeofencesPage }         from "../features/geofences";
+// import { ProtocolPage }         from "../features/protocol";
 import { FirmwarePage }         from "../features/firmware";
 import { SimPage }              from "../features/sim";
 import { SystemHealthPage }     from "../features/health";
@@ -51,7 +52,7 @@ const MODULE_ELEMENTS: Record<string, ReactElement> = {
   "noc-bridge":         <NocBridgePage />,
   "ops":                <OpsWarRoomPage />,
   "gatehouse":          <GatehousePage />,
-  "protocol":           <ProtocolPage />,
+  "protocol":           <GeofencesPage />,
   "firmware":           <FirmwarePage />,
   "sim":                <SimPage />,
   "health":             <SystemHealthPage />,

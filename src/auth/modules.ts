@@ -133,7 +133,7 @@ const BUILT_MODULES: ModuleDef[] = [
     group: "system",
     showInNavRail: true,
     showInSidebar: true,
-    catalogModuleName: "API & Integration Hub",
+    catalogModuleName: "Geo-Zones & POIs",
   },
   {
     id: "firmware",

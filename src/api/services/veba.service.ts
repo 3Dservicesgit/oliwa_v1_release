@@ -2,7 +2,7 @@
  * veba.service.ts — VEBA marketplace API service.
  */
 
-import { get, post, put } from "../client";
+import { get, post, put, del, postMultipart } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
 import type {
@@ -66,6 +66,17 @@ export function archiveVebaListing(
   listingUid: string, updatedBy: string, opts?: RequestOptions,
 ): Promise<ApiResponse<string>> {
   return put<string>(`${ENDPOINTS.VEBA.LISTINGS_ARCHIVE}/${listingUid}/archive`, { data: { updated_by: updatedBy } }, opts);
+}
+
+export function deleteVebaListing(
+  listingUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ listing_uid: string }>> {
+  return del<{ listing_uid: string }>(
+    `${ENDPOINTS.VEBA.LISTINGS_DELETE}/${listingUid}/delete`,
+    undefined,
+    opts,
+  );
 }
 
 export function updateVebaListing(
@@ -137,4 +148,29 @@ export function getBookingRequests(
     ...opts,
     params: { account_root: accountRoot, ...opts?.params },
   });
+}
+
+export function uploadAssetPhoto(
+  assetUid: string,
+  file: File,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ photo_url: string }>> {
+  const formData = new FormData();
+  formData.append("photo", file);
+  return postMultipart<{ photo_url: string }>(
+    `${ENDPOINTS.VEBA.ASSET_PHOTO_UPLOAD}/${assetUid}/photo`,
+    formData,
+    opts,
+  );
+}
+
+/**
+ * Build the full URL for an asset photo path returned by the API.
+ * The photo_url from the backend is a relative path like "/veba/assets/photo/xxx.jpg".
+ */
+export function getAssetPhotoFullUrl(photoPath: string): string {
+  if (!photoPath) return "";
+  if (photoPath.startsWith("http")) return photoPath;
+  const base = import.meta.env.VITE_API_BASE_URL || "";
+  return `${base.replace(/\/+$/, "")}${photoPath}`;
 }

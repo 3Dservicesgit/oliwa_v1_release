@@ -144,3 +144,17 @@ export type {
   CreateBookingRequest,
   CreateBookingRequestResponse,
 } from "./booking.types";
+
+export type {
+  GeozoneCoord,
+  Geozone,
+  CreateGeozoneRequest,
+  UpdateGeozoneRequest,
+  AttachDevicesRequest,
+  DeviceGeozone,
+  GeozoneDetails,
+  LatLng,
+  ParsedGeozone,
+} from "./geozones.types";
+
+export { parseGeozonePoints, serializeGeozonePoints } from "./geozones.types";

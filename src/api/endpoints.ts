@@ -46,6 +46,9 @@ export const ENDPOINTS = {
     LISTINGS_PAUSE:          "/veba/listings",
     LISTINGS_REACTIVATE:     "/veba/listings",
     LISTINGS_ARCHIVE:        "/veba/listings",
+    LISTINGS_DELETE:         "/veba/listings",
+    ASSET_PHOTO_UPLOAD:      "/veba/assets",
+    ASSET_PHOTO_SERVE:       "/veba/assets/photo",
     BOOKING_REQUESTS:        "/veba/booking-requests",
     BOOKING_REQUESTS_CREATE: "/veba/booking-requests/create",
   },
@@ -91,6 +94,16 @@ export const ENDPOINTS = {
   },
   FINANCE: {
     PAYMENTS: "/finance/payments",
+  },
+  GEOZONES: {
+    CREATE:        "/geozones/create",
+    UPDATE:        "/geozones",           // PUT  /{geozone_id}/update
+    LIST:          "/geozones",           // GET  /{owner_uid}/list/{access_level}/load
+    DETAILS:       "/geozones",           // GET  /{geozone_id}/details
+    DELETE:        "/geozones",           // DELETE /{geozone_id}/delete
+    ATTACH:        "/geozones",           // POST /{geozone_id}/attach
+    DETACH:        "/geozones",           // PUT  /{geozone_id}/detach/{device_id}/action
+    DEVICE_ZONES:  "/geozones/devices",   // GET  /{device_uid}/list
   },
   PORTS: {
     ACTIVITY: "/ports/activity",

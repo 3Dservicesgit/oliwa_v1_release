@@ -31,19 +31,13 @@ import React, { useState, useEffect } from "react";
 // ── Existing shared components ───────────────────────────────────────────────
 import { NavRail }           from "../../components/navigation";
 import { AccordionSidebar }  from "../../components/navigation";
-import { WaswaAIPanel }      from "../../components/waswa";
 import type { ApprovalRow }  from "./components/HITLApprovalTable";
 import { HITLApprovalTable } from "./components/HITLApprovalTable";
 
 // ── New components ───────────────────────────────────────────────────────────
-import { AegisTopBar }           from "./components/AegisTopBar";
-import { AegisStatusStrip }      from "./components/AegisStatusStrip";
 import { TaskManagerTable }      from "./components/TaskManagerTable";
-import { PaymentGatewaysCard }   from "./components/PaymentGatewaysCard";
-import { TokenEngineCard }       from "./components/TokenEngineCard";
 import { VebaGovernanceTable }   from "./components/VebaGovernanceTable";
 import { AuditTrailCard }        from "./components/AuditTrailCard";
-import { WaswaDrawer }           from "../../components/waswa";
 import { TokenTopupModal }       from "../tokens/components/TokenTopupModal";
 
 // ── Auth & API ──────────────────────────────────────────────────────────────
@@ -54,12 +48,6 @@ import { ENDPOINTS } from "../../api/endpoints";
 // ─────────────────────────────────────────────────────────────────────────────
 // Static data
 // ─────────────────────────────────────────────────────────────────────────────
-
-const AEGIS_TICKER = [
-  "Forecast: Healthy",
-  "API 99.95%",
-  "Socket Threads-Open: 5",
-];
 
 const AEGIS_NAV_ITEMS = [
   { key: "home",     glyph: "⌂",  label: "Home",         path: "/"         },
@@ -164,8 +152,6 @@ const HITL_ROWS: ApprovalRow[] = [
 export function AegisDashboard() {
   const { state }              = useAuth();
   const [topupOpen,      setTopupOpen]      = useState(false);
-  const [waswaOn,        setWaswaOn]        = useState(true);
-  const [waswaDrawerOpen,setWaswaDrawerOpen]= useState(false);
   // Show Airlock modal if not authenticated
   const [airlockOpen,    setAirlockOpen]    = useState(() => state.status !== "authenticated");
   // Statistics metrics state
@@ -240,29 +226,7 @@ export function AegisDashboard() {
     fetchStats();
   }, []);
   return (
-    <div className="min-h-screen min-h-dvh flex flex-col bg-[#F0F2F5] pb-14 md:pb-0 overflow-x-hidden w-full">
-
-      {/* 1. Aegis Top Bar */}
-      <AegisTopBar
-        waswaOn={waswaOn}
-        onToggleWaswa={() => setWaswaOn((v) => !v)}
-        onOpenTopup={() => setTopupOpen(true)}
-        tickerItems={AEGIS_TICKER}
-      />
-
-      {/* 2. Aegis Status Strip */}
-      <AegisStatusStrip
-        waswaOn={waswaOn}
-        onToggleWaswa={() => setWaswaOn((v) => !v)}
-        onOpenTopup={() => setTopupOpen(true)}
-      />
-
-      <div className="flex flex-1 min-h-0 min-w-0 overflow-x-hidden">
-
-        
-
-        {/* 5. Main workspace */}
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col gap-3 p-3">
+    <div className="flex flex-col gap-3 p-3 bg-[#F0F2F5] w-full">
 
           {/* Page heading */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3 flex flex-wrap items-start gap-3">
@@ -316,62 +280,8 @@ export function AegisDashboard() {
             <BigKpiCard label="VEBA Tokens Active (all tenants)"          value={vebaTokensActive.toLocaleString()}      delta="+2"     deltaColor="green" isLoading={loadingVebaTokensActive}  />
           </div>
 
-          {/* Waswa AI + HITL queue row */}
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-3">
-
-            {/* Waswa AI insights card */}
-            <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#E9EDEF] flex flex-wrap items-center gap-3">
-                <div className="font-black text-[13px] text-[#111B21]">
-                  Waswa AI Co‑Pilot — HiC(Human In Command) Insights (Today)
-                </div>
-                <span className="text-[10px] font-extrabold bg-[#128C7E] text-white px-2.5 py-1 rounded-full">
-                  AI ON
-                </span>
-                <span className="ml-auto text-[11px] text-[#667781]">
-                  Model: Cascade (Local→SLM→External)
-                </span>
-              </div>
-              <div className="px-4 py-2 text-[11px] text-[#667781]">
-                AI suggests; human approves. All decisions are cryptographically logged (Irrefutable).
-              </div>
-              <ul className="px-5 pb-4 text-[12px] text-[#111B21] leading-relaxed list-disc flex flex-col gap-1 marker:text-[#128C7E]">
-                <li>Detected revenue leakage pattern in VEBA: 'Boda' category — contact sharing attempts ↑ 2.1×</li>
-                <li>Token burn spike driver: Video retrieval (DASHCAM) + maps routing calls (↑ 18%)</li>
-                <li>Suggested action: Raise VEBA 'Lead Unlock' fee by +1.5 T (HITL approval required)</li>
-                <li>Suggested action: Enable Smart Caps: 80% soft alert, 95% hard lock (per tenant)</li>
-              </ul>
-            </div>
-
-            {/* HITL queue card */}
-            <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden flex flex-col">
-              <div className="px-4 py-3 border-b border-[#E9EDEF] flex items-center justify-between">
-                <div>
-                  <div className="font-black text-[13px] text-[#111B21]">HITL/HIC Approvals Queue</div>
-                  <div className="text-[11px] text-[#667781] mt-0.5">High-risk actions awaiting review</div>
-                </div>
-                <span className="text-[10px] font-extrabold bg-[#FFF8E1] border border-[#FFE08A] text-[#7A5E00] px-2 py-0.5 rounded-full whitespace-nowrap">
-                  7 pending
-                </span>
-              </div>
-              <ol className="px-5 py-3 text-[12px] text-[#111B21] leading-relaxed list-decimal flex flex-col gap-1.5 marker:text-[#667781]">
-                <li>Price rule change (OLIWA‑PLUS) — +10%</li>
-                <li>Refund &gt; UGX 2,000,000 — INV‑8841</li>
-                <li>VEBA dispute payout hold — BK‑1192</li>
-                <li>Data export (10k rows) — Reports</li>
-                <li>AI model deploy (Waswa‑SLM v2.6)</li>
-              </ol>
-            </div>
-          </div>
-
           {/* Task manager table */}
           <TaskManagerTable />
-
-          {/* Payments + Token Engine side by side */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-            <PaymentGatewaysCard />
-            <TokenEngineCard onMint={() => setTopupOpen(true)} />
-          </div>
 
           {/* VEBA Governance table */}
           <VebaGovernanceTable />
@@ -388,36 +298,9 @@ export function AegisDashboard() {
               Kafka: 12s lag&nbsp;•&nbsp;Redis: 97% hit&nbsp;•&nbsp;Cassandra write p95 9ms&nbsp;•&nbsp;MoMo retries 41&nbsp;•&nbsp;UI refresh 30s
             </div>
           </div>
-        </main>
 
-        {/* 6. Waswa AI right panel (desktop) */}
-        <WaswaAIPanel />
-      </div>
-
-      {/* Floating Waswa W button */}
-      <button
-        onClick={() => setWaswaDrawerOpen(true)}
-        aria-label="Open Waswa AI"
-        className="
-          fixed right-5 bottom-20 z-[300] lg:bottom-5
-          w-14 h-14 rounded-full border-none
-          bg-[#25D366] text-white font-black text-[22px]
-          shadow-[0_12px_30px_rgba(0,0,0,0.18)]
-          cursor-pointer hover:brightness-105 active:scale-95 transition-all
-          grid place-items-center
-        "
-      >
-        W
-      </button>
-
-      {/* Modals + drawers */}
+      {/* Modals */}
       <TokenTopupModal open={topupOpen} onClose={() => setTopupOpen(false)} />
-      <WaswaDrawer
-        open={waswaDrawerOpen && waswaOn}
-        onClose={() => setWaswaDrawerOpen(false)}
-        waswaOn={waswaOn}
-        onToggleWaswa={() => setWaswaOn((v) => !v)}
-      />
 
       {/* Airlock login modal overlay */}
       <AirlockModal open={airlockOpen} onClose={() => setAirlockOpen(false)} />
