@@ -37,6 +37,7 @@ import { BillingInvoicingPage } from "../features/billing-invoicing";
 import { MoneyPage }            from "../features/money";
 import { ProtocolPage }         from "../features/protocol";
 import { FirmwarePage }         from "../features/firmware";
+import { GeofencesPage } from "../features/geofences";
 import { SimPage }             from "../features/sim";
 
 import { AssetDigitalTwinPage }  from "../features/asset-digital-twin";

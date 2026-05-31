@@ -15,7 +15,7 @@ import {
 import { useAuth } from "../../../auth/AuthContext";
 import { usePermissions } from "../../../auth/PermissionsContext";
 import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
-import type { VebaListing, ListingStatus, PricingBasis } from "../../../api/types";
+import type { VebaListing, ListingStatus, PricingBasis, ClientDevice } from "../../../api/types";
 import { EditListingDrawer } from "./EditListingDrawer";
 import { ListingDetailPanel } from "./ListingDetailPanel";
 import { ConfirmDialog, useConfirmDialog } from "../../../components/ui/ConfirmDialog";
@@ -108,17 +108,6 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
   const { hasPermission } = usePermissions();
   const canBrowse = hasPermission("can_browse_asset_listings");
 
-  // ── My assets state ────────────────────────────────────────────────
-  const [devices, setDevices]         = useState<ClientDevice[]>([]);
-  const [devicesLoading, setDevicesLoading] = useState(true);
-  const [devicesError, setDevicesError]     = useState<string | null>(null);
-  /** Map: device_imei → VebaListing (or null if not listed). */
-  const [assetListings, setAssetListings] = useState<Record<string, VebaListing | null>>({});
-  const [assetSearch, setAssetSearch] = useState("");
-
-  // Create listing drawer state (opened from "List on Marketplace" button)
-  const [listingDevice, setListingDevice] = useState<ClientDevice | null>(null);
-
   // ── Marketplace listings state ─────────────────────────────────────
   const [listings, setListings] = useState<VebaListing[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -203,24 +192,6 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
   }, [listings]);
 
   const resetFilters = () => setFilters(INITIAL_FILTERS);
-
-  const handleListAsset = (device: ClientDevice) => {
-    setListingDevice(device);
-  };
-
-  const handleListingCreated = () => {
-    fetchDevices();
-    fetchListings();
-  };
-
-  if (!canBrowse) {
-    return (
-      <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
-        <div className="text-[14px] font-extrabold text-[#111B21] mb-1">Access restricted</div>
-        <p className="text-[12px] text-[#667781]">You do not have permission to browse marketplace listings. Contact your administrator to request access.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -313,6 +284,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
           <div className="w-5 h-5 border-[3px] border-[#128C7E] border-t-transparent rounded-full animate-spin" />
           <span className="text-[12px] text-[#667781]">Loading all marketplace listings...</span>
         </div>
+      )}
 
       {!loading && error && (
         <div className="bg-white border border-[#FFD6D6] rounded-xl p-6 text-[12px] text-[#B00020]">
@@ -326,16 +298,6 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
           <p className="text-[12px] text-[#667781]">When asset owners list their vehicles or equipment, they will appear here.</p>
         </div>
       )}
-
-          <div className="flex flex-col gap-1 min-w-[110px]">
-            <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Max daily rate</span>
-            <input
-              type="number" inputMode="numeric" placeholder="no max"
-              value={filters.maxRate}
-              onChange={(e) => setFilters((f) => ({ ...f, maxRate: e.target.value }))}
-              className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
-            />
-          </div>
 
       {/* ── Table ────────────────────────────────────────────────────── */}
       {!loading && !error && visible.length > 0 && (

@@ -58,20 +58,11 @@ export const ENDPOINTS = {
     ASSET_PHOTO_SERVE:       "/veba/assets/photo",
     BOOKING_REQUESTS:        "/veba/booking-requests",
     BOOKING_REQUESTS_CREATE: "/veba/booking-requests/create",
-    STATISTICS:       "/veba/statistics",
-    LISTINGS:         "/veba/listings",             // GET /{account_root}
-    LISTINGS_CREATE:  "/veba/listings/create",      // POST
-    LISTINGS_UPDATE:  "/veba/listings",             // PUT /{listing_uid}/update
-    LISTINGS_PAUSE:   "/veba/listings",             // PUT /{listing_uid}/pause
-    LISTINGS_REACTIVATE: "/veba/listings",          // PUT /{listing_uid}/reactivate
-    LISTINGS_ARCHIVE: "/veba/listings",             // PUT /{listing_uid}/archive
-    BOOKING_REQUESTS: "/veba/booking-requests",     // GET /{account_root}
-    BOOKING_CREATE:   "/veba/booking-requests/create", // POST
-    BOOKING_APPROVE:  "/veba/booking-requests",     // PUT /{uid}/approve
-    BOOKING_REJECT:   "/veba/booking-requests",     // PUT /{uid}/reject
-    BOOKING_CANCEL:   "/veba/booking-requests",     // PUT /{uid}/cancel
-    BOOKING_FULFILL:  "/veba/booking-requests",     // PUT /{uid}/fulfill
-    MARKETPLACE:      "/veba/marketplace/listings", // GET public marketplace
+    BOOKING_APPROVE:         "/veba/booking-requests",     // PUT /{uid}/approve
+    BOOKING_REJECT:          "/veba/booking-requests",     // PUT /{uid}/reject
+    BOOKING_CANCEL:          "/veba/booking-requests",     // PUT /{uid}/cancel
+    BOOKING_FULFILL:         "/veba/booking-requests",     // PUT /{uid}/fulfill
+    MARKETPLACE:             "/veba/marketplace/listings", // GET public marketplace
   },
   TENANTS: {
     CREATE:          "/tenants/create",
