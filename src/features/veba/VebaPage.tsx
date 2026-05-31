@@ -13,6 +13,7 @@ import { MarketplaceBrowse } from "./components/MarketplaceBrowse";
 import { BookingRequestModal } from "./components/BookingRequestModal";
 import { IncomingBookingRequests } from "./components/IncomingBookingRequests";
 import type { VebaListing } from "../../api/types";
+import { Pill } from "../../components/Pill";
 
 type VebaTab = "marketplace" | "booking-requests" | "ops";
 

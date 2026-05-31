@@ -3,11 +3,11 @@
  */
 
 import { get, post, put, del, postMultipart } from "../client";
-import { get, post, put } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { RequestOptions } from "../types";
 import type { VebaStatistics, VebaListing, CreateVebaListingRequest, CreateVebaListingResponse } from "../types";
 import type { BookingRequest, CreateBookingRequest, CreateBookingRequestResponse } from "../types";
+import type { ApiResponse } from "../types";
 
 /* ── Statistics ────────────────────────────────────────────────────── */
 
@@ -97,17 +97,6 @@ export function deleteVebaListing(
   );
 }
 
-export function updateVebaListing(
-  listingUid: string,
-  updatedBy: string,
-  opts?: RequestOptions,
-) {
-  return put(
-    `${ENDPOINTS.VEBA.LISTINGS_ARCHIVE}/${listingUid}/archive`,
-    { updated_by: updatedBy },
-    opts,
-  );
-}
 
 /* ── Booking requests ──────────────────────────────────────────────── */
 
@@ -180,20 +169,7 @@ export function fulfillBookingRequest(
   );
 }
 
-export function createBookingRequest(
-  payload: CreateBookingRequest, opts?: RequestOptions,
-): Promise<ApiResponse<CreateBookingRequestResponse>> {
-  return post<CreateBookingRequestResponse>(ENDPOINTS.VEBA.BOOKING_REQUESTS_CREATE, { data: payload }, opts);
-}
 
-export function getBookingRequests(
-  accountRoot: string, opts?: RequestOptions,
-): Promise<ApiResponse<BookingRequest[]>> {
-  return get<BookingRequest[]>(ENDPOINTS.VEBA.BOOKING_REQUESTS, {
-    ...opts,
-    params: { account_root: accountRoot, ...opts?.params },
-  });
-}
 
 export function uploadAssetPhoto(
   assetUid: string,
