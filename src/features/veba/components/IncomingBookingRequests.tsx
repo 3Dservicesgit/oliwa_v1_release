@@ -50,7 +50,7 @@ export function IncomingBookingRequests() {
     setError(null);
     try {
       const data = await getBookingRequests(authState.accountRoot, {
-        params: { direction: "all" },
+        params: { direction: "incoming" },
       });
       setRequests(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -113,7 +113,7 @@ export function IncomingBookingRequests() {
     return (
       <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
         <div className="text-[16px] font-extrabold text-[#111B21] mb-1">No booking requests yet</div>
-        <p className="text-[12px] text-[#667781]">Client booking requests will appear here once marketplace activity begins.</p>
+        <p className="text-[12px] text-[#667781]">Booking requests for your listed assets will appear here.</p>
       </div>
     );
   }
@@ -124,7 +124,7 @@ export function IncomingBookingRequests() {
         <div>
           <h2 className="font-extrabold text-[13px] text-[#111B21]">Booking Requests</h2>
           <p className="text-[11px] text-[#667781]">
-            {requests.length} booking request{requests.length === 1 ? "" : "s"} across all clients
+            {requests.length} booking request{requests.length === 1 ? "" : "s"} for your assets
           </p>
         </div>
         <button

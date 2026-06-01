@@ -63,6 +63,11 @@ function basisLabel(b: string): string {
   }
 }
 
+/** Format rate for table-view columns. */
+function formatRate(l: { currency: string; daily_rate: number; pricing_basis: string }): string {
+  return `${l.currency} ${l.daily_rate.toLocaleString()} ${basisLabel(l.pricing_basis)}`;
+}
+
 // ── Single listing card ─────────────────────────────────────────────────────
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];

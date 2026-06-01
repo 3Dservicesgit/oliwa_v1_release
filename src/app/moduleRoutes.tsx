@@ -28,7 +28,7 @@ import { OpsWarRoomPage }       from "../features/ops-war-room";
 import { GatehousePage }        from "../features/gatehouse";
 import { GeofencesPage }         from "../features/geofences";
 // import { ProtocolPage }         from "../features/protocol";
-import { FirmwarePage }         from "../features/firmware";
+import { EventsPage }           from "../features/events";
 import { SimPage }              from "../features/sim";
 import { SystemHealthPage }     from "../features/health";
 import { AlarmFactoryPage }     from "../features/alarm-factory";
@@ -53,7 +53,7 @@ const MODULE_ELEMENTS: Record<string, ReactElement> = {
   "ops":                <OpsWarRoomPage />,
   "gatehouse":          <GatehousePage />,
   "protocol":           <GeofencesPage />,
-  "firmware":           <FirmwarePage />,
+  "events":             <EventsPage />,
   "sim":                <SimPage />,
   "health":             <SystemHealthPage />,
   "alarms-factory":     <AlarmFactoryPage />,

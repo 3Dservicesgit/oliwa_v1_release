@@ -119,7 +119,7 @@ export function createBookingRequest(
   opts?: RequestOptions,
 ): Promise<CreateBookingRequestResponse> {
   return post<CreateBookingRequestResponse>(
-    ENDPOINTS.VEBA.BOOKING_CREATE,
+    ENDPOINTS.VEBA.BOOKING_REQUESTS_CREATE,
     payload,
     opts,
   ).then(res => res.data);

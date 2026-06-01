@@ -35,8 +35,7 @@ import { AuditPage }           from "../features/audit";
 import { TenantTowerPage }     from "../features/tenant-tower";
 import { BillingInvoicingPage } from "../features/billing-invoicing";
 import { MoneyPage }            from "../features/money";
-import { ProtocolPage }         from "../features/protocol";
-import { FirmwarePage }         from "../features/firmware";
+import { EventsPage }           from "../features/events";
 import { GeofencesPage } from "../features/geofences";
 import { SimPage }             from "../features/sim";
 
@@ -73,8 +72,8 @@ export default function App() {
           <Route path="/tenant-tower"   element={<ProtectedRoute permission="tenants.view"><TenantTowerPage /></ProtectedRoute>} />
           <Route path="/billing-invoicing" element={<ProtectedRoute permission="billing.view"><BillingInvoicingPage /></ProtectedRoute>} />
           <Route path="/money"            element={<ProtectedRoute permission="money.view"><MoneyPage /></ProtectedRoute>} />
-          <Route path="/protocol"         element={<ProtectedRoute permission="protocol.view"><ProtocolPage /></ProtectedRoute>} />
-          <Route path="/firmware"         element={<ProtectedRoute permission="firmware.view"><FirmwarePage /></ProtectedRoute>} />
+          <Route path="/protocol"         element={<ProtectedRoute permission="geofences.view"><GeofencesPage /></ProtectedRoute>} />
+          <Route path="/events"           element={<ProtectedRoute permission="events.view"><EventsPage /></ProtectedRoute>} />
           <Route path="/sim"             element={<ProtectedRoute permission="sim.view"><SimPage /></ProtectedRoute>} />
           <Route path="/asset-digital-twin" element={<ProtectedRoute permission="assets.view"><AssetDigitalTwinPage /></ProtectedRoute>} />
 

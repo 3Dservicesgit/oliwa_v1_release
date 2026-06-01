@@ -57,9 +57,9 @@ export function GeofencesPage() {
       .finally(() => setLoading(false));
   }, [authState.accountRoot]);
 
-  useEffect(() => {
-    fetchGeozones();
-  }, [fetchGeozones]);
+  // Fetch on mount / when accountRoot changes
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchGeozones(); }, [fetchGeozones]);
 
   // ── Selection / interaction state ───────────────────────────────────────
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
@@ -120,18 +120,25 @@ export function GeofencesPage() {
   // ── Delete handler ──────────────────────────────────────────────────────
   const [deleteConfirm, setDeleteConfirm] = useState<ParsedGeozone | null>(null);
 
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const deleteMutation = useGuardedMutation(
     "can_delete_geofence",
     useCallback(async () => {
       if (!deleteConfirm) return;
-      const res = await deleteGeozone(deleteConfirm.geozone_uid);
-      if (res.status === "success") {
-        setGeozones((prev) =>
-          prev.filter((g) => g.geozone_uid !== deleteConfirm.geozone_uid),
-        );
-        if (selectedUid === deleteConfirm.geozone_uid) setSelectedUid(null);
+      setDeleteError(null);
+      try {
+        const res = await deleteGeozone(deleteConfirm.geozone_uid);
+        if (res.status === "success") {
+          setGeozones((prev) =>
+            prev.filter((g) => g.geozone_uid !== deleteConfirm.geozone_uid),
+          );
+          if (selectedUid === deleteConfirm.geozone_uid) setSelectedUid(null);
+        }
+        setDeleteConfirm(null);
+      } catch (err) {
+        setDeleteError(err instanceof Error ? err.message : "Failed to delete geofence.");
       }
-      setDeleteConfirm(null);
     }, [deleteConfirm, selectedUid]),
   );
 
@@ -293,6 +300,11 @@ export function GeofencesPage() {
               </span>
               ? This action cannot be undone.
             </div>
+            {deleteError && (
+              <div className="text-[11px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2 mb-3">
+                {deleteError}
+              </div>
+            )}
             <div className="flex gap-2 justify-end">
               <button
                 type="button"

@@ -170,6 +170,13 @@ export const ENDPOINTS = {
     REGISTER_UNIT:    "/devices/create",
   },
 
+  DEVICE_EVENTS: {
+    CREATE:   "/events/create",
+    UPDATE:   "/events",           // append /{event_uid}/update
+    GET_ALL:  "/events/getall",
+    DETAILS:  "/events",           // append /{event_id}/details
+    DELETE:   "/events",           // append /{event_uid}/delete
+  },
   AUDIT: {
     /** CMS-wide audit event stream (all modules). Supports ?domain=&severity=&range= query params */
     EVENTS:         "/audit/events",

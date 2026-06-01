@@ -23,7 +23,8 @@ const DEFAULT_ITEMS: SidebarItem[] = [
   // ── Core dashboards (Dashboard has no permission — always visible) ──────
   { key: "aegis",              label: "Dashboard",               path: "/"                  },
   { key: "noc-bridge",         label: "NOC Bridge",              path: "/noc-bridge",        permission: "noc.view" },
-  { key: "protocol",           label: "Protocol Port",           path: "/protocol",          permission: "protocol.view" },
+  { key: "protocol",           label: "Geofences & Zones",       path: "/protocol",          permission: "geofences.view" },
+  { key: "events",             label: "Events & Notifications",  path: "/events",            permission: "events.view" },
   { key: "sim",                label: "Signal Vault",            path: "/sim",               permission: "sim.view" },
   { key: "ops",                label: "Ops War Room",            path: "/ops",               permission: "ops.view" },
   { key: "gatehouse",          label: "Monitoring Alpha",        path: "/gatehouse",         permission: "gatehouse.view" },

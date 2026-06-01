@@ -3,29 +3,23 @@
  *
  * Client-facing marketplace module. Clients can:
  *   - View & manage their asset listings (create, edit, delete, pause/reactivate)
- *   - Browse the marketplace for other listings
  *   - Review incoming booking requests for their assets
  */
 import React, { useState } from "react";
 import { MyListings } from "./components/MyListings";
-import { MarketplaceBrowse } from "./components/MarketplaceBrowse";
-import { BookingRequestModal } from "./components/BookingRequestModal";
 import { IncomingBookingRequests } from "./components/IncomingBookingRequests";
-import type { VebaListing } from "../../api/types";
 
-type VebaTab = "my-listings" | "marketplace" | "booking-requests";
+type VebaTab = "my-listings" | "booking-requests";
 
 // ─── Tab config ──────────────────────────────────────────────────────────────
 const TABS: { key: VebaTab; label: string }[] = [
   { key: "my-listings",      label: "My Listings" },
-  { key: "marketplace",      label: "Marketplace" },
   { key: "booking-requests", label: "Booking Requests" },
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export function VebaPage() {
   const [activeTab, setActiveTab] = useState<VebaTab>("my-listings");
-  const [bookingFor, setBookingFor] = useState<VebaListing | null>(null);
 
   return (
     <div className="flex flex-col gap-3 p-3 bg-[#F0F2F5] w-full">
@@ -35,7 +29,7 @@ export function VebaPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="font-black text-[16px] text-[#111B21]">VEBA Marketplace</div>
-                <nav className="text-[11px] text-[#667781] mt-0.5">List assets, browse the marketplace, and manage bookings</nav>
+                <nav className="text-[11px] text-[#667781] mt-0.5">List assets and manage bookings</nav>
               </div>
             </div>
           </div>
@@ -62,19 +56,8 @@ export function VebaPage() {
           {/* ── My Listings tab ───────────────────────────────────────── */}
           {activeTab === "my-listings" && <MyListings />}
 
-          {/* ── Marketplace tab ───────────────────────────────────────── */}
-          {activeTab === "marketplace" && (
-            <MarketplaceBrowse onRequestBooking={(l) => setBookingFor(l)} />
-          )}
-
           {/* ── Booking Requests tab ──────────────────────────────────── */}
           {activeTab === "booking-requests" && <IncomingBookingRequests />}
-
-          {/* ── Booking request modal (renders only when set) ─────────── */}
-          <BookingRequestModal
-            listing={bookingFor}
-            onClose={() => setBookingFor(null)}
-          />
 
     </div>
   );

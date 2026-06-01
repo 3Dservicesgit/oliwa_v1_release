@@ -21,6 +21,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 import { getUserPermissions } from "../api/services/rbac.service";
@@ -52,6 +53,13 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Fetch-generation counter: prevents stale responses from concurrent calls
+   * (e.g. React StrictMode double-fires effects in dev). Only the latest
+   * call's result is applied; earlier calls silently discard their results.
+   */
+  const fetchGenRef = useRef(0);
+
   const fetchPermissions = useCallback(async () => {
     // Get account UID from AuthContext state or fall back to cookie
     const accountUid =
@@ -65,20 +73,27 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const gen = ++fetchGenRef.current;
     setLoading(true);
     try {
       const res = await getUserPermissions(accountUid);
+      // Only apply if this is still the latest fetch
+      if (gen !== fetchGenRef.current) return;
       const data = res.data;
       setRole(data.role ?? "");
       setPermissions(
         (data.permissions ?? []).map((p) => p.permission_name),
       );
     } catch {
+      // Only apply if this is still the latest fetch
+      if (gen !== fetchGenRef.current) return;
       // API error — default to no permissions (safe fail-closed)
       setPermissions([]);
       setRole("");
     } finally {
-      setLoading(false);
+      if (gen === fetchGenRef.current) {
+        setLoading(false);
+      }
     }
   }, [authState.accountUid]);
 

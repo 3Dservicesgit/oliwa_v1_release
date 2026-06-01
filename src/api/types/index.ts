@@ -166,3 +166,17 @@ export type {
 } from "./geozones.types";
 
 export { parseGeozonePoints, serializeGeozonePoints } from "./geozones.types";
+
+export type {
+  EventCondition,
+  DeviceEvent,
+  CreateEventRequest,
+  UpdateEventRequest,
+  EventLoadLevel,
+  GetEventsRequest,
+} from "./events.types";
+
+export {
+  EVENT_CONDITION_LABELS,
+  EVENT_CONDITION_DESCRIPTIONS,
+} from "./events.types";
