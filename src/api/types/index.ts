@@ -144,15 +144,6 @@ export type {
   AuditFilters,
 } from "./audit.types";
 
-export type { VebaListingAssetSummary } from "./veba.types";
-
-export type {
-  BookingRequestStatus,
-  BookingRequest,
-  CreateBookingRequest,
-  CreateBookingRequestResponse,
-} from "./booking.types";
-
 export type {
   GeozoneCoord,
   Geozone,
