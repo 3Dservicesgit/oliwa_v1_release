@@ -170,6 +170,22 @@ export const ENDPOINTS = {
     REGISTER_UNIT:    "/devices/create",
   },
 
+  REPORTS: {
+    /** Generate: POST /data-house/reports/{type}/{format} */
+    GENERATE:       "/data-house/reports",
+    /** List by type: GET /data-stream/reports/{owner}/{type}/list */
+    LIST_BY_TYPE:   "/data-stream/reports",
+    /** List state reports: GET /data-stream/reports/{owner}/state/list */
+    LIST_STATE:     "/data-stream/reports",
+    /** Status check: GET /data-stream/reports/{request_uid}/status */
+    STATUS:         "/data-stream/reports",
+    /** Delete: DELETE /data-stream/reports/{request_uid}/delete */
+    DELETE:         "/data-stream/reports",
+    /** Available types: GET /data-stream/reports/types/available */
+    TYPES:          "/data-stream/reports/types/available",
+    /** Download file: GET /reports-cdn/{filename} */
+    CDN:            "/reports-cdn",
+  },
   DEVICE_EVENTS: {
     CREATE:   "/events/create",
     UPDATE:   "/events",           // append /{event_uid}/update

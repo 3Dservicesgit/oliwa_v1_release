@@ -159,6 +159,23 @@ export type {
 export { parseGeozonePoints, serializeGeozonePoints } from "./geozones.types";
 
 export type {
+  ReportType,
+  ReportFormat,
+  StateReportType,
+  GenerateReportRequest,
+  GenerateReportResponse,
+  PreviousReport,
+  ReportStatus,
+  AvailableReportType,
+} from "./reports.types";
+
+export {
+  REPORT_TYPE_LABELS,
+  REPORT_TYPE_ICONS,
+  isStateReport,
+} from "./reports.types";
+
+export type {
   EventCondition,
   DeviceEvent,
   CreateEventRequest,

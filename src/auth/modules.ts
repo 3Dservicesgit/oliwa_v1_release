@@ -122,6 +122,18 @@ const BUILT_MODULES: ModuleDef[] = [
     catalogModuleName: "Security & HIC Controls",
   },
 
+  {
+    id: "reports",
+    name: "Reports",
+    navLabel: "Reports",
+    navGlyph: "📊",
+    route: "/reports",
+    viewPermission: "reports.view",
+    group: "core",
+    showInNavRail: true,
+    showInSidebar: true,
+  },
+
   // ── System & Ops ──────────────────────────────────────────────────────────
   {
     id: "protocol",

@@ -37,6 +37,7 @@ import { BillingInvoicingPage } from "../features/billing-invoicing";
 import { MoneyPage }            from "../features/money";
 import { EventsPage }           from "../features/events";
 import { GeofencesPage } from "../features/geofences";
+import { ReportsPage }   from "../features/reports";
 import { SimPage }             from "../features/sim";
 
 import { AssetDigitalTwinPage }  from "../features/asset-digital-twin";
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/money"            element={<ProtectedRoute permission="money.view"><MoneyPage /></ProtectedRoute>} />
           <Route path="/protocol"         element={<ProtectedRoute permission="geofences.view"><GeofencesPage /></ProtectedRoute>} />
           <Route path="/events"           element={<ProtectedRoute permission="events.view"><EventsPage /></ProtectedRoute>} />
+          <Route path="/reports"          element={<ProtectedRoute permission="reports.view"><ReportsPage /></ProtectedRoute>} />
           <Route path="/sim"             element={<ProtectedRoute permission="sim.view"><SimPage /></ProtectedRoute>} />
           <Route path="/asset-digital-twin" element={<ProtectedRoute permission="assets.view"><AssetDigitalTwinPage /></ProtectedRoute>} />
 

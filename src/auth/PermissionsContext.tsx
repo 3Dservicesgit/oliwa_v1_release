@@ -47,78 +47,99 @@ const PermissionsContext = createContext<PermissionsContextValue | null>(null);
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
+/**
+ * Reads the role cookie and, if it's a bypass role, returns it immediately
+ * so we can skip the permissions API round-trip entirely.  This avoids the
+ * 401→refresh→retry race condition that previously caused infinite loading
+ * for super_admin / system users on page reload.
+ */
+function getBypassRoleFromCookie(): string | null {
+  const cookieRole = getCookie("_nvxs_account_role");
+  if (cookieRole && BYPASS_ROLES.includes(cookieRole)) return cookieRole;
+  return null;
+}
+
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { state: authState } = useAuth();
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [role, setRole] = useState<string>("");
-  const [loading, setLoading] = useState(true);
 
-  /**
-   * Fetch-generation counter: prevents stale responses from concurrent calls
-   * (e.g. React StrictMode double-fires effects in dev). Only the latest
-   * call's result is applied; earlier calls silently discard their results.
-   */
-  const fetchGenRef = useRef(0);
+  // ── Fast-path: bypass role from cookie → skip API entirely ────────────
+  const bypassRole = getBypassRoleFromCookie();
+
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [role, setRole] = useState<string>(bypassRole ?? "");
+  // If we already know the role is a bypass role, no loading needed
+  const [loading, setLoading] = useState(!bypassRole);
+
+  const isFetchingRef = useRef(false);
+  const accountUidRef = useRef(authState.accountUid);
+  accountUidRef.current = authState.accountUid;
 
   const fetchPermissions = useCallback(async () => {
-    // Get account UID from AuthContext state or fall back to cookie
+    // Bypass roles never need to fetch — they have full access
+    const currentBypass = getBypassRoleFromCookie();
+    if (currentBypass) {
+      setRole(currentBypass);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent concurrent calls
+    if (isFetchingRef.current) return;
+
     const accountUid =
-      authState.accountUid || getCookie("_nvxs_account_uid");
+      accountUidRef.current || getCookie("_nvxs_account_uid");
 
     if (!accountUid) {
-      // Not logged in — clear state
       setPermissions([]);
       setRole("");
       setLoading(false);
       return;
     }
 
-    const gen = ++fetchGenRef.current;
+    isFetchingRef.current = true;
     setLoading(true);
     try {
       const res = await getUserPermissions(accountUid);
-      // Only apply if this is still the latest fetch
-      if (gen !== fetchGenRef.current) return;
       const data = res.data;
       setRole(data.role ?? "");
       setPermissions(
         (data.permissions ?? []).map((p) => p.permission_name),
       );
     } catch {
-      // Only apply if this is still the latest fetch
-      if (gen !== fetchGenRef.current) return;
       // API error — default to no permissions (safe fail-closed)
       setPermissions([]);
       setRole("");
     } finally {
-      if (gen === fetchGenRef.current) {
-        setLoading(false);
-      }
+      isFetchingRef.current = false;
+      setLoading(false);
     }
-  }, [authState.accountUid]);
+  }, []); // stable — reads accountUid from ref
 
-  // React to auth state changes
+  // React to auth state changes + handle cookie rehydration on mount
   useEffect(() => {
+    // If bypass role is already set, skip entirely
+    if (getBypassRoleFromCookie()) {
+      setRole(getBypassRoleFromCookie()!);
+      setLoading(false);
+      return;
+    }
+
     if (authState.status === "authenticated") {
       fetchPermissions();
     } else if (authState.status === "logged_out") {
-      setPermissions([]);
-      setRole("");
-      setLoading(false);
+      const cookieUid = getCookie("_nvxs_account_uid");
+      if (cookieUid) {
+        fetchPermissions();
+      } else {
+        setPermissions([]);
+        setRole("");
+        setLoading(false);
+      }
     }
   }, [authState.status, fetchPermissions]);
 
-  // Initial fetch on mount (handles page refresh when cookie exists but AuthContext is fresh)
-  useEffect(() => {
-    const accountUid = getCookie("_nvxs_account_uid");
-    if (accountUid && authState.status === "logged_out") {
-      fetchPermissions();
-    }
-  }, []);
-
   const hasPermission = useCallback(
     (permission: string): boolean => {
-      // Bypass roles have full access
       if (BYPASS_ROLES.includes(role)) return true;
       return permissions.includes(permission);
     },
