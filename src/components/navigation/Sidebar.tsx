@@ -26,7 +26,7 @@ const DEFAULT_ITEMS: SidebarItem[] = [
   { key: "protocol",           label: "Geofences & Zones",       path: "/protocol",          permission: "geofences.view" },
   { key: "events",             label: "Events & Notifications",  path: "/events",            permission: "events.view" },
   { key: "reports",            label: "Reports",                 path: "/reports",           permission: "reports.view" },
-  { key: "sim",                label: "Signal Vault",            path: "/sim",               permission: "sim.view" },
+  { key: "sim",                label: "Token Subscription",      path: "/sim",               permission: "sim.view" },
   { key: "ops",                label: "Ops War Room",            path: "/ops",               permission: "ops.view" },
   { key: "gatehouse",          label: "Monitoring Alpha",        path: "/gatehouse",         permission: "gatehouse.view" },
   { key: "alarms-factory",     label: "Alarm Factory",           path: "/alarms-factory",    permission: "alarms.view" },

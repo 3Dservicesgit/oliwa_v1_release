@@ -103,6 +103,12 @@ export const ENDPOINTS = {
     BUY:      "/payments/tokens/buy",
     TRANSFER: "/tokens/transfer",
     BALANCE:  "/tokens",               // append /{client_uid}/balance
+    /** Subscription management */
+    SUB_PAUSE:   "/tokens/subscriptions/pause",    // POST {device_imei}
+    SUB_RESTORE: "/tokens/subscriptions/restore",  // POST {device_imei}
+    SUB_UPDATE:  "/tokens/subscriptions/update",   // POST {new_token_billing_uid, device_imei}
+    /** Payment status check */
+    PAYMENT_STATUS: "/payments/transactions",      // GET  /{transaction_uid}/status
   },
   FINANCE: {
     PAYMENTS: "/finance/payments",
