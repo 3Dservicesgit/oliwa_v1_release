@@ -624,7 +624,7 @@ function subStatusLabel(status: string) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export function SimPage() {
-  const authState = useAuth();
+  const { state: authState } = useAuth();
   const [tab, setTab] = useState<Tab>("balance");
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
