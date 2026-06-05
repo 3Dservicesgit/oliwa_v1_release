@@ -22,7 +22,6 @@ import { AssetTwinBlade }   from './components/AssetTwinBlade';
 import { CreateAssetModal } from './components/CreateAssetModal';
 import { MaintenancePanel } from './components/MaintenancePanel';
 import { PaymentsSection }  from './components/PaymentsSection';
-import { DigitalTwinCard }  from './components/DigitalTwinCard';
 
 // ── Sample data ───────────────────────────────────────────────────────────────
 const ASSETS: Asset[] = [
@@ -134,24 +133,6 @@ export default function AssetDigitalTwinPage() {
         </div>
 
         <KpiGrid />
-
-        {/* Digital Twin Cards — at-a-glance summary per unit (Phase A) */}
-        <section style={{ marginTop: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-            <h2 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: COLORS.text }}>Digital Twin Cards</h2>
-            <span style={{ fontSize: 11, color: COLORS.muted }}>{ASSETS.length} unit{ASSETS.length === 1 ? '' : 's'} - health, productivity, risk, opportunity, spend</span>
-          </div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: 10,
-          }}>
-            {ASSETS.map((a) => (
-              <DigitalTwinCard key={a.id} asset={a} onSelect={handleSelectAsset} />
-            ))}
-          </div>
-        </section>
-
         <AssetsTable assets={ASSETS} onSelectAsset={handleSelectAsset} onCreateAsset={() => setCreateOpen(true)} />
         <MaintenancePanel />
         <PaymentsSection />

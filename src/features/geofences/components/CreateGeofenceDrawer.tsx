@@ -54,18 +54,26 @@ export function CreateGeofenceDrawer({
         setError("Description must be at least 6 characters.");
         return;
       }
+      if (!authState.accountRoot) {
+        setError("Session expired — please log in again.");
+        return;
+      }
       setError(null);
-      const res = await createGeozone({
-        geozone_name: name.trim(),
-        geozone_decription: description.trim(),
-        geozone_points: serializeGeozonePoints(drawnPath),
-        geozone_owner: authState.accountRoot || "",
-      });
-      if (res.status === "success") {
-        onCreated?.();
-        onClose();
-      } else {
-        setError(res.message || "Failed to create geofence.");
+      try {
+        const res = await createGeozone({
+          geozone_name: name.trim(),
+          geozone_decription: description.trim(),
+          geozone_points: serializeGeozonePoints(drawnPath),
+          geozone_owner: authState.accountRoot,
+        });
+        if (res.status === "success") {
+          onCreated?.();
+          onClose();
+        } else {
+          setError(res.message || "Failed to create geofence.");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to create geofence.");
       }
     }, [name, description, drawnPath, authState.accountRoot, onCreated, onClose]),
   );

@@ -4,12 +4,12 @@
  * Synchronized with AuthContext:
  *   - Fetches permissions when auth status becomes "authenticated"
  *   - Clears permissions on logout
- *   - Uses accountUid from AuthContext only (no cookie fallback)
+ *   - Falls back to reading _nvxs_account_uid cookie for backward compat
  *
  * Exposes:
  *   - permissions: string[]        — list of permission names (e.g. "audit.view")
  *   - role: string                 — user's role name
- *   - hasPermission(p): boolean    — check a single permission (alias-aware, Slice 3)
+ *   - hasPermission(p): boolean    — check a single permission
  *   - hasAnyPermission(ps): boolean — check if user has at least one
  *   - loading: boolean
  *
@@ -21,12 +21,12 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useMemo,
+  useRef,
   ReactNode,
 } from "react";
 import { getUserPermissions } from "../api/services/rbac.service";
 import { useAuth } from "./AuthContext";
-import { legacyAliasMemo, catalogAliasesMemo } from "./permissionAliases";
+import { getCookie } from "../utils/cookies";
 
 // ── Bypass roles (full access, no permission checks needed) ──────────────────
 
@@ -47,14 +47,47 @@ const PermissionsContext = createContext<PermissionsContextValue | null>(null);
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
+/**
+ * Reads the role cookie and, if it's a bypass role, returns it immediately
+ * so we can skip the permissions API round-trip entirely.  This avoids the
+ * 401→refresh→retry race condition that previously caused infinite loading
+ * for super_admin / system users on page reload.
+ */
+function getBypassRoleFromCookie(): string | null {
+  const cookieRole = getCookie("_nvxs_account_role");
+  if (cookieRole && BYPASS_ROLES.includes(cookieRole)) return cookieRole;
+  return null;
+}
+
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { state: authState } = useAuth();
+
+  // ── Fast-path: bypass role from cookie → skip API entirely ────────────
+  const bypassRole = getBypassRoleFromCookie();
+
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [role, setRole] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string>(bypassRole ?? "");
+  // If we already know the role is a bypass role, no loading needed
+  const [loading, setLoading] = useState(!bypassRole);
+
+  const isFetchingRef = useRef(false);
+  const accountUidRef = useRef(authState.accountUid);
+  accountUidRef.current = authState.accountUid;
 
   const fetchPermissions = useCallback(async () => {
-    const accountUid = authState.accountUid;
+    // Bypass roles never need to fetch — they have full access
+    const currentBypass = getBypassRoleFromCookie();
+    if (currentBypass) {
+      setRole(currentBypass);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent concurrent calls
+    if (isFetchingRef.current) return;
+
+    const accountUid =
+      accountUidRef.current || getCookie("_nvxs_account_uid");
 
     if (!accountUid) {
       setPermissions([]);
@@ -63,6 +96,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    isFetchingRef.current = true;
     setLoading(true);
     try {
       const res = await getUserPermissions(accountUid);
@@ -72,67 +106,52 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         (data.permissions ?? []).map((p) => p.permission_name),
       );
     } catch {
+      // API error — default to no permissions (safe fail-closed)
       setPermissions([]);
       setRole("");
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
-  }, [authState.accountUid]);
+  }, []); // stable — reads accountUid from ref
 
+  // React to auth state changes + handle cookie rehydration on mount
   useEffect(() => {
+    // If bypass role is already set, skip entirely
+    if (getBypassRoleFromCookie()) {
+      setRole(getBypassRoleFromCookie()!);
+      setLoading(false);
+      return;
+    }
+
     if (authState.status === "authenticated") {
       fetchPermissions();
     } else if (authState.status === "logged_out") {
-      setPermissions([]);
-      setRole("");
-      setLoading(false);
+      const cookieUid = getCookie("_nvxs_account_uid");
+      if (cookieUid) {
+        fetchPermissions();
+      } else {
+        setPermissions([]);
+        setRole("");
+        setLoading(false);
+      }
     }
   }, [authState.status, fetchPermissions]);
 
-  // Build a Set for O(1) lookup; rebuilt only when the underlying list changes.
-  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
-
-  /**
-   * Returns true if the user is granted `permission`, checking:
-   *   1. Literal key match
-   *   2. Forward alias: can_* → module.action (legacy backend)
-   *   3. Reverse alias: module.action → can_* (future backend with catalog keys)
-   *
-   * A user with `rbac.create` satisfies `can_create_user`, and vice-versa.
-   */
   const hasPermission = useCallback(
     (permission: string): boolean => {
       if (BYPASS_ROLES.includes(role)) return true;
-      // 1. Literal match
-      if (permissionSet.has(permission)) return true;
-      // 2. Forward: can_* → module.action
-      const alias = legacyAliasMemo(permission);
-      if (alias && permissionSet.has(alias)) return true;
-      // 3. Reverse: module.action → can_* (any match suffices)
-      const reverseAliases = catalogAliasesMemo(permission);
-      for (const ra of reverseAliases) {
-        if (permissionSet.has(ra)) return true;
-      }
-      return false;
+      return permissions.includes(permission);
     },
-    [permissionSet, role],
+    [permissions, role],
   );
 
   const hasAnyPermission = useCallback(
     (perms: string[]): boolean => {
       if (BYPASS_ROLES.includes(role)) return true;
-      for (const p of perms) {
-        if (permissionSet.has(p)) return true;
-        const alias = legacyAliasMemo(p);
-        if (alias && permissionSet.has(alias)) return true;
-        const reverseAliases = catalogAliasesMemo(p);
-        for (const ra of reverseAliases) {
-          if (permissionSet.has(ra)) return true;
-        }
-      }
-      return false;
+      return perms.some((p) => permissions.includes(p));
     },
-    [permissionSet, role],
+    [permissions, role],
   );
 
   return (

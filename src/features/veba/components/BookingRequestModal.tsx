@@ -65,8 +65,8 @@ export function BookingRequestModal({ listing, onClose, onSubmitted }: BookingRe
       notes:          notes.trim() || null,
     };
     try {
-      const res = await requestMutation.mutate(payload);
-      onSubmitted?.(res.data?.request_uid ?? "");
+      const res = await requestMutation.mutate(payload) as { request_uid?: string } | undefined;
+      onSubmitted?.(res?.request_uid ?? "");
       handleClose();
     } catch {
       // requestMutation.error renders in the footer

@@ -4,62 +4,80 @@
 
 import { get, post, put, del, postMultipart } from "../client";
 import { ENDPOINTS } from "../endpoints";
-import type { ApiResponse, RequestOptions } from "../types";
-import type {
-  VebaStatistics,
-  VebaListing,
-  CreateVebaListingRequest,
-  CreateVebaListingResponse,
-  BookingRequest,
-  CreateBookingRequest,
-  CreateBookingRequestResponse,
-} from "../types";
+import type { RequestOptions } from "../types";
+import type { VebaStatistics, VebaListing, CreateVebaListingRequest, CreateVebaListingResponse } from "../types";
+import type { BookingRequest, CreateBookingRequest, CreateBookingRequestResponse } from "../types";
+import type { ApiResponse } from "../types";
 
-export function getVebaStatistics(opts?: RequestOptions): Promise<VebaStatistics> {
-  return get<VebaStatistics>(ENDPOINTS.VEBA.STATISTICS, opts).then((res) => res.data);
+/* ── Statistics ────────────────────────────────────────────────────── */
+
+export function getVebaStatistics(
+  opts?: RequestOptions,
+): Promise<VebaStatistics> {
+  return get<VebaStatistics>(ENDPOINTS.VEBA.STATISTICS, opts).then(res => res.data);
+}
+
+/* ── Listings ──────────────────────────────────────────────────────── */
+
+export function getVebaListings(
+  accountRoot: string,
+  opts?: RequestOptions,
+): Promise<VebaListing[]> {
+  const merged: RequestOptions = {
+    ...opts,
+    params: { account_root: accountRoot, ...(opts?.params ?? {}) },
+  };
+  return get<VebaListing[]>(
+    ENDPOINTS.VEBA.LISTINGS,
+    merged,
+  ).then(res => res.data);
 }
 
 export function createVebaListing(
   payload: CreateVebaListingRequest,
   opts?: RequestOptions,
-): Promise<ApiResponse<CreateVebaListingResponse>> {
-  return post<CreateVebaListingResponse>(ENDPOINTS.VEBA.LISTINGS_CREATE, { data: payload }, opts);
+): Promise<CreateVebaListingResponse> {
+  return post<CreateVebaListingResponse>(
+    ENDPOINTS.VEBA.LISTINGS_CREATE,
+    payload,
+    opts,
+  ).then(res => res.data);
 }
 
-export function getVebaListingForAsset(
-  assetUid: string,
-  opts?: RequestOptions,
-): Promise<ApiResponse<VebaListing | null>> {
-  return get<VebaListing | null>(`${ENDPOINTS.VEBA.LISTINGS_BY_ASSET}/${assetUid}`, opts);
-}
-
-export function getVebaListingByUid(
+export function updateVebaListing(
   listingUid: string,
+  fields: Record<string, unknown>,
   opts?: RequestOptions,
-): Promise<ApiResponse<VebaListing>> {
-  return get<VebaListing>(`${ENDPOINTS.VEBA.LISTINGS_BY_UID}/${listingUid}`, opts);
-}
-
-export function getVebaListings(
-  accountRoot: string,
-  opts?: RequestOptions,
-): Promise<ApiResponse<VebaListing[]>> {
-  return get<VebaListing[]>(ENDPOINTS.VEBA.LISTINGS, {
-    ...opts,
-    params: { account_root: accountRoot, ...opts?.params },
-  });
+) {
+  return put(
+    `${ENDPOINTS.VEBA.LISTINGS_UPDATE}/${listingUid}/update`,
+    fields,
+    opts,
+  );
 }
 
 export function pauseVebaListing(
-  listingUid: string, updatedBy: string, opts?: RequestOptions,
-): Promise<ApiResponse<string>> {
-  return put<string>(`${ENDPOINTS.VEBA.LISTINGS_PAUSE}/${listingUid}/pause`, { data: { updated_by: updatedBy } }, opts);
+  listingUid: string,
+  updatedBy: string,
+  opts?: RequestOptions,
+) {
+  return put(
+    `${ENDPOINTS.VEBA.LISTINGS_PAUSE}/${listingUid}/pause`,
+    { updated_by: updatedBy },
+    opts,
+  );
 }
 
 export function reactivateVebaListing(
-  listingUid: string, updatedBy: string, opts?: RequestOptions,
-): Promise<ApiResponse<string>> {
-  return put<string>(`${ENDPOINTS.VEBA.LISTINGS_REACTIVATE}/${listingUid}/reactivate`, { data: { updated_by: updatedBy } }, opts);
+  listingUid: string,
+  updatedBy: string,
+  opts?: RequestOptions,
+) {
+  return put(
+    `${ENDPOINTS.VEBA.LISTINGS_REACTIVATE}/${listingUid}/reactivate`,
+    { updated_by: updatedBy },
+    opts,
+  );
 }
 
 export function archiveVebaListing(
@@ -79,25 +97,41 @@ export function deleteVebaListing(
   );
 }
 
-export function updateVebaListing(
-  listingUid: string,
-  fields: Record<string, unknown>,
+
+/* ── Booking requests ──────────────────────────────────────────────── */
+
+export function getBookingRequests(
+  accountRoot: string,
   opts?: RequestOptions,
-): Promise<ApiResponse<{ listing_uid: string }>> {
-  return put<{ listing_uid: string }>(
-    `${ENDPOINTS.VEBA.LISTINGS_UPDATE}/${listingUid}/update`,
-    { data: fields },
+): Promise<BookingRequest[]> {
+  const merged: RequestOptions = {
+    ...opts,
+    params: { account_root: accountRoot, ...(opts?.params ?? {}) },
+  };
+  return get<BookingRequest[]>(
+    ENDPOINTS.VEBA.BOOKING_REQUESTS,
+    merged,
+  ).then(res => res.data);
+}
+
+export function createBookingRequest(
+  payload: CreateBookingRequest,
+  opts?: RequestOptions,
+): Promise<CreateBookingRequestResponse> {
+  return post<CreateBookingRequestResponse>(
+    ENDPOINTS.VEBA.BOOKING_REQUESTS_CREATE,
+    payload,
     opts,
-  );
+  ).then(res => res.data);
 }
 
 export function approveBookingRequest(
   requestUid: string,
   opts?: RequestOptions,
-): Promise<ApiResponse<{ request_uid: string; status: string }>> {
-  return put<{ request_uid: string; status: string }>(
-    `${ENDPOINTS.VEBA.BOOKING_REQUESTS}/${requestUid}/approve`,
-    { data: {} },
+) {
+  return put(
+    `${ENDPOINTS.VEBA.BOOKING_APPROVE}/${requestUid}/approve`,
+    {},
     opts,
   );
 }
@@ -105,10 +139,10 @@ export function approveBookingRequest(
 export function rejectBookingRequest(
   requestUid: string,
   opts?: RequestOptions,
-): Promise<ApiResponse<{ request_uid: string; status: string }>> {
-  return put<{ request_uid: string; status: string }>(
-    `${ENDPOINTS.VEBA.BOOKING_REQUESTS}/${requestUid}/reject`,
-    { data: {} },
+) {
+  return put(
+    `${ENDPOINTS.VEBA.BOOKING_REJECT}/${requestUid}/reject`,
+    {},
     opts,
   );
 }
@@ -116,10 +150,10 @@ export function rejectBookingRequest(
 export function cancelBookingRequest(
   requestUid: string,
   opts?: RequestOptions,
-): Promise<ApiResponse<{ request_uid: string; status: string }>> {
-  return put<{ request_uid: string; status: string }>(
-    `${ENDPOINTS.VEBA.BOOKING_REQUESTS}/${requestUid}/cancel`,
-    { data: {} },
+) {
+  return put(
+    `${ENDPOINTS.VEBA.BOOKING_CANCEL}/${requestUid}/cancel`,
+    {},
     opts,
   );
 }
@@ -127,28 +161,15 @@ export function cancelBookingRequest(
 export function fulfillBookingRequest(
   requestUid: string,
   opts?: RequestOptions,
-): Promise<ApiResponse<{ request_uid: string; status: string }>> {
-  return put<{ request_uid: string; status: string }>(
-    `${ENDPOINTS.VEBA.BOOKING_REQUESTS}/${requestUid}/fulfill`,
-    { data: {} },
+) {
+  return put(
+    `${ENDPOINTS.VEBA.BOOKING_FULFILL}/${requestUid}/fulfill`,
+    {},
     opts,
   );
 }
 
-export function createBookingRequest(
-  payload: CreateBookingRequest, opts?: RequestOptions,
-): Promise<ApiResponse<CreateBookingRequestResponse>> {
-  return post<CreateBookingRequestResponse>(ENDPOINTS.VEBA.BOOKING_REQUESTS_CREATE, { data: payload }, opts);
-}
 
-export function getBookingRequests(
-  accountRoot: string, opts?: RequestOptions,
-): Promise<ApiResponse<BookingRequest[]>> {
-  return get<BookingRequest[]>(ENDPOINTS.VEBA.BOOKING_REQUESTS, {
-    ...opts,
-    params: { account_root: accountRoot, ...opts?.params },
-  });
-}
 
 export function uploadAssetPhoto(
   assetUid: string,

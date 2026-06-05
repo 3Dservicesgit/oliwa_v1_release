@@ -31,10 +31,12 @@ import React, { useState, useEffect } from "react";
 // ── Existing shared components ───────────────────────────────────────────────
 import { NavRail }           from "../../components/navigation";
 import { AccordionSidebar }  from "../../components/navigation";
+// import { WaswaAIPanel }      from "../../components/waswa";
 import type { ApprovalRow }  from "./components/HITLApprovalTable";
 import { HITLApprovalTable } from "./components/HITLApprovalTable";
 
 // ── New components ───────────────────────────────────────────────────────────
+// import { AegisStatusStrip }      from "./components/AegisStatusStrip";
 import { TaskManagerTable }      from "./components/TaskManagerTable";
 import { VebaGovernanceTable }   from "./components/VebaGovernanceTable";
 import { AuditTrailCard }        from "./components/AuditTrailCard";
@@ -42,12 +44,19 @@ import { TokenTopupModal }       from "../tokens/components/TokenTopupModal";
 
 // ── Auth & API ──────────────────────────────────────────────────────────────
 import { useAuth } from "../../auth/AuthContext";
+import { getCookie } from "../../utils/cookies";
 import { getRaw } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Static data
 // ─────────────────────────────────────────────────────────────────────────────
+
+// const AEGIS_TICKER = [
+//   "Forecast: Healthy",
+//   "API 99.95%",
+//   "Socket Threads-Open: 5",
+// ];
 
 const AEGIS_NAV_ITEMS = [
   { key: "home",     glyph: "⌂",  label: "Home",         path: "/"         },
@@ -153,7 +162,7 @@ export function AegisDashboard() {
   const { state }              = useAuth();
   const [topupOpen,      setTopupOpen]      = useState(false);
   // Show Airlock modal if not authenticated
-  const [airlockOpen,    setAirlockOpen]    = useState(() => state.status !== "authenticated");
+  const [airlockOpen,    setAirlockOpen]    = useState(() => !getCookie("account_uid"));
   // Statistics metrics state
   const [unitsOnline,    setUnitsOnline]    = useState({ count: 0, total: 0 });
   const [unitsOffline,   setUnitsOffline]   = useState({ count: 0 });
@@ -226,7 +235,7 @@ export function AegisDashboard() {
     fetchStats();
   }, []);
   return (
-    <div className="flex flex-col gap-3 p-3 bg-[#F0F2F5] w-full">
+    <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col gap-3 p-3 pb-14 md:pb-3 bg-[#F0F2F5]">
 
           {/* Page heading */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3 flex flex-wrap items-start gap-3">
@@ -298,13 +307,28 @@ export function AegisDashboard() {
               Kafka: 12s lag&nbsp;•&nbsp;Redis: 97% hit&nbsp;•&nbsp;Cassandra write p95 9ms&nbsp;•&nbsp;MoMo retries 41&nbsp;•&nbsp;UI refresh 30s
             </div>
           </div>
+      {/* Floating Waswa W button */}
+      <button
+        onClick={() => setWaswaDrawerOpen(true)}
+        aria-label="Open Waswa AI"
+        className="
+          fixed right-5 bottom-20 z-[300] lg:bottom-5
+          w-14 h-14 rounded-full border-none
+          bg-[#25D366] text-white font-black text-[22px]
+          shadow-[0_12px_30px_rgba(0,0,0,0.18)]
+          cursor-pointer hover:brightness-105 active:scale-95 transition-all
+          grid place-items-center
+        "
+      >
+        W
+      </button>
 
-      {/* Modals */}
+      {/* Modals + drawers */}
       <TokenTopupModal open={topupOpen} onClose={() => setTopupOpen(false)} />
 
       {/* Airlock login modal overlay */}
       <AirlockModal open={airlockOpen} onClose={() => setAirlockOpen(false)} />
-    </div>
+    </main>
   );
 }
 
@@ -386,8 +410,8 @@ function AirlockModal({ open, onClose }: { open: boolean; onClose: () => void })
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
-    // Close modal when auth state becomes authenticated
-    if (state.status === "authenticated") { onClose(); }
+    // Close modal if auth state indicates authenticated OR if account_uid cookie exists
+    if (state.status === "authenticated" || getCookie("_nvxs_account_uid")) { onClose(); }
   }, [state.status]);
 
   // Resend cooldown timer
