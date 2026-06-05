@@ -8,6 +8,7 @@
  *         Policies, Role Templates) + right detail blade + create modal
  */
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getAllRoles, getAllPermissions, deletePermission, getActiveRolesCount, getTotalPermissionsCount, getActiveClientsCount, getActive3dClientsCount, getClientUsersCount, getRoleUserCounts, getPermissionRoleCounts } from "../../api";
 import type { RbacRole, RbacPermission } from "../../api";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -88,6 +89,7 @@ function mapRbacPermToPermissionSet(p: RbacPermission): PermissionSet {
 // ─── Page ────────────────────────────────────────────────────────────────────
 export function RbacPage() {
   const guard = usePermissionGuard();
+  const navigate = useNavigate();
   const [sectionTab, setSectionTab] = useState<SectionTab>("Roles");
   const [bladeOpen, setBladeOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -241,6 +243,33 @@ export function RbacPage() {
     }
   }
 
+  function handleExport() {
+    let csv = "";
+    let filename = "";
+    if (sectionTab === "Roles") {
+      csv = "ID,Name,Owner,Tenant,Users,Permissions,Last Modified\n"
+        + roles.map(r => [r.id, r.name, r.owner, r.tenant, r.users === -1 ? "" : r.users, r.permissions, r.lastModified]
+          .map(v => `"${String(v ?? "").replace(/"/g, '""')}"`)
+          .join(",")
+        ).join("\n");
+      filename = "rbac-roles.csv";
+    } else {
+      csv = "ID,Name,Owner,Module,Actions,Roles Using,Description\n"
+        + permissionSets.map(p => [p.id, p.name, p.owner, p.module, p.actions.join(";"), p.rolesUsing, p.description]
+          .map(v => `"${String(v ?? "").replace(/"/g, '""')}"`)
+          .join(",")
+        ).join("\n");
+      filename = "rbac-permissions.csv";
+    }
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const s = statsLoading ? "..." : null;
 
   return (
@@ -269,21 +298,12 @@ export function RbacPage() {
               </div>
               <div className="flex gap-2 shrink-0">
                 <PermissionGate permission="rbac.create">
-                  <Pill onClick={() => { setWizardMode("quick"); setWizardInitialStep(3); setWizardOpen(true); }} color="green">+ Create User</Pill>
-                </PermissionGate>
-                <PermissionGate permission="rbac.create">
-                  <Pill onClick={() => { setWizardMode("quick"); setWizardInitialStep(1); setWizardOpen(true); }} color="green">+ Create Permission</Pill>
-                </PermissionGate>
-                <PermissionGate permission="rbac.create">
-                  <Pill onClick={() => { setWizardMode("quick"); setWizardInitialStep(2); setWizardOpen(true); }} color="dark">+ Create Role</Pill>
-                </PermissionGate>
-                <PermissionGate permission="rbac.assign">
-                  <Pill onClick={() => { setWizardMode("quick"); setWizardInitialStep(4); setWizardOpen(true); }} color="dark">Assign Role</Pill>
+                  <Pill onClick={() => navigate("/rbac/roles/new")} color="green">+ Create Role</Pill>
                 </PermissionGate>
                 <PermissionGate permissions={["rbac.create", "rbac.assign"]}>
-                  <Pill onClick={() => { setWizardMode("full"); setWizardInitialStep(1); setWizardOpen(true); }} color="dark">Full Setup</Pill>
+                  <Pill onClick={() => { setWizardMode("full"); setWizardInitialStep(1); setWizardOpen(true); }} color="dark">Setup Wizard</Pill>
                 </PermissionGate>
-                <Pill>Export</Pill>
+                <Pill onClick={handleExport}>Export</Pill>
               </div>
             </div>
           </div>
@@ -439,7 +459,7 @@ export function RbacPage() {
         <RbacDetailBlade
           role={selectedRole}
           onClose={() => setBladeOpen(false)}
-          onEdit={() => setEditRoleModalOpen(true)}
+          onEdit={() => { setBladeOpen(false); navigate(`/rbac/roles/${selectedRole.id}/edit`); }}
           onDisabled={() => { setBladeOpen(false); refreshRoles(); refreshStats(); }}
         />
       )}
@@ -498,3 +518,5 @@ function KpiCard({ title, value, delta, deltaTone, sub, dot }: {
     </div>
   );
 }
+
+      

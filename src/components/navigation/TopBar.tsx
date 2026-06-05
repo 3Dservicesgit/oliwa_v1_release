@@ -3,12 +3,8 @@
  *
  * Renders the application header containing the brand identity, global
  * search input, and the current user's RBAC role badges and avatar.
- *
- * User identity is derived from AuthContext (the logged-in user), NOT
- * from hardcoded defaults. Falls back to fetching /users/{uid}/details
- * for display_name if the auth state only has UIDs.
  */
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getRaw } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -31,43 +27,37 @@ export function TopBar({
   pageTitle         = "TRACKING CONSOLE",
   searchPlaceholder = "Search tenants, units, tokens, incidents…",
 }: TopBarProps) {
-  const { state: authState, logout } = useAuth();
+  const { state: authState } = useAuth();
   const [userDetails, setUserDetails] = useState<any>(null);
 
   useEffect(() => {
-    if (!authState.accountUid) return;
-    const fetchDetails = async () => {
+    const accountUid = authState.accountUid;
+    if (!accountUid) { setUserDetails(null); return; }
+
+    let cancelled = false;
+    (async () => {
       try {
         const json = await getRaw<{ status: string; data: any }>(
-          `${ENDPOINTS.AUTH.USER_DETAILS}/${authState.accountUid}/details`
+          `${ENDPOINTS.AUTH.USER_DETAILS}/${accountUid}/details`
         );
-        if (json?.status === "success" && json?.data) {
+        if (!cancelled && json?.status === "success" && json?.data) {
           setUserDetails(json.data);
         }
       } catch {
-        // Silently fall back to auth state
+        // best-effort — the bar still renders with auth context values
       }
-    };
-    fetchDetails();
+    })();
+    return () => { cancelled = true; };
   }, [authState.accountUid]);
 
-  // Derive display values from fetched details → auth state → safe fallbacks
-  const displayName = userDetails?.account_name || authState.accountUid || "User";
-  const displayRole = userDetails?.account_role || authState.role || "";
+  // Derive display values from fetched details, falling back to auth context
+  const displayName = userDetails?.account_name || "User";
+  const displayRole = (userDetails?.account_role || authState.role || "").toUpperCase().replace(/_/g, " ");
   const avatarInitial = displayName.charAt(0).toUpperCase();
-  const whoLabel = displayRole
-    ? `${displayName} • ${displayRole.toUpperCase().replace(/_/g, " ")}`
-    : displayName;
-
-  // Build role pills from the actual user role
-  const rolePills: { label: string; variant: "teal" | "azure" | "green" }[] = [];
-  if (displayRole) {
-    rolePills.push({
-      label: displayRole.toUpperCase().replace(/_/g, " ").substring(0, 16),
-      variant: "teal",
-    });
-  }
-
+  const whoLabel = `${displayName} • ${displayRole}`;
+  const roles = [
+    { label: displayRole || "USER", variant: "teal" as const },
+  ];
   return (
     <header className="
       h-12 flex items-center gap-3 px-4
@@ -96,7 +86,7 @@ export function TopBar({
 
       {/* RBAC / user */}
       <div className="flex items-center gap-2 ml-auto shrink-0">
-        {rolePills.map((r) => (
+        {roles.map((r) => (
           <span
             key={r.label}
             className={`
@@ -120,14 +110,6 @@ export function TopBar({
         <span className="hidden sm:block text-xs opacity-90 whitespace-nowrap">
           {whoLabel}
         </span>
-
-        {/* Logout button */}
-        <button
-          onClick={logout}
-          className="hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold bg-white/10 hover:bg-white/20 text-white border-none cursor-pointer transition-colors"
-        >
-          Logout
-        </button>
       </div>
     </header>
   );

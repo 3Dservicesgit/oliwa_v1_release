@@ -7,7 +7,6 @@ import type {
   HighSubClientsResponse,
   ChurnRateResponse,
   ExpiringSubscriptionsResponse,
-  ExpiredTokensResponse,
   ClientTransaction,
 } from "../types";
 
@@ -45,13 +44,6 @@ export function getExpiringSubscriptions(
   opts?: RequestOptions,
 ): Promise<ApiResponse<ExpiringSubscriptionsResponse>> {
   return get<ExpiringSubscriptionsResponse>(`${ENDPOINTS.BILLING.EXPIRING}?days=${days}`, opts);
-}
-
-/** Fetch expired token subscriptions. */
-export function getExpiredSubscriptions(
-  opts?: RequestOptions,
-): Promise<ApiResponse<ExpiredTokensResponse>> {
-  return get<ExpiredTokensResponse>(ENDPOINTS.STATISTICS.TOKENS_EXPIRED, opts);
 }
 
 /** Fetch transaction history for a specific client. */
