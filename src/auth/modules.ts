@@ -122,6 +122,18 @@ const BUILT_MODULES: ModuleDef[] = [
     catalogModuleName: "Security & HIC Controls",
   },
 
+  {
+    id: "reports",
+    name: "Reports",
+    navLabel: "Reports",
+    navGlyph: "📊",
+    route: "/reports",
+    viewPermission: "reports.view",
+    group: "core",
+    showInNavRail: true,
+    showInSidebar: true,
+  },
+
   // ── System & Ops ──────────────────────────────────────────────────────────
   {
     id: "protocol",
@@ -136,15 +148,15 @@ const BUILT_MODULES: ModuleDef[] = [
     catalogModuleName: "Geo-Zones & POIs",
   },
   {
-    id: "firmware",
+    id: "events",
     name: "Events & Notifications",
     navLabel: "Events & Notifications",
-    navGlyph: "⬆",
-    route: "/firmware",
+    navGlyph: "⚡",
+    route: "/events",
     viewPermission: "events.view",
     group: "system",
     showInNavRail: true,
-    showInSidebar: false,
+    showInSidebar: true,
     catalogModuleName: "Device Lifecycle & Firmware",
   },
   {

@@ -95,15 +95,26 @@ export interface ExpiredTokensResponse {
 
 // ── Token registry (packages available for purchase) ────────────────────────
 
+export interface TokenVariant {
+  variant_uid:      string;
+  variant_name:     string;
+  billing_amount:   number;   // price
+  billing_currency: string;   // UGX, KES, USD
+  billing_type:     string;   // period code: "h2","h6","60","180","recurring", etc.
+}
+
 export interface TokenPackage {
   token_id:         string;
   token_name:       string;
-  token_type:       string;   // "parameter" | "dynamic"
-  token_validity:   number;   // hours
-  token_currency:   string;   // KES, UGX, USD
+  token_type:       string;   // "parameter" | "dynamic" | "veba"
   token_parameters: unknown[];
   date_created:     string;
-  token_amount:     number;   // price per unit
+  token_product_variant_uid?: string;
+  variant?:         TokenVariant;
+  // Legacy flat fields (may be null if variant is present)
+  token_validity?:  number | null;
+  token_currency?:  string | null;
+  token_amount?:    number | null;
 }
 
 // ── Token wallet ────────────────────────────────────────────────────────────

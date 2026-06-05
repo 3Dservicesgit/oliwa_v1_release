@@ -8,6 +8,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { createVebaListing, uploadAssetPhoto } from "../../../api/services/veba.service";
+import { getClientDevices } from "../../../api/services/clients.service";
 import { useAuth } from "../../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
 import { AssetPhotoUpload } from "./AssetPhotoUpload";
@@ -29,22 +30,35 @@ interface CreateListingDrawerProps {
 export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }: CreateListingDrawerProps) {
   const { state: authState } = useAuth();
 
-  // Asset identification
-  const [assetUid, setAssetUid] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [assetClass, setAssetClass] = useState("");
-  const [ownerOrg, setOwnerOrg] = useState("");
-  const [country, setCountry] = useState("");
+  // Device selection (replaces manual asset fields)
+  const [devices, setDevices] = useState<ClientDevice[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [selectedImei, setSelectedImei] = useState("");
+
+  // Fetch client devices when drawer opens
+  useEffect(() => {
+    if (!open || !authState.accountRoot) return;
+    setLoadingDevices(true);
+    getClientDevices(authState.accountRoot)
+      .then((res) => {
+        if (res.status === "success" && Array.isArray(res.data)) {
+          setDevices(res.data);
+        } else {
+          setDevices([]);
+        }
+      })
+      .catch(() => setDevices([]))
+      .finally(() => setLoadingDevices(false));
+  }, [open, authState.accountRoot]);
 
   // Pre-fill from device when drawer opens via MyAssetCard
   useEffect(() => {
     if (!open || !prefillDevice) return;
-    setAssetUid(prefillDevice.device_imei);
-    setDisplayName(prefillDevice.device_name || "");
-    setAssetClass(prefillDevice.car_type || "");
-    setOwnerOrg(prefillDevice.client_name || "");
-    setCountry("");
+    setSelectedImei(prefillDevice.device_imei);
   }, [open, prefillDevice]);
+
+  // Derive asset details from the selected device
+  const selectedDevice = devices.find((d) => d.device_imei === selectedImei) ?? null;
 
   // Pricing
   const [dailyRate, setDailyRate] = useState("");
@@ -55,7 +69,6 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
   // Availability
   const [availabilityStart, setAvailabilityStart] = useState("");
   const [availabilityEnd, setAvailabilityEnd] = useState("");
-  const [geographicScope, setGeographicScope] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
 
   // Photo
@@ -72,9 +85,9 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
   );
 
   const resetForm = () => {
-    setAssetUid(""); setDisplayName(""); setAssetClass(""); setOwnerOrg(""); setCountry("");
+    setSelectedImei("");
     setDailyRate(""); setCurrency("UGX"); setPricingBasis("per_day"); setHourlyRate("");
-    setAvailabilityStart(""); setAvailabilityEnd(""); setGeographicScope(""); setOperatorIncluded(false);
+    setAvailabilityStart(""); setAvailabilityEnd(""); setOperatorIncluded(false);
     setVisibility("public"); setNotes(""); setPendingPhoto(null); setValidationError(null);
     listMutation.reset();
   };
@@ -90,8 +103,8 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
   const handleSubmit = async () => {
     setValidationError(null);
 
-    if (!assetUid.trim()) {
-      setValidationError("Asset UID / IMEI is required.");
+    if (!selectedImei) {
+      setValidationError("Please select a device / unit.");
       return;
     }
     const dailyRateNum = Number(dailyRate);
@@ -113,18 +126,18 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
       return;
     }
 
-    const assetSummary = (displayName || assetClass || ownerOrg || country)
+    const assetSummary = selectedDevice
       ? {
-          asset_uid: assetUid.trim(),
-          display_name: displayName.trim() || undefined,
-          asset_class: assetClass.trim() || undefined,
-          owner_org: ownerOrg.trim() || undefined,
-          country: country.trim() || undefined,
+          asset_uid: selectedImei,
+          display_name: selectedDevice.device_name || undefined,
+          asset_class: selectedDevice.car_type || undefined,
+          owner_org: selectedDevice.client_name || undefined,
+          country: undefined,
         }
       : undefined;
 
     const payload: CreateVebaListingRequest = {
-      asset_uid: assetUid.trim(),
+      asset_uid: selectedImei,
       account_root: authState.accountRoot,
       created_by: authState.accountUid,
       daily_rate: dailyRateNum,
@@ -133,7 +146,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
       hourly_rate: hourlyRateNum,
       availability_start: availabilityStart || null,
       availability_end: availabilityEnd || null,
-      geographic_scope: geographicScope.trim() || null,
+      geographic_scope: null,
       operator_included: operatorIncluded,
       notes: notes.trim() || null,
       visibility,
@@ -144,9 +157,9 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
       await listMutation.mutate(payload);
 
       // Upload photo after listing creation (now the asset_uid has a listing).
-      if (pendingPhoto && assetUid.trim()) {
+      if (pendingPhoto && selectedImei) {
         try {
-          await uploadAssetPhoto(assetUid.trim(), pendingPhoto);
+          await uploadAssetPhoto(selectedImei, pendingPhoto);
         } catch {
           // Non-blocking — listing was created, photo just failed.
           console.warn("Photo upload failed after listing creation");
@@ -197,36 +210,47 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
 
         {/* Body */}
         <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4">
-          {/* Asset identification */}
+          {/* Device / Unit selection */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl p-3">
-            <div className="text-[11px] font-extrabold text-[#111B21] mb-2">Asset</div>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Asset UID / IMEI *</span>
-              <input value={assetUid} onChange={(e) => setAssetUid(e.target.value)}
-                placeholder="e.g. IME-862107048639271" disabled={busy} className={inp} />
-            </label>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Display name</span>
-                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Boda UAX 221P" disabled={busy} className={inp} />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Asset class</span>
-                <input value={assetClass} onChange={(e) => setAssetClass(e.target.value)}
-                  placeholder="e.g. Motorcycle" disabled={busy} className={inp} />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Owner org</span>
-                <input value={ownerOrg} onChange={(e) => setOwnerOrg(e.target.value)}
-                  placeholder="e.g. Kato Rentals" disabled={busy} className={inp} />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Country</span>
-                <input value={country} onChange={(e) => setCountry(e.target.value)}
-                  placeholder="e.g. UG" maxLength={4} disabled={busy} className={inp} />
-              </label>
-            </div>
+            <div className="text-[11px] font-extrabold text-[#111B21] mb-2">Select Unit *</div>
+            {loadingDevices ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : devices.length === 0 ? (
+              <div className="text-[12px] text-[#667781] py-2">No units found</div>
+            ) : (
+              <>
+                <select
+                  value={selectedImei}
+                  onChange={(e) => setSelectedImei(e.target.value)}
+                  disabled={busy}
+                  className={inp + " w-full"}
+                >
+                  <option value="">— Choose a unit —</option>
+                  {devices.map((d) => (
+                    <option key={d.device_imei} value={d.device_imei}>
+                      {d.device_name || d.device_imei}
+                      {d.car_make ? ` · ${d.car_make} ${d.car_model || ""}`.trimEnd() : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Show selected device details */}
+                {selectedDevice && (
+                  <div className="mt-2 bg-[#F0F2F5] border border-[#E9EDEF] rounded-lg p-2.5 flex flex-col gap-0.5">
+                    <div className="text-[11px] font-extrabold text-[#111B21]">
+                      {selectedDevice.device_name || selectedDevice.device_imei}
+                    </div>
+                    <div className="text-[10px] text-[#667781]">
+                      IMEI: {selectedDevice.device_imei}
+                      {selectedDevice.car_make ? ` · ${selectedDevice.car_make} ${selectedDevice.car_model || ""}`.trimEnd() : ""}
+                      {selectedDevice.car_type ? ` · ${selectedDevice.car_type}` : ""}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Photo */}
@@ -323,11 +347,6 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
                   onChange={(e) => setAvailabilityEnd(e.target.value)} disabled={busy} className={inp} />
               </label>
             </div>
-            <label className="flex flex-col gap-1 mt-3">
-              <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">Geographic scope</span>
-              <input value={geographicScope} onChange={(e) => setGeographicScope(e.target.value)}
-                placeholder="e.g. Uganda, Kampala only, EAC region" disabled={busy} className={inp} />
-            </label>
             <label className="flex items-center gap-2 mt-3 text-[12px] text-[#111B21] cursor-pointer">
               <input type="checkbox" checked={operatorIncluded}
                 onChange={(e) => setOperatorIncluded(e.target.checked)} disabled={busy} />

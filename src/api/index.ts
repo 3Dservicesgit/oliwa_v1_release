@@ -117,7 +117,7 @@ export type {
 
 // ── Domain services ──────────────────────────────────────────────────────────
 
-export { isUserLoggedIn, startSessionMonitor, stopSessionMonitor, broadcastLogout } from "./services/auth.service";
+export { isUserLoggedIn, getAccountUid, startSessionMonitor, stopSessionMonitor, broadcastLogout } from "./services/auth.service";
 export { createSimCard, getAllSimCards } from "./services/simcards.service";
 export { getSimStatistics, getOnlineUnits, getOfflineUnits, getExpiredTokens } from "./services/statistics.service";
 export { getServerMetrics, getApiPerformance } from "./services/metrics.service";

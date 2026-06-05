@@ -1,12 +1,10 @@
 /**
  * Right-side detail panel for a selected asset.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import type { Asset, PayoutProvider } from './types';
 import { COLORS, btn, btnPrimary, btnBlue } from './types';
 import { Pill, SectionTitle } from './MetricCard';
-import { ListOnVebaDrawer } from './ListOnVebaDrawer';
-import { GuardedButton } from '../../../auth/guards';
 
 const s = {
   blade: {
@@ -35,14 +33,6 @@ interface AssetTwinBladeProps {
 }
 
 export function AssetTwinBlade({ asset, onClose, onTopUp }: AssetTwinBladeProps) {
-  // Phase 1 — VEBA Marketplace Listing
-  const [vebaDrawerOpen, setVebaDrawerOpen] = useState(false);
-  const [optimisticallyListed, setOptimisticallyListed] = useState(false);
-
-  // Effective listed state: respect server-side asset.veba unless we just
-  // listed it optimistically from this session.
-  const isListed = optimisticallyListed || asset.veba === 'Listed';
-
   return (
     <div style={s.blade}>
       <div style={s.header}>
@@ -106,38 +96,15 @@ export function AssetTwinBlade({ asset, onClose, onTopUp }: AssetTwinBladeProps)
         <div style={s.card}>
           <SectionTitle title="VEBA Listing" subtitle="Escrow + leakage monitor" />
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-            <Pill
-              bg={isListed ? '#E8F5F3' : '#F8F9FA'}
-              fg={isListed ? COLORS.tealDark : COLORS.muted}
-            >
-              {isListed ? 'Listed' : asset.veba}
-            </Pill>
+            <Pill bg={asset.veba === 'Listed' ? '#E8F5F3' : '#F8F9FA'} fg={asset.veba === 'Listed' ? COLORS.tealDark : COLORS.muted}>{asset.veba}</Pill>
             <Pill bg="#E8F5F3" fg={COLORS.tealDark}>Leakage: Low</Pill>
             <Pill bg="#fff"    fg={COLORS.muted}>Next Booking: 14:00</Pill>
           </div>
           <div style={s.actions}>
-            {/* Phase 1 — only show the listing CTA when not already listed. */}
-            {!isListed && (
-              <GuardedButton
-                permission="can_list_asset_on_marketplace"
-                onClick={() => setVebaDrawerOpen(true)}
-                style={{ ...btn, ...btnPrimary }}
-              >
-                List on VEBA
-              </GuardedButton>
-            )}
             <button style={{ ...btn, ...btnBlue }}>Open Booking Ops</button>
             <button style={btn}>Pricing</button>
           </div>
         </div>
-
-        {/* Drawer mount — controlled by local state above. */}
-        <ListOnVebaDrawer
-          asset={asset}
-          open={vebaDrawerOpen}
-          onClose={() => setVebaDrawerOpen(false)}
-          onListed={() => setOptimisticallyListed(true)}
-        />
 
         {/* Wallet */}
         <div style={s.card}>
@@ -161,10 +128,9 @@ export function AssetTwinBlade({ asset, onClose, onTopUp }: AssetTwinBladeProps)
             <button style={{ ...btn, background: '#F97316',      borderColor: '#F97316',      color: '#fff' }}>Suspend Listing</button>
             <button style={{ ...btn, background: '#6B7280',      borderColor: '#6B7280',      color: '#fff' }}>Bulk Export</button>
           </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: COLORS.muted }}>Last approval: SA • 09:14 • hash 9f3c…</div>
         </div>
       </div>
     </div>
   );
 }
-
-
