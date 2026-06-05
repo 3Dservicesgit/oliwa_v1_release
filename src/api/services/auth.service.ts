@@ -9,23 +9,17 @@
  *   3. `storage` event — syncs logout across browser tabs
  *   4. Manual `isUserLoggedIn()` check on startup
  */
-import { getCookie } from "../../utils/cookies";
+import { hasAccessToken } from "../client";
 
-const ACCOUNT_COOKIE_NAME = "_nvxs_account_uid";
 const LOGOUT_SIGNAL_KEY = "_nvxs_logout_signal";
 
 /**
- * Check if user is currently logged in (cookie exists).
+ * Check if user is currently logged in (in-memory JWT exists).
+ * No longer reads the _nvxs_account_uid cookie — that cookie is
+ * now a UI hint only, not a source of auth truth.
  */
 export function isUserLoggedIn(): boolean {
-  return getCookie(ACCOUNT_COOKIE_NAME) !== null;
-}
-
-/**
- * Get account UID from cookie.
- */
-export function getAccountUid(): string | null {
-  return getCookie(ACCOUNT_COOKIE_NAME);
+  return hasAccessToken();
 }
 
 /**

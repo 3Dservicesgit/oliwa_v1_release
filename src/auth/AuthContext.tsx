@@ -21,7 +21,7 @@ import React, {
 } from "react";
 import { post, setAccessToken } from "../api/client";
 import { ENDPOINTS } from "../api/endpoints";
-import { getCookie, setCookie, clearAllCookies } from "../utils/cookies";
+import { setCookie, clearAllCookies } from "../utils/cookies";
 import { broadcastLogout } from "../api/services/auth.service";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -49,44 +49,16 @@ interface AuthContextValue {
 
 // ── Initial state ─────────────────────────────────────────────────────────────
 
-/**
- * Build initial auth state from cookies.
- * On page refresh the React state is lost, but the cookies set during login
- * survive. Re-hydrating here avoids the "logged_out with null accountRoot"
- * problem that breaks every API call relying on authState.accountRoot.
- */
-function buildInitialState(): AuthState {
-  const uid  = getCookie("_nvxs_account_uid");
-  const root = getCookie("_nvxs_account_root");
-  const type = getCookie("_nvxs_account_type");
-  const role = getCookie("_nvxs_account_role");
-
-  if (uid) {
-    return {
-      status:      "authenticated",
-      tenant:      root || "",
-      role:        role || "",
-      accountType: type || "",
-      accountUid:  uid,
-      accountRoot: root || null,
-      loginHint:   null,
-      error:       null,
-    };
-  }
-
-  return {
-    status:      "logged_out",
-    tenant:      "",
-    role:        "",
-    accountType: "",
-    accountUid:  null,
-    accountRoot: null,
-    loginHint:   null,
-    error:       null,
-  };
-}
-
-const INITIAL_STATE: AuthState = buildInitialState();
+const INITIAL_STATE: AuthState = {
+  status:      "logged_out",
+  tenant:      "",
+  role:        "",
+  accountType: "",
+  accountUid:  null,
+  accountRoot: null,
+  loginHint:   null,
+  error:       null,
+};
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
@@ -126,16 +98,7 @@ function reducer(state: AuthState, action: AuthAction): AuthState {
         error: null,
       };
     case "LOGOUT":
-      return {
-        status:      "logged_out",
-        tenant:      "",
-        role:        "",
-        accountType: "",
-        accountUid:  null,
-        accountRoot: null,
-        loginHint:   null,
-        error:       null,
-      };
+      return { ...INITIAL_STATE };
     case "ERROR":
       return { ...state, error: action.payload };
     default:

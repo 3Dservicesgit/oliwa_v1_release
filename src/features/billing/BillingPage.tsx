@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from "react";
 import { getActiveSubscriptions, getHighSubClients, getPausedSubscriptions, getExpiringSubscriptions, getClientTransactions, getAllClients } from "../../api";
 import type { ActiveSubscriptionsResponse, HighSubClientsResponse, PausedSubscriptionsResponse, ExpiringSubscriptionsResponse, ClientTransaction, Client } from "../../api";
+import { usePermissions } from "../../auth/PermissionsContext";
 
 // ─── Status colors ───────────────────────────────────────────────────────────
 const stColor: Record<string, string> = {
@@ -68,6 +69,10 @@ const MISMATCHES = [
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export function BillingPage() {
+  const { hasPermission } = usePermissions();
+  const canExport         = hasPermission("can_download_statement");
+  const canApprovePayment = hasPermission("can_approve_payment");
+
   const [bladeOpen, setBladeOpen] = useState(false);
   const [bladeTab, setBladeTab] = useState("Overview");
   const [selectedTxn, setSelectedTxn] = useState<ClientTransaction | null>(null);
@@ -249,7 +254,7 @@ export function BillingPage() {
                   ))}
                 </select>
                 <Pill onClick={refreshTransactions}>{txnLoading ? "Refreshing…" : "Refresh"}</Pill>
-                <Pill onClick={exportTransactionsCsv}>Export CSV</Pill>
+                {canExport && <Pill onClick={exportTransactionsCsv}>Export CSV</Pill>}
               </div>
             </div>
             {txnLoading ? (

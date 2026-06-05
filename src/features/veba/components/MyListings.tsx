@@ -21,7 +21,6 @@ import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
 import type { VebaListing, ListingStatus } from "../../../api/types";
 import { EditListingDrawer } from "./EditListingDrawer";
 import { CreateListingDrawer } from "./CreateListingDrawer";
-import { ConfirmDialog, useConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
 // ── Status badge styles ──────────────────────────────────────────────────────
 
@@ -61,11 +60,6 @@ function basisLabel(b: string): string {
     case "per_trip": return "/trip";
     default: return "";
   }
-}
-
-/** Format rate for table-view columns. */
-function formatRate(l: { currency: string; daily_rate: number; pricing_basis: string }): string {
-  return `${l.currency} ${l.daily_rate.toLocaleString()} ${basisLabel(l.pricing_basis)}`;
 }
 
 // ── Single listing card ─────────────────────────────────────────────────────
@@ -358,7 +352,7 @@ export function MyListings() {
   const [pendingUid, setPendingUid] = useState<string | null>(null);
   const [editingListing, setEditingListing] = useState<VebaListing | null>(null);
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
-  const { confirm, dialogProps } = useConfirmDialog();
+  const [expandedUid, setExpandedUid] = useState<string | null>(null);
 
   const fetchListings = useCallback(async () => {
     if (!authState.accountRoot) {
@@ -369,8 +363,8 @@ export function MyListings() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getVebaListings(authState.accountRoot);
-      setListings(Array.isArray(data) ? data : []);
+      const res = await getVebaListings(authState.accountRoot);
+      setListings(res.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load listings.");
       setListings([]);
@@ -398,11 +392,8 @@ export function MyListings() {
     (uid: string) => deleteVebaListing(uid),
   );
 
-  const run = async (mutation: typeof pauseMut, uid: string, confirmOpts?: { title: string; message: string; confirmLabel: string; variant?: "danger" | "warning" | "default" }) => {
-    if (confirmOpts) {
-      const ok = await confirm(confirmOpts);
-      if (!ok) return;
-    }
+  const run = async (mutation: typeof pauseMut, uid: string, confirmText?: string) => {
+    if (confirmText && !window.confirm(confirmText)) return;
     setPendingUid(uid);
     try {
       await mutation.mutate(uid);
@@ -486,92 +477,23 @@ export function MyListings() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="bg-[#F8F9FA] border-b border-[#E9EDEF]">
-              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Asset</th>
-              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Rate</th>
-              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Window</th>
-              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Visibility</th>
-              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Status</th>
-              <th className="text-right font-extrabold text-[#667781] px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {listings.map((l) => {
-              const title = l.asset_summary?.display_name ?? l.asset_uid;
-              const cls = l.asset_summary?.asset_class;
-              const isPending = pendingUid === l.listing_uid;
-              const window = l.availability_start || l.availability_end
-                ? `${l.availability_start ?? "-"} -> ${l.availability_end ?? "open"}`
-                : "Available now";
-
-              return (
-                <tr key={l.listing_uid} className="border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-3 py-2.5">
-                    <div className="font-extrabold text-[#111B21]">{title}</div>
-                    <div className="text-[11px] text-[#667781]">
-                      {[cls, l.asset_summary?.owner_org, l.asset_summary?.country].filter(Boolean).join(" * ")}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{formatRate(l)}</td>
-                  <td className="px-3 py-2.5 text-[#667781] whitespace-nowrap">{window}</td>
-                  <td className="px-3 py-2.5">{l.visibility === "tenant" ? "Tenant-private" : "Marketplace"}</td>
-                  <td className="px-3 py-2.5"><StatusPill status={l.status} /></td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex gap-1.5 justify-end">
-                      <GuardedButton
-                        permission="can_edit_asset_listing"
-                        onClick={() => setEditingListing(l)}
-                        disabled={isPending}
-                        className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[#128C7E] hover:bg-[#E9F7F4] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Edit
-                      </GuardedButton>
-                      {l.status === "active" && (
-                        <GuardedButton
-                          permission="can_edit_asset_listing"
-                          onClick={() => run(pauseMut, l.listing_uid)}
-                          disabled={isPending}
-                          className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[#111B21] hover:bg-[#F0F2F5] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isPending ? "..." : "Pause"}
-                        </GuardedButton>
-                      )}
-                      {(l.status === "paused" || l.status === "archived") && (
-                        <GuardedButton
-                          permission="can_edit_asset_listing"
-                          onClick={() => run(
-                            reactivateMut,
-                            l.listing_uid,
-                            l.status === "archived"
-                              ? { title: "Unarchive listing?", message: "This listing will become active and visible on the marketplace again.", confirmLabel: "Unarchive", variant: "warning" as const }
-                              : undefined,
-                          )}
-                          disabled={isPending}
-                          className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isPending ? "..." : l.status === "archived" ? "Unarchive" : "Reactivate"}
-                        </GuardedButton>
-                      )}
-                      {l.status !== "archived" && (
-                        <GuardedButton
-                          permission="can_edit_asset_listing"
-                          onClick={() => run(archiveMut, l.listing_uid, { title: "Archive listing?", message: "Existing bookings will continue, but no new ones can be requested.", confirmLabel: "Archive", variant: "danger" })}
-                          disabled={isPending}
-                          className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#FFD6D6] bg-white text-[#B00020] hover:bg-[#FFF5F5] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isPending ? "..." : "Archive"}
-                        </GuardedButton>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Cards */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+        {listings.map((l) => (
+          <ListingCardItem
+            key={l.listing_uid}
+            listing={l}
+            isExpanded={expandedUid === l.listing_uid}
+            isPending={pendingUid === l.listing_uid}
+            onToggle={() => setExpandedUid(expandedUid === l.listing_uid ? null : l.listing_uid)}
+            onEdit={() => setEditingListing(l)}
+            onPause={() => run(pauseMut, l.listing_uid)}
+            onReactivate={() => run(reactivateMut, l.listing_uid)}
+            onArchive={() => run(archiveMut, l.listing_uid, "Archive this listing? Existing bookings will continue, but no new ones can be requested.")}
+            onDelete={() => run(deleteMut, l.listing_uid, "Permanently delete this listing? This cannot be undone.")}
+            onPhotoUploaded={fetchListings}
+          />
+        ))}
       </div>
 
       {/* Drawers */}
@@ -589,8 +511,6 @@ export function MyListings() {
         onClose={() => setCreateDrawerOpen(false)}
         onCreated={fetchListings}
       />
-
-      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

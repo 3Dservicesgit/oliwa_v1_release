@@ -14,7 +14,7 @@
 
 import type { ApiResponse, RequestOptions } from "./types";
 import { ApiError } from "./types";
-import { getCookie, clearAllCookies } from "../utils/cookies";
+import { clearAllCookies } from "../utils/cookies";
 
 // ── Base URL ─────────────────────────────────────────────────────────────────
 
@@ -24,11 +24,13 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /**
  * In-memory JWT access token.
- * Preferred over cookies for XSS resistance — the token never touches
+ * Stored only in memory for XSS resistance — never touches
  * `document.cookie` or `localStorage`.
  *
- * Falls back to reading `_nvxs_account_uid` cookie while the backend
- * is still in the interim (pre-JWT) phase.
+ * If the token is null (e.g. after a page refresh), the 401 interceptor
+ * will trigger a silent refresh via the HttpOnly cookie. There is NO
+ * fallback to reading the account_uid cookie — that path was removed
+ * because it allowed raw UIDs to be sent as bearer tokens.
  */
 let accessToken: string | null = null;
 
@@ -42,11 +44,12 @@ export function hasAccessToken(): boolean {
   return accessToken !== null;
 }
 
-/** Get the current auth token. Prefers in-memory JWT, falls back to cookie. */
+/**
+ * Get the current auth token (in-memory JWT only).
+ * Returns null if no token is held — the 401 interceptor handles refresh.
+ */
 function getAuthToken(): string | null {
-  if (accessToken) return accessToken;
-  // Interim fallback: read account_uid from cookie
-  return getCookie("_nvxs_account_uid") ?? null;
+  return accessToken;
 }
 
 /**
@@ -359,3 +362,5 @@ export function patch<T>(path: string, body: unknown, opts?: RequestOptions) {
 export function del<T>(path: string, body?: unknown, opts?: RequestOptions) {
   return request<T>("DELETE", path, body, opts);
 }
+
+
