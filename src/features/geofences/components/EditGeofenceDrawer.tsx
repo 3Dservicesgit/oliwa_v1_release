@@ -55,17 +55,21 @@ export function EditGeofenceDrawer({
 
       const pathToSave = editedPath && editedPath.length >= 3 ? editedPath : geozone.path;
 
-      const res = await updateGeozone(geozone.geozone_uid, {
-        new_geozone_name: name.trim(),
-        new_geozone_decription: description.trim(),
-        new_geozone_points: serializeGeozonePoints(pathToSave),
-      });
+      try {
+        const res = await updateGeozone(geozone.geozone_uid, {
+          new_geozone_name: name.trim(),
+          new_geozone_decription: description.trim(),
+          new_geozone_points: serializeGeozonePoints(pathToSave),
+        });
 
-      if (res.status === "success") {
-        onUpdated?.();
-        onClose();
-      } else {
-        setError(res.message || "Failed to update geofence.");
+        if (res.status === "success") {
+          onUpdated?.();
+          onClose();
+        } else {
+          setError(res.message || "Failed to update geofence.");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update geofence.");
       }
     }, [geozone, name, description, editedPath, onUpdated, onClose]),
   );

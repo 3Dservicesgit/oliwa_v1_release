@@ -21,16 +21,13 @@ interface SidebarProps {
 }
 
 /**
- * Default sidebar items are derived from the module registry
- * (`auth/modules.ts`). Any module with `showInSidebar: true` appears here,
- * in registry order. Override by passing a custom `items` prop.
+ * Derive sidebar items from the central module registry (auth/modules.ts).
+ * This is the single source of truth — add/remove modules there.
  */
 const DEFAULT_ITEMS: SidebarItem[] = getModulesForSidebar().map((m) => ({
   key:        m.id,
   label:      m.navLabel ?? m.name,
-  // Aegis is the landing page — route to "/" rather than "/aegis" so the
-  // active-state highlight tracks the home URL the rest of the app uses.
-  path:       m.id === "aegis" ? "/" : m.route,
+  path:       m.route,
   permission: m.viewPermission,
 }));
 

@@ -14,6 +14,7 @@ import {
 import { useAuth } from "../../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
 import type { BookingRequest, BookingRequestStatus } from "../../../api/types";
+import { ConfirmDialog, useConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
 const STATUS_STYLES: Record<BookingRequestStatus, { bg: string; fg: string; label: string }> = {
   pending:   { bg: "#FFF4E5", fg: "#9A6700", label: "Pending" },
@@ -41,16 +42,17 @@ export function IncomingBookingRequests() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [pendingUid, setPendingUid] = useState<string | null>(null);
+  const { confirm, dialogProps } = useConfirmDialog();
 
   const fetchRequests = useCallback(async () => {
     if (!authState.accountRoot) { setRequests([]); setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
-      const res = await getBookingRequests(authState.accountRoot, {
+      const data = await getBookingRequests(authState.accountRoot, {
         params: { direction: "incoming" },
       });
-      setRequests(res.data ?? []);
+      setRequests(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load booking requests.");
       setRequests([]);
@@ -74,8 +76,11 @@ export function IncomingBookingRequests() {
     (uid: string) => fulfillBookingRequest(uid),
   );
 
-  const run = async (mutation: typeof approveMut, uid: string, confirmText?: string) => {
-    if (confirmText && !window.confirm(confirmText)) return;
+  const run = async (mutation: typeof approveMut, uid: string, confirmOpts?: { title: string; message: string; confirmLabel: string; variant?: "danger" | "warning" | "default" }) => {
+    if (confirmOpts) {
+      const ok = await confirm(confirmOpts);
+      if (!ok) return;
+    }
     setPendingUid(uid);
     try {
       await mutation.mutate(uid);
@@ -108,7 +113,7 @@ export function IncomingBookingRequests() {
     return (
       <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
         <div className="text-[16px] font-extrabold text-[#111B21] mb-1">No booking requests yet</div>
-        <p className="text-[12px] text-[#667781]">When marketplace buyers request bookings on your listed assets, they will appear here.</p>
+        <p className="text-[12px] text-[#667781]">Booking requests for your listed assets will appear here.</p>
       </div>
     );
   }
@@ -117,9 +122,9 @@ export function IncomingBookingRequests() {
     <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-[#E9EDEF] flex items-center justify-between">
         <div>
-          <h2 className="font-extrabold text-[13px] text-[#111B21]">Incoming Booking Requests</h2>
+          <h2 className="font-extrabold text-[13px] text-[#111B21]">Booking Requests</h2>
           <p className="text-[11px] text-[#667781]">
-            {requests.length} request{requests.length === 1 ? "" : "s"} from marketplace buyers
+            {requests.length} booking request{requests.length === 1 ? "" : "s"} for your assets
           </p>
         </div>
         <button
@@ -178,7 +183,7 @@ export function IncomingBookingRequests() {
                           </GuardedButton>
                           <GuardedButton
                             permission="can_reject_booking_request"
-                            onClick={() => run(rejectMut, r.request_uid, "Reject this booking request?")}
+                            onClick={() => run(rejectMut, r.request_uid, { title: "Reject booking?", message: "This booking request will be declined. The requester will be notified.", confirmLabel: "Reject", variant: "danger" })}
                             disabled={isPending}
                             className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#FFD6D6] bg-white text-[#B00020] hover:bg-[#FFF5F5] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
@@ -189,7 +194,7 @@ export function IncomingBookingRequests() {
                       {r.status === "approved" && (
                         <GuardedButton
                           permission="can_approve_booking_request"
-                          onClick={() => run(fulfillMut, r.request_uid, "Mark this booking as fulfilled?")}
+                          onClick={() => run(fulfillMut, r.request_uid, { title: "Mark as fulfilled?", message: "This confirms the booking has been completed and the asset returned or service delivered.", confirmLabel: "Mark Fulfilled", variant: "default" })}
                           disabled={isPending}
                           className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[#1E40AF] text-white hover:bg-[#1E3A8A] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -209,6 +214,8 @@ export function IncomingBookingRequests() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

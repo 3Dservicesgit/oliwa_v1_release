@@ -1,7 +1,3 @@
-/**
- * veba.types.ts — Types for the VEBA marketplace.
- */
-
 export interface VebaStatistics {
   bookings_today: number;
   leakage_attempts: number;

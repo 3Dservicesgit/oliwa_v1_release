@@ -8,8 +8,7 @@
  *   MODAL:  Right blade — Create Tenant / Sub-Org (tabs: Basics, Billing, Modules, RBAC, Review)
  */
 import React, { useEffect, useState } from "react";
-import { getAllTenants, getAllClients, createClient, getClientDevices, getClientBalance, getExpiredTokens, getActiveSubscriptions, /* getApprovals, approveRequest, rejectRequest, */ saveDraft, requestDraftApproval, submitApprovedDraft, trashClient, updateClient, ApiError } from "../../api";
-import { useAuth } from "../../auth/AuthContext";
+import { getAllTenants, getAllClients, createClient, getClientDevices, getClientBalance, getExpiredTokens, getActiveSubscriptions, /* getApprovals, approveRequest, rejectRequest, */ saveDraft, requestDraftApproval, submitApprovedDraft, getAccountUid, trashClient, updateClient, ApiError } from "../../api";
 import type { Tenant, Client, ClientDevice, ClientTokenBalance, ExpiredTokensResponse, ActiveSubscriptionsResponse, /* Approval, */ TenantTier } from "../../api";
 
 import { TrashRestoreModal } from "./components/TrashRestoreModal";
@@ -38,7 +37,6 @@ const MODAL_TABS = ["Basics","Billing & Tokens","Modules","RBAC","Review"];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export function TenantTowerPage() {
-  const { state: authState } = useAuth();
   const [bladeOpen, setBladeOpen] = useState(false);
   const [bladeTab, setBladeTab] = useState("Basics");
   const [trashOpen, setTrashOpen] = useState(false);
@@ -307,7 +305,7 @@ export function TenantTowerPage() {
   function handleCreateClient() {
     if (!bladeName.trim()) { window.alert("Client name is required"); return; }
     if (!bladeEmail.trim()) { window.alert("Client email is required"); return; }
-    const owner = authState.accountUid;
+    const owner = getAccountUid();
     if (!owner) { window.alert("You must be logged in to create a client"); return; }
     const payload = { client_name: bladeName.trim(), client_email: bladeEmail.trim(), client_owner: owner };
     setBladeSubmitting(true);
@@ -842,7 +840,7 @@ export function TenantTowerPage() {
               <button
                 onClick={async () => {
                   const uid = deletingClient.client_uid;
-                  const owner = authState.accountUid || "";
+                  const owner = getAccountUid() || "";
                   try {
                     await trashClient(uid, { deleted_by: owner });
                     setClients((prev) => prev.filter((c) => c.client_uid !== uid));

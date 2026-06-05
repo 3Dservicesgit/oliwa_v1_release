@@ -1,38 +1,37 @@
 /**
  * NavRail — Primary Side Navigation Bar
- * Uses react-router-dom NavLink for URL-driven active state.
  *
- * Permission-filtered: only modules the current user has access to are
- * displayed. Modules with no `viewPermission` (e.g. Aegis dashboard)
- * are always shown. The "home" entry is always visible.
+ * Drives its items from the central module registry (auth/modules.ts)
+ * and filters out modules the current user doesn't have permission to view.
+ * Uses react-router-dom NavLink for URL-driven active state.
  */
-import React, { useMemo } from "react";
+import React from "react";
 import { NavLink } from "react-router-dom";
 import { getModulesForNavRail } from "../../auth/modules";
 import { usePermissions } from "../../auth/PermissionsContext";
 
-export interface NavRailItem { key: string; glyph: string; label: string; path?: string; permission?: string; }
+export interface NavRailItem { key: string; glyph: string; label: string; path?: string; }
+interface NavRailProps { items?: NavRailItem[]; }
 
-const HOME_ITEM: NavRailItem = { key: "home", glyph: "⌂", label: "Home", path: "/" };
-
-export function NavRail() {
+export function NavRail({ items }: NavRailProps) {
   const { hasPermission, loading } = usePermissions();
 
-  const items = useMemo(() => {
-    const modules = getModulesForNavRail();
-    const filtered = modules
-      .filter((m) => !m.viewPermission || hasPermission(m.viewPermission))
-      .map((m) => ({
-        key:   m.id,
-        glyph: m.navGlyph ?? "•",
-        label: m.navLabel ?? m.name,
-        path:  m.route,
-      }));
-    return [HOME_ITEM, ...filtered];
-  }, [hasPermission]);
+  // Derive items from the module registry, filtered by the user's permissions
+  const visibleItems: NavRailItem[] = items ?? getModulesForNavRail()
+    .filter((m) => {
+      // Modules with no viewPermission are always visible (e.g. landing pages)
+      if (!m.viewPermission) return true;
+      // While permissions are loading, show all items (avoid flash of empty nav)
+      if (loading) return true;
+      return hasPermission(m.viewPermission);
+    })
+    .map((m) => ({
+      key: m.id,
+      glyph: m.navGlyph || m.id.charAt(0).toUpperCase(),
+      label: m.navLabel || m.name,
+      path: m.route,
+    }));
 
-  // While permissions load, show only the home item to avoid layout shift
-  const displayItems = loading ? [HOME_ITEM] : items;
   return (
     <>
       {/* Desktop vertical rail */}
@@ -40,7 +39,7 @@ export function NavRail() {
         aria-label="Primary navigation"
         className="hidden md:flex flex-col gap-2 w-[60px] bg-white border-r border-[#E9EDEF] px-[10px] py-3 shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {displayItems.map((item) => <RailLink key={item.key} item={item} />)}
+        {visibleItems.map((item) => <RailLink key={item.key} item={item} />)}
       </nav>
 
       {/* Mobile bottom tab bar */}
@@ -48,7 +47,7 @@ export function NavRail() {
         aria-label="Primary navigation"
         className="flex md:hidden flex-row items-center justify-around fixed bottom-0 left-0 right-0 h-14 z-[200] overflow-x-auto bg-white border-t border-[#E9EDEF] px-2 gap-1"
       >
-        {displayItems.map((item) => <RailLink key={item.key} item={item} mobile />)}
+        {visibleItems.map((item) => <RailLink key={item.key} item={item} mobile />)}
       </nav>
     </>
   );

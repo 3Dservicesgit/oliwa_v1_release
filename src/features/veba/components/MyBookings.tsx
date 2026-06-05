@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../../auth/guards";
 import type { BookingRequest, BookingRequestStatus } from "../../../api/types";
+import { ConfirmDialog, useConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
 const STATUS_STYLES: Record<BookingRequestStatus, { bg: string; fg: string; label: string }> = {
   pending:   { bg: "#FFF4E5", fg: "#9A6700", label: "Pending" },
@@ -39,16 +40,17 @@ export function MyBookings() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [pendingUid, setPendingUid] = useState<string | null>(null);
+  const { confirm, dialogProps } = useConfirmDialog();
 
   const fetchRequests = useCallback(async () => {
     if (!authState.accountRoot) { setRequests([]); setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
-      const res = await getBookingRequests(authState.accountRoot, {
+      const data = await getBookingRequests(authState.accountRoot, {
         params: { direction: "outgoing" },
       });
-      setRequests(res.data ?? []);
+      setRequests(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load your bookings.");
       setRequests([]);
@@ -65,7 +67,8 @@ export function MyBookings() {
   );
 
   const handleCancel = async (uid: string) => {
-    if (!window.confirm("Cancel this booking request?")) return;
+    const ok = await confirm({ title: "Cancel booking?", message: "This will withdraw your booking request. This action cannot be undone.", confirmLabel: "Cancel Booking", variant: "danger" });
+    if (!ok) return;
     setPendingUid(uid);
     try {
       await cancelMut.mutate(uid);
@@ -180,6 +183,8 @@ export function MyBookings() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
