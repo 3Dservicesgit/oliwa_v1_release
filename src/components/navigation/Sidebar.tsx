@@ -6,6 +6,7 @@ import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { usePermissions } from "../../auth/PermissionsContext";
 import { useAuth } from "../../auth/AuthContext";
+import { getModulesForSidebar } from "../../auth/modules";
 
 /** Each sidebar item can optionally require a permission to be visible. */
 export interface SidebarItem { key: string; label: string; path?: string; permission?: string; }
@@ -19,43 +20,16 @@ interface SidebarProps {
   open?:     boolean;
 }
 
-const DEFAULT_ITEMS: SidebarItem[] = [
-  // ── Core dashboards (Dashboard has no permission — always visible) ──────
-  { key: "aegis",              label: "Dashboard",               path: "/"                  },
-  { key: "noc-bridge",         label: "NOC Bridge",              path: "/noc-bridge",        permission: "noc.view" },
-  { key: "protocol",           label: "Geofences & Zones",       path: "/protocol",          permission: "geofences.view" },
-  { key: "events",             label: "Events & Notifications",  path: "/events",            permission: "events.view" },
-  { key: "reports",            label: "Reports",                 path: "/reports",           permission: "reports.view" },
-  { key: "sim",                label: "Token Subscription",      path: "/sim",               permission: "sim.view" },
-  { key: "ops",                label: "Ops War Room",            path: "/ops",               permission: "ops.view" },
-  { key: "gatehouse",          label: "Monitoring Alpha",        path: "/gatehouse",         permission: "gatehouse.view" },
-  { key: "alarms-factory",     label: "Alarm Factory",           path: "/alarms-factory",    permission: "alarms.view" },
-  { key: "tenant-tower",       label: "Tenant Tower",            path: "/tenant-tower",      permission: "tenants.view" },
-  // { key: "billing-invoicing",  label: "Billing & Invoicing",     path: "/billing-invoicing", permission: "billing.view" },
-  // { key: "asset-digital-twin", label: "Asset Digital Twin",      path: "/asset-digital-twin", permission: "assets.view" },
-
-  // ── System & Ops ─────────────────────────────────────────────────────────
-  // { key: "health",             label: "System Health",           path: "/health",            permission: "health.view" },
-  { key: "alarms",             label: "Alarms Center",           path: "/alarms",            permission: "alarms.view" },
-  // { key: "ingestion",          label: "Ingestion Pipeline",      path: "/health"            },
-  // { key: "kafka",              label: "Kafka",                   path: "/health"            },
-  // { key: "compute",            label: "Compute",                 path: "/health"            },
-  // { key: "task-manager",       label: "Task Manager (Diag)",     path: "/health"            },
-
-  // ── Tokenomics & Finance ─────────────────────────────────────────────────
-  { key: "tokens",             label: "Token Engine",            path: "/tokens",            permission: "tokens.view" },
-  { key: "billing",            label: "Billing",                 path: "/billing",           permission: "billing.view" },
-  // { key: "payments",           label: "Payments",                path: "/payments",          permission: "payments.view" },
-  { key: "money",              label: "Money Switchboard",       path: "/money",             permission: "money.view" },
-
-  // ── Platform ─────────────────────────────────────────────────────────────
-  { key: "veba",               label: "VEBA Marketplace",        path: "/veba",              permission: "veba.view" },
-  // { key: "ai-workloads",       label: "AI Workloads",            path: "/ai",                permission: "ai.view" },
-  { key: "rbac",               label: "RBAC / Access Control",   path: "/rbac",              permission: "rbac.view" },
-  // { key: "runbooks",           label: "Runbooks",                path: "/audit"             },
-  { key: "audit",              label: "Audit Trail",             path: "/audit",             permission: "audit.view" },
-
-];
+/**
+ * Derive sidebar items from the central module registry (auth/modules.ts).
+ * This is the single source of truth — add/remove modules there.
+ */
+const DEFAULT_ITEMS: SidebarItem[] = getModulesForSidebar().map((m) => ({
+  key:        m.id,
+  label:      m.navLabel ?? m.name,
+  path:       m.route,
+  permission: m.viewPermission,
+}));
 
 const DEFAULT_TIP: SidebarTip = {
   title: "Waswa Tip",

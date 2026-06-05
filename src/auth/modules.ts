@@ -160,6 +160,18 @@ const BUILT_MODULES: ModuleDef[] = [
     catalogModuleName: "Device Lifecycle & Firmware",
   },
   {
+    id: "sim",
+    name: "Token Subscription",
+    navLabel: "Token Subscription",
+    navGlyph: "🪙",
+    route: "/sim",
+    viewPermission: "sim.view",
+    group: "finance",
+    showInNavRail: true,
+    showInSidebar: true,
+    catalogModuleName: "Payments & Statements",
+  },
+  {
     id: "billing",
     name: "System Billing",
     navLabel: "System Billing",
