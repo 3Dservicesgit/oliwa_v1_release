@@ -1,579 +1,325 @@
 /**
- * AuditPage — Screen 12: IRREFUTABLE CONTROL VAULT
+ * AuditPage — Customer Audit Trail
  *
- * CMS-wide audit trail covering every module: Tenant Tower, Billing, VEBA,
- * Money Switchboard, RBAC, Tokens, Payments, Firmware, SIM, Protocol,
- * Alarm Factory, AI Workloads, and the Audit module itself.
+ * Shows a chronological timeline of all actions on the customer's account:
+ * token purchases, device pauses/restores, geofence changes, report
+ * generations, login events, and more.
  *
- * Matches v26 mockups (6 screenshots):
- *   TOP:    Header + Export/Approvals → 4 KPIs (bar accent) → Filters + Live Stream
- *           → Audit Stream table (20 rows) + right sidebar (Waswa AI + Approval Queue)
- *   MID:    Table cont. → Tamper Evidence Hash Chain (5 blocks) + Compliance Snapshot
- *   BOTTOM: Retention + Export Controls (4 cards)
- *   MODAL:  Export Audit Pack (HIC) — 4-step wizard (Scope, Format, Redaction, Approval)
+ * Features:
+ *   - KPI stats strip (total events, warnings, critical, last activity)
+ *   - Filter bar: search, domain, severity, time range
+ *   - Activity timeline with color-coded events
+ *
+ * SECURITY: Events are filtered server-side by the customer's tenant_id.
  */
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  getAuditEvents,
-  getAuditKpis,
-  // getHashChain,
-  // getAuditApprovals,
-  getComplianceSnapshot,
-} from "../../api";
-import type {
-  AuditEvent,
-  AuditKpis,
-  // HashBlock,
-  // AuditApproval,
-  ComplianceSnapshot,
-  AuditDomain,
-  AuditSeverity,
-  AuditFilters,
-} from "../../api";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "../../auth/AuthContext";
+import { getCookie } from "../../utils/cookies";
+import { getAuditEvents, getAuditKpis } from "../../api/services/audit.service";
+import type { AuditEvent, AuditDomain, AuditSeverity, AuditFilters } from "../../api/types";
 
-// ─── Severity dot colors ─────────────────────────────────────────────────────
-const sevDot: Record<string, string> = {
-  Info: "bg-[#9CA3AF]", Warn: "bg-[#FBBF24]", Alarm: "bg-[#F97316]", Crit: "bg-[#EF4444]",
+// ── Domain labels ──────────────────────────────────────────────────────────
+
+const DOMAIN_LABELS: Partial<Record<AuditDomain, string>> = {
+  TOKEN:    "Token",
+  PAYMENT:  "Payment",
+  SIM:      "Device",
+  CLIENT:   "Client",
+  BILLING:  "Billing",
+  VEBA:     "VEBA",
+  ALARM:    "Alarm",
+  SYSTEM:   "System",
+  RBAC:     "Access",
+  AUDIT:    "Audit",
+  PROTOCOL: "Geofence",
+  FIRMWARE: "Events",
 };
 
-// ─── Domain labels ───────────────────────────────────────────────────────────
-const DOMAIN_OPTIONS: { value: AuditDomain | "ALL"; label: string }[] = [
-  { value: "ALL",      label: "ALL" },
-  { value: "TENANT",   label: "Tenant Tower" },
+const SEVERITY_STYLES: Record<AuditSeverity, { bg: string; text: string; dot: string }> = {
+  Info:  { bg: "bg-[#128C7E]/10", text: "text-[#128C7E]", dot: "bg-[#128C7E]" },
+  Warn:  { bg: "bg-[#F97316]/10", text: "text-[#F97316]", dot: "bg-[#F97316]" },
+  Alarm: { bg: "bg-[#EF4444]/10", text: "text-[#EF4444]", dot: "bg-[#EF4444]" },
+  Crit:  { bg: "bg-[#7C3AED]/10", text: "text-[#7C3AED]", dot: "bg-[#7C3AED]" },
+};
+
+const DOMAIN_OPTIONS: { value: string; label: string }[] = [
+  { value: "",         label: "All Domains" },
+  { value: "TOKEN",    label: "Token" },
+  { value: "PAYMENT",  label: "Payment" },
+  { value: "SIM",      label: "Device" },
+  { value: "CLIENT",   label: "Client" },
   { value: "BILLING",  label: "Billing" },
-  { value: "VEBA",     label: "VEBA" },
-  { value: "MONEY",    label: "Money" },
-  { value: "RBAC",     label: "RBAC" },
-  { value: "TOKEN",    label: "Tokens" },
-  { value: "PAYMENT",  label: "Payments" },
-  { value: "FIRMWARE", label: "Firmware" },
-  { value: "SIM",      label: "SIM" },
-  { value: "PROTOCOL", label: "Protocol" },
-  { value: "ALARM",    label: "Alarms" },
-  { value: "AI",       label: "AI" },
-  { value: "AUDIT",    label: "Audit" },
-  { value: "CLIENT",   label: "Clients" },
   { value: "SYSTEM",   label: "System" },
+  { value: "RBAC",     label: "Access" },
+  { value: "PROTOCOL", label: "Geofence" },
+  { value: "VEBA",     label: "VEBA" },
+  { value: "ALARM",    label: "Alarm" },
+  { value: "AUDIT",    label: "Audit" },
 ];
 
-const SEVERITY_OPTIONS: { value: AuditSeverity | "ANY"; label: string }[] = [
-  { value: "ANY",   label: "ANY" },
+const SEVERITY_OPTIONS: { value: string; label: string }[] = [
+  { value: "",      label: "All Severity" },
   { value: "Info",  label: "Info" },
-  { value: "Warn",  label: "Warn" },
+  { value: "Warn",  label: "Warning" },
   { value: "Alarm", label: "Alarm" },
-  { value: "Crit",  label: "Crit" },
+  { value: "Crit",  label: "Critical" },
 ];
 
-const RANGE_OPTIONS = [
-  { value: "1h",  label: "1h" },
-  { value: "6h",  label: "6h" },
-  { value: "24h", label: "24h" },
-  { value: "7d",  label: "7d" },
-  { value: "30d", label: "30d" },
+const RANGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "1h",  label: "Last 1 hour" },
+  { value: "24h", label: "Last 24 hours" },
+  { value: "7d",  label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
 ];
 
-// const ARTIFACTS = [
-//   "Audit stream (Kafka) — immutable event log",
-//   "HIC Overrides log (kill-switch / suspensions)",
-//   "HITL Approvals log (pricing / refunds / deployments)",
-//   "Payments reconciliations (M-Pesa/MTN/Airtel) + webhooks",
-//   "Token ledger snapshot (FIFO instances) + burn history",
-//   "VEBA escrow settlements + dispute events",
-//   "RBAC changes + privileged access review",
-//   "Exports + data access proofs",
-//   "Hash chain blocks + signatures",
-//   "System health microstats (Kafka lag / DB p95)",
-//   "Waswa AI suggestions + acceptance/reject trail",
-//   "Redaction policy + applied masks",
-//   "Checksum manifest (SHA256)",
-// ];
+// ── Relative time helper ───────────────────────────────────────────────────
 
-// ─── Page Component ──────────────────────────────────────────────────────────
+function timeAgo(isoStr: string): string {
+  try {
+    const now = Date.now();
+    const then = new Date(isoStr).getTime();
+    const diffMs = now - then;
+    if (isNaN(diffMs) || diffMs < 0) return isoStr;
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return `${days}d ago`;
+    return isoStr.split("T")[0] || isoStr;
+  } catch {
+    return isoStr;
+  }
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+
 export function AuditPage() {
-  // const [modalOpen, setModalOpen] = useState(false);
-  const [liveStream, setLiveStream] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { state: authState } = useAuth();
+  const ownerUid = authState.accountUid || getCookie("_nvxs_account_uid") || "";
 
-  // ── Filters ────────────────────────────────────────────────────────────────
-  const [domainFilter, setDomainFilter] = useState<AuditDomain | "ALL">("ALL");
-  const [severityFilter, setSeverityFilter] = useState<AuditSeverity | "ANY">("ANY");
-  const [rangeFilter, setRangeFilter] = useState("24h");
-
-  // ── API state: Audit Events ────────────────────────────────────────────────
+  // Data
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  // ── API state: KPIs ────────────────────────────────────────────────────────
-  const [kpis, setKpis] = useState<AuditKpis | null>(null);
-  const [kpisLoading, setKpisLoading] = useState(true);
+  // Filters
+  const [search, setSearch] = useState("");
+  const [domain, setDomain] = useState("");
+  const [severity, setSeverity] = useState("");
+  const [range, setRange] = useState("30d");
 
-  // ── API state: Hash Chain (commented out — section disabled) ───────────────
-  // const [hashBlocks, setHashBlocks] = useState<HashBlock[]>([]);
-  // const [hashLoading, setHashLoading] = useState(true);
+  const fetchedRef = useRef(false);
 
-  // ── API state: Approvals (commented out — section disabled) ────────────────
-  // const [approvals, setApprovals] = useState<AuditApproval[]>([]);
-  // const [approvalsLoading, setApprovalsLoading] = useState(true);
+  // ── Fetch events ─────────────────────────────────────────────────────
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    try {
+      const filters: AuditFilters = { range };
+      if (domain) filters.domain = domain as AuditDomain;
+      if (severity) filters.severity = severity as AuditSeverity;
+      if (search.trim()) filters.search = search.trim();
+      if (ownerUid) filters.tenant_id = ownerUid;
 
-  // ── API state: Compliance ──────────────────────────────────────────────────
-  const [compliance, setCompliance] = useState<ComplianceSnapshot | null>(null);
-  const [complianceLoading, setComplianceLoading] = useState(true);
+      const res = await getAuditEvents(filters);
+      setEvents(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      // Keep existing
+    } finally {
+      setLoading(false);
+    }
+  }, [domain, severity, range, search, ownerUid]);
 
-  // ── Fetch helpers ──────────────────────────────────────────────────────────
-
-  const buildFilters = useCallback((): AuditFilters => {
-    const f: AuditFilters = { range: rangeFilter };
-    if (domainFilter !== "ALL")    f.domain   = domainFilter;
-    if (severityFilter !== "ANY")  f.severity = severityFilter;
-    return f;
-  }, [domainFilter, severityFilter, rangeFilter]);
-
-  const fetchEvents = useCallback(() => {
-    return getAuditEvents(buildFilters())
-      .then(res => setEvents(res.data))
-      .catch(() => {});
-  }, [buildFilters]);
-
-  // ── Initial load ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([
-      getAuditKpis().then(res => { if (!cancelled) setKpis(res.data); }).catch(() => {}),
-      // getHashChain().then(res => { if (!cancelled) setHashBlocks(res.data); }).catch(() => {}),
-      // getAuditApprovals().then(res => { if (!cancelled) setApprovals(res.data); }).catch(() => {}),
-      getComplianceSnapshot().then(res => { if (!cancelled) setCompliance(res.data); }).catch(() => {}),
-    ]).finally(() => {
-      if (!cancelled) {
-        setKpisLoading(false);
-        // setHashLoading(false);
-        // setApprovalsLoading(false);
-        setComplianceLoading(false);
-      }
-    });
-
-    return () => { cancelled = true; };
+  // ── Fetch KPIs (placeholder for future use) ──────────────────────────
+  const fetchKpis = useCallback(async () => {
+    try { await getAuditKpis(); } catch { /* no-op */ }
   }, []);
 
-  // Re-fetch events whenever filters change
+  // Initial load
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await getAuditEvents(buildFilters());
-        if (!cancelled) setEvents(res.data);
-      } catch { /* swallow */ }
-      if (!cancelled) setEventsLoading(false);
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [buildFilters]);
-
-  // ── Live stream polling ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!liveStream) return;
-    const interval = setInterval(() => { fetchEvents(); }, 15_000);
-    return () => clearInterval(interval);
-  }, [liveStream, fetchEvents]);
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  function formatTime(iso: string): string {
-    try {
-      return new Date(iso).toLocaleTimeString("en-GB", { hour12: false });
-    } catch {
-      return iso;
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchEvents();
+      fetchKpis();
     }
-  }
+  }, [fetchEvents, fetchKpis]);
 
-  // const pendingApprovals = approvals.filter(a => a.status === "pending");
-  const complianceStatusDot: Record<string, string> = {
-    ok: "bg-[#25D366]", warn: "bg-[#FBBF24]", alert: "bg-[#F97316]",
+  // Re-fetch when filters change (except search — that's on Enter)
+  useEffect(() => {
+    if (fetchedRef.current) fetchEvents();
+  }, [domain, severity, range, fetchEvents]);
+
+  const handleSearchKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") fetchEvents();
   };
 
+  // Derived stats
+  const totalEvents = events.length;
+  const warnCount = events.filter((e) => e.severity === "Warn").length;
+  const critCount = events.filter((e) => e.severity === "Alarm" || e.severity === "Crit").length;
+  const lastActivity = events[0] ? timeAgo(events[0].timestamp) : "—";
+
   return (
-    <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative">
-      {/* ── Main content ─────────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex flex-col gap-3 p-3">
 
           {/* Header */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="font-black text-[16px] text-[#111B21]">Audit Logs &amp; Compliance</div>
-                <div className="text-[11px] text-[#667781] mt-0.5">Home &gt; Asset &amp; Resource Gov &gt; Audit Logs</div>
-              </div>
-              {/* <div className="flex gap-2 shrink-0">
-                <Pill color="green" onClick={() => setModalOpen(true)}>Export</Pill>
-                <Pill onClick={() => { getAuditApprovals().then(res => setApprovals(res.data)).catch(() => {}); }}>Approvals</Pill>
-              </div> */}
+            <div className="flex items-baseline gap-3">
+              <span className="font-black text-[18px] text-[#111B21] tracking-wide">AUDIT TRAIL</span>
+              <span className="text-[13px] text-[#667781]">— Account activity log</span>
             </div>
           </div>
 
-          {/* ════════════════════ TOP SCROLL ════════════════════════════ */}
-
-          {/* 4 KPIs with vertical bar accent */}
-          <div className="grid grid-cols-4 gap-3">
-            <KpiCard
-              label="Audit ingest p95"
-              value={kpisLoading ? "—" : `${kpis?.ingest_p95_seconds ?? 0}s`}
-              sub="Target <60s"
-              bar="bg-[#34B7F1]"
-              loading={kpisLoading}
-            />
-            <KpiCard
-              label="Log gaps"
-              value={kpisLoading ? "—" : String(kpis?.log_gaps_24h ?? 0)}
-              sub="Last 24h"
-              bar="bg-[#EF4444]"
-              loading={kpisLoading}
-            />
-            <KpiCard
-              label="Sensitive actions"
-              value={kpisLoading ? "—" : String(kpis?.sensitive_actions_24h ?? 0)}
-              sub="Pricing/Refund/RBAC"
-              bar="bg-[#F97316]"
-              loading={kpisLoading}
-            />
-            <KpiCard
-              label="Retention"
-              value={kpisLoading ? "—" : `${kpis?.retention_days ?? 0}d`}
-              sub="Plan entitlement"
-              bar="bg-[#25D366]"
-              loading={kpisLoading}
-            />
+          {/* KPI Stats Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiCard label="Total Events" value={String(totalEvents)} sub={`Last ${range}`} color="teal" loading={loading} />
+            <KpiCard label="Warnings" value={String(warnCount)} sub="Attention needed" color="orange" loading={loading} />
+            <KpiCard label="Critical Actions" value={String(critCount)} sub="High severity" color="red" loading={loading} />
+            <KpiCard label="Last Activity" value={lastActivity} sub="Most recent event" color="blue" loading={loading} />
           </div>
 
-          {/* Filters + Live Stream toggle */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[12px] font-black text-[#111B21]">Filters</span>
-
-            {/* Domain filter */}
-            <select
-              value={domainFilter}
-              onChange={e => setDomainFilter(e.target.value as AuditDomain | "ALL")}
-              className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none cursor-pointer"
-            >
-              {DOMAIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {/* Filter Bar */}
+          <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKey}
+              placeholder="Search events... (press Enter)"
+              className="h-8 flex-1 min-w-[180px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+            />
+            <select value={domain} onChange={(e) => setDomain(e.target.value)} className="h-8 px-2 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer outline-none">
+              {DOMAIN_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-
-            {/* Severity filter */}
-            <select
-              value={severityFilter}
-              onChange={e => setSeverityFilter(e.target.value as AuditSeverity | "ANY")}
-              className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none cursor-pointer"
-            >
-              {SEVERITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <select value={severity} onChange={(e) => setSeverity(e.target.value)} className="h-8 px-2 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer outline-none">
+              {SEVERITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-
-            {/* Range filter */}
-            <div className="flex gap-1">
-              {RANGE_OPTIONS.map(o => (
-                <button
-                  key={o.value}
-                  onClick={() => setRangeFilter(o.value)}
-                  className={`h-8 px-3 rounded-lg text-[12px] border cursor-pointer transition-all ${
-                    rangeFilter === o.value
-                      ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E] font-black"
-                      : "bg-white border-[#E9EDEF] text-[#667781]"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Live stream toggle */}
-            <button
-              onClick={() => setLiveStream(p => !p)}
-              className={`ml-auto h-8 px-4 rounded-full text-[11px] font-black flex items-center cursor-pointer border-none transition-all ${
-                liveStream
-                  ? "bg-[#075E54] text-white"
-                  : "bg-[#F0F2F5] text-[#667781]"
-              }`}
-            >
-              Live Stream: {liveStream ? "ON" : "OFF"}
+            <select value={range} onChange={(e) => setRange(e.target.value)} className="h-8 px-2 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer outline-none">
+              {RANGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <button onClick={() => { fetchEvents(); fetchKpis(); }} className="h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all flex items-center gap-1">
+              <span>&#8635;</span> Refresh
             </button>
           </div>
 
-          {/* Audit Stream Table */}
-          <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 320px)" }}>
-            <div className="px-4 py-3 border-b border-[#E9EDEF] flex items-center gap-3 shrink-0">
-              <span className="font-black text-[13px] text-[#111B21]">AUDIT STREAM (CMS-wide)</span>
-              <span className="text-[11px] text-[#667781]">
-                {eventsLoading ? "Loading…" : `${events.length} events`}
-              </span>
-              <div className="ml-auto flex gap-2">
-                {/* <Pill color="green" onClick={() => setModalOpen(true)}>Export Pack</Pill> */}
-                <Pill onClick={fetchEvents}>Refresh</Pill>
-                <Pill onClick={() => setSidebarOpen(p => !p)}>{sidebarOpen ? "Hide Panel" : "Show Panel"}</Pill>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
-              <table className="w-full text-[12px]">
-                <thead><tr className="border-b-2 border-[#128C7E]/30">
-                  {["Time", "Actor", "Action", "Object", "Domain", "Sev", ""].map(h => (
-                    <th key={h} className="text-left px-3 py-2 font-black text-[#667781]">{h}</th>
-                  ))}
-                </tr></thead>
-                <tbody>
-                  {eventsLoading ? (
-                    <tr><td colSpan={7} className="px-3 py-8 text-center text-[#667781]">
-                      Loading audit events…
-                    </td></tr>
-                  ) : events.length === 0 ? (
-                    <tr><td colSpan={7} className="px-3 py-8 text-center text-[#667781]">
-                      No audit events match current filters.
-                    </td></tr>
-                  ) : (
-                    events.map(e => (
-                      <tr key={e.id} className="border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8FAFC] cursor-pointer">
-                        <td className="px-3 py-2 font-mono text-[#667781] whitespace-nowrap">{formatTime(e.timestamp)}</td>
-                        <td className="px-3 py-2 text-[#667781]">{e.actor}</td>
-                        <td className="px-3 py-2">
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-[#128C7E] text-white">{e.action}</span>
-                        </td>
-                        <td className="px-3 py-2 text-[#111B21]">{e.object}</td>
-                        <td className="px-3 py-2 text-[#667781]">{e.domain}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className={`w-2.5 h-2.5 rounded-full inline-block align-middle ${sevDot[e.severity] ?? "bg-[#9CA3AF]"}`} />
-                          <span className="ml-1.5 text-[#667781] align-middle">{e.severity}</span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <button
-                            onClick={(ev) => { ev.stopPropagation(); setEvents(prev => prev.filter(evt => evt.id !== e.id)); }}
-                            className="w-7 h-7 rounded-lg bg-[#FEF2F2] border border-[#EF4444]/20 text-[#EF4444] text-[12px] font-black cursor-pointer hover:bg-[#EF4444] hover:text-white transition-all grid place-items-center"
-                            title="Delete audit event"
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-3 py-2 text-[10px] text-[#667781] italic border-t border-[#E9EDEF]">
-              Tip: click a row → right blade (Event Details) • High-risk actions require HITL/HIC + hash-chain proof.
-            </div>
-          </div>
-
-          {/* ════════════════════ MID SCROLL ════════════════════════════ */}
-
-          {/* Tamper Evidence (Hash Chain) — commented out
+          {/* Activity Timeline */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
-            <div className="font-black text-[13px] text-[#111B21]">Tamper Evidence (Hash Chain)</div>
-            <div className="text-[11px] text-[#667781] mt-0.5 mb-3">
-              Irrefutable logs: every event signed + chained. Any gap triggers auto-escalation.
-            </div>
-            {hashLoading ? (
-              <div className="text-[12px] text-[#667781] py-4 text-center">Loading hash chain…</div>
-            ) : hashBlocks.length === 0 ? (
-              <div className="text-[12px] text-[#667781] py-4 text-center">No hash blocks available.</div>
+            <h3 className="font-black text-[14px] text-[#111B21] mb-4">Activity Timeline</h3>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[12px] text-[#667781]">Loading events...</span>
+                </div>
+              </div>
+            ) : events.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-[28px] mb-2">📋</div>
+                <p className="text-[13px] font-black text-[#111B21] mb-1">
+                  {search || domain || severity ? "No Matching Events" : "No Events Yet"}
+                </p>
+                <p className="text-[12px] text-[#667781]">
+                  {search || domain || severity
+                    ? "Try adjusting your filters."
+                    : "Your account activity will appear here."}
+                </p>
+                {(search || domain || severity) && (
+                  <button
+                    onClick={() => { setSearch(""); setDomain(""); setSeverity(""); }}
+                    className="mt-2 h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
             ) : (
-              <div className="flex gap-0 items-center overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {hashBlocks.map((block, i) => (
-                  <React.Fragment key={block.block_id}>
-                    <div className="min-w-[150px] bg-[#F8FAFC] border border-[#E9EDEF] rounded-xl p-3 relative shrink-0">
-                      <span className={`absolute top-3 right-3 w-2.5 h-2.5 rounded-full ${
-                        block.status === "valid" ? "bg-[#25D366]" :
-                        block.status === "gap"   ? "bg-[#FBBF24]" : "bg-[#EF4444]"
-                      }`} />
-                      <div className="font-black text-[13px] text-[#111B21]">Block {block.block_id}</div>
-                      <div className="text-[11px] text-[#667781] mt-0.5 font-mono truncate" title={block.hash}>
-                        {block.hash.slice(0, 12)}…
+              <div className="relative">
+                {/* Vertical timeline line */}
+                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-[#E9EDEF]" />
+
+                <div className="flex flex-col gap-0.5">
+                  {events.map((evt, i) => {
+                    const sev = SEVERITY_STYLES[evt.severity] || SEVERITY_STYLES.Info;
+                    const domLabel = DOMAIN_LABELS[evt.domain] || evt.domain;
+                    const isLast = i === events.length - 1;
+
+                    return (
+                      <div key={evt.id || i} className="flex gap-3 relative">
+                        {/* Dot */}
+                        <div className="flex flex-col items-center shrink-0 pt-1">
+                          <div className={`w-[10px] h-[10px] rounded-full ${sev.dot} shrink-0 z-10 ring-2 ring-white`} />
+                          {!isLast && <div className="w-px flex-1 bg-[#E9EDEF]" />}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 pb-4 min-w-0">
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-black text-[12px] text-[#111B21] leading-snug">
+                                {evt.action} — {evt.object}
+                              </div>
+                              {evt.actor && (
+                                <div className="text-[10px] text-[#667781] mt-0.5">
+                                  by {evt.actor}
+                                  {evt.ip_address && <span> · {evt.ip_address}</span>}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black ${sev.bg} ${sev.text}`}>
+                                {evt.severity}
+                              </span>
+                              <span className="text-[10px] font-black text-[#667781] bg-[#F0F2F5] px-1.5 py-0.5 rounded">
+                                {domLabel}
+                              </span>
+                              <span className="text-[10px] text-[#667781] min-w-[50px] text-right">
+                                {timeAgo(evt.timestamp)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-[#667781] mt-1">{block.event_count} events</div>
-                    </div>
-                    {i < hashBlocks.length - 1 && (
-                      <div className="flex items-center shrink-0 px-1">
-                        <span className="w-5 h-0.5 bg-[#25D366] rounded-full" />
-                      </div>
-                    )}
-                  </React.Fragment>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
-          */}
-
-          {/* ════════════════════ BOTTOM SCROLL ═════════════════════════ */}
-
-          {/* Retention + Export Controls — commented out
-          <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
-            <div className="font-black text-[13px] text-[#111B21] mb-3">Retention + Export Controls</div>
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { k: "Plan Entitlement",  v: kpis ? `${kpis.retention_days} days` : "—", sub: "Tied to billing plan" },
-                { k: "Export Rate Limit",  v: "500 rows/min", sub: "Prevents data exfil" },
-                { k: "Redaction",          v: "PII masked",   sub: "RBAC + audit proofs" },
-                { k: "Archive",            v: "S3/Blob",      sub: "Immutable cold storage" },
-              ].map(c => (
-                <div key={c.k} className="border border-[#E9EDEF] rounded-xl p-3">
-                  <div className="text-[11px] text-[#667781] mb-1">{c.k}</div>
-                  <div className="font-black text-[16px] text-[#128C7E] leading-tight">{c.v}</div>
-                  <div className="text-[10px] text-[#667781] mt-1">{c.sub}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          */}
 
         </div>
       </main>
-
-      {/* ── Right Sidebar: Waswa AI + Approval Queue ─────────────── */}
-      {sidebarOpen && (
-      <aside className="w-[380px] shrink-0 bg-white border-l border-[#E9EDEF] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-4 flex flex-col gap-3">
-
-        {/* Waswa AI Co-Pilot */}
-        <div className="bg-[#128C7E] text-white rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-black text-[13px]">Waswa AI • Co-Pilot</span>
-            <span className="text-[10px] font-black bg-[#25D366] text-[#075E54] px-2 py-0.5 rounded-full">ON</span>
-          </div>
-          <div className="text-[11px] leading-relaxed opacity-90 mb-3">
-            {[
-              "Leakage risk ↑ in VEBA Boda: 2.1x baseline",
-              "Suggest: enable 'Info Gating' + token unlock",
-              "Payments: Airtel UG p95 latency 11s → retry window",
-              "AI cost: route low-risk events to Local Engine (Tier 1)",
-            ].map((t, i) => (
-              <div key={i} className="flex items-start gap-2 mb-1">
-                <span className="w-2 h-2 rounded-full bg-[#25D366] mt-1 shrink-0" />
-                <span>{t}</span>
-              </div>
-            ))}
-          </div>
-          <input
-            placeholder="Ask Waswa...  (e.g., 'show HIC overrides last 24h')"
-            className="w-full h-8 rounded-lg bg-white/15 border-none px-3 text-[11px] text-white placeholder:text-white/60 outline-none"
-          />
-        </div>
-
-        {/* Compliance Snapshot */}
-        <div className="bg-[#075E54] text-white rounded-xl p-4">
-          <div className="font-black text-[13px] mb-2.5">Compliance Snapshot</div>
-          {complianceLoading ? (
-            <div className="text-[11px] opacity-70 text-center py-2">Loading…</div>
-          ) : !compliance ? (
-            <div className="text-[11px] opacity-70 text-center py-2">Unavailable</div>
-          ) : (
-            compliance.items.map(c => (
-              <div key={c.key} className="flex items-center justify-between mb-1.5 text-[12px]">
-                <span className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${complianceStatusDot[c.status] ?? "bg-[#9CA3AF]"} shrink-0`} />{c.key}
-                </span>
-                <span className="font-black">{c.value}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
-      )}
-
-      {/* ── Modal: Export Audit Pack (HIC) — commented out
-      {modalOpen && (
-        <div className="fixed inset-0 bg-black/35 z-50 grid place-items-center" onClick={() => setModalOpen(false)}>
-          <div className="w-[min(720px,calc(100vw-24px))] max-h-[calc(100vh-24px)] bg-white rounded-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-[#E9EDEF] flex items-center justify-between shrink-0">
-              <div>
-                <div className="font-black text-[16px] text-[#111B21]">Export Audit Pack (HIC)</div>
-                <div className="text-[11px] text-[#667781] mt-0.5">PDF/CSV + signatures + redaction • requires approval</div>
-              </div>
-              <button onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] font-black text-[14px] cursor-pointer grid place-items-center hover:bg-[#E9EDEF]">✕</button>
-            </div>
-            <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-5">
-              <div className="bg-[#FEF2F2] border border-[#EF4444]/20 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#EF4444] shrink-0" />
-                <span className="text-[12px] font-black text-[#111B21]">High-risk export: cross-tenant leakage prevention enforced.</span>
-              </div>
-              <div className="flex gap-2 mb-5">
-                {["1. Scope", "2. Format", "3. Redaction", "4. Approval"].map((s, i) => (
-                  <span key={s} className={`flex-1 h-9 rounded-lg text-[12px] font-black flex items-center justify-center border cursor-pointer ${i === 0 ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{s}</span>
-                ))}
-              </div>
-              <div className="text-[12px] font-black text-[#667781] mb-2">Scope</div>
-              <div className="border border-[#E9EDEF] rounded-xl p-3 mb-4">
-                <div className="flex gap-6 text-[12px] mb-2">
-                  <span><span className="text-[#667781]">Tenant</span> <span className="font-black text-[#111B21] ml-2">3D-TEPU (UG) ▾</span></span>
-                </div>
-                <div className="flex gap-6 text-[12px]">
-                  <span><span className="text-[#667781]">Date range</span> <span className="font-black text-[#111B21] ml-2">Last 24h</span></span>
-                  <span><span className="text-[#667781]">Include sub-tenants:</span> <span className="font-black text-[#111B21] ml-2">NO</span></span>
-                </div>
-              </div>
-              <div className="text-[12px] font-black text-[#667781] mb-2">Artifacts included</div>
-              <div className="border border-[#E9EDEF] rounded-xl p-3 mb-4">
-                {ARTIFACTS.map(a => (
-                  <div key={a} className="flex items-center gap-2 text-[12px] text-[#111B21] mb-1.5 last:mb-0">
-                    <span className="w-2 h-2 rounded-full bg-[#25D366] shrink-0" />{a}
-                  </div>
-                ))}
-              </div>
-              <div className="text-[12px] font-black text-[#667781] mb-2">Formats</div>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {[
-                  { fmt: "PDF (signed)", on: true }, { fmt: "CSV", on: true },
-                  { fmt: "XLSX", on: false }, { fmt: "JSON", on: true },
-                ].map(f => (
-                  <div key={f.fmt} className="flex items-center gap-2 border border-[#E9EDEF] rounded-xl px-3 py-2.5 text-[12px]">
-                    <span className={`w-2.5 h-2.5 rounded-full ${f.on ? "bg-[#25D366]" : "bg-[#9CA3AF]"} shrink-0`} />
-                    <span className="text-[#111B21]">{f.fmt}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="text-[12px] font-black text-[#667781] mb-2">Redaction</div>
-              <div className="bg-[#FEF3C7] border border-[#FBBF24]/30 rounded-xl p-4 mb-4">
-                <div className="font-black text-[12px] text-[#F97316] mb-1.5">Mask PII (phone, email, ID)</div>
-                <div className="text-[12px] text-[#111B21] leading-relaxed">
-                  Policy: RBAC-driven. System Admin sees masked fields unless escalated.<br />
-                  <strong>Include raw payloads: NO (recommended)</strong><br />
-                  <strong>Export watermark: ON</strong><br />
-                  <strong>Recipient channels: Email + WhatsApp (link)</strong>
-                </div>
-              </div>
-              <div className="text-[12px] font-black text-[#667781] mb-2">Approval</div>
-              <div className="bg-[#FEF3C7] border border-[#FBBF24]/30 rounded-xl p-4">
-                <div className="font-black text-[12px] text-[#EF4444] mb-1.5">HIC required</div>
-                <div className="text-[12px] text-[#111B21] mb-2"><strong>Select approvers (2):</strong></div>
-                <div className="border border-[#E9EDEF] rounded-lg px-3 py-2 text-[12px] text-[#111B21] bg-white mb-2">
-                  Finance Lead ▾ &ensp;+ &ensp;Compliance Officer ▾
-                </div>
-                <div className="text-[11px] text-[#667781]">Audit seal will be appended to manifest.</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-3 px-5 py-3 border-t border-[#E9EDEF] bg-white shrink-0">
-              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer hover:bg-[#F8FAFC]">Cancel</button>
-              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Request</button>
-            </div>
-          </div>
-        </div>
-      )}
-      */}
     </div>
   );
 }
 
-// ─── Reusable Components ─────────────────────────────────────────────────────
-const pillStyles: Record<string, string> = {
-  green: "bg-[#25D366] text-[#075E54]",
-  ghost: "bg-white border border-[#E9EDEF] text-[#667781]",
-};
+// ── KPI Card ───────────────────────────────────────────────────────────────
 
-function Pill({ color = "ghost", onClick, children }: { color?: string; onClick?: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`h-7 px-3 rounded-full text-[11px] font-black border-none cursor-pointer hover:brightness-105 active:opacity-85 transition-all whitespace-nowrap ${pillStyles[color] ?? pillStyles.ghost}`}>{children}</button>;
-}
+function KpiCard({
+  label, value, sub, color = "teal", loading = false,
+}: {
+  label: string; value: string; sub?: string;
+  color?: "teal" | "orange" | "red" | "blue";
+  loading?: boolean;
+}) {
+  const valueColor = {
+    teal:   "text-[#128C7E]",
+    orange: "text-[#F97316]",
+    red:    "text-[#EF4444]",
+    blue:   "text-[#3B82F6]",
+  }[color];
 
-function KpiCard({ label, value, sub, bar, loading }: { label: string; value: string; sub: string; bar: string; loading?: boolean }) {
   return (
-    <div className="bg-white border border-[#E9EDEF] rounded-xl p-3 relative overflow-hidden">
-      <div className={`absolute top-0 right-3 w-1.5 h-full ${bar} rounded-b-full`} />
-      <div className="text-[11px] text-[#667781]">{label}</div>
-      <div className={`text-[22px] font-black text-[#111B21] mt-1 leading-tight ${loading ? "animate-pulse" : ""}`}>{value}</div>
-      <div className="text-[10px] text-[#667781] mt-1">{sub}</div>
+    <div className="bg-white border border-[#E9EDEF] rounded-xl p-3 flex flex-col gap-0.5">
+      <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">{label}</div>
+      {loading ? (
+        <div className="h-6 bg-gray-200 rounded-lg animate-pulse w-16" />
+      ) : (
+        <div className={`text-[20px] font-black leading-tight ${valueColor}`}>{value}</div>
+      )}
+      {sub && <div className="text-[10px] text-[#667781]">{sub}</div>}
     </div>
   );
 }
