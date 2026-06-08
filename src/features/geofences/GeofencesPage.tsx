@@ -22,12 +22,14 @@ import { CreateGeofenceDrawer } from "./components/CreateGeofenceDrawer";
 import { EditGeofenceDrawer } from "./components/EditGeofenceDrawer";
 import { AttachDevicesModal } from "./components/AttachDevicesModal";
 import { DeviceZones } from "./components/DeviceZones";
+import { GeofenceGroups } from "./components/GeofenceGroups";
 
-type GeofenceTab = "my-geofences" | "device-zones";
+type GeofenceTab = "my-geofences" | "device-zones" | "groups";
 
 const TABS: { key: GeofenceTab; label: string }[] = [
   { key: "my-geofences", label: "My Geofences" },
   { key: "device-zones", label: "Device Zones" },
+  { key: "groups",       label: "Groups" },
 ];
 
 export function GeofencesPage() {
@@ -257,10 +259,15 @@ export function GeofencesPage() {
               />
             </div>
           </div>
-        ) : (
+        ) : activeTab === "device-zones" ? (
           /* Device Zones tab */
           <div className="h-full max-w-2xl">
             <DeviceZones />
+          </div>
+        ) : (
+          /* Groups tab */
+          <div className="h-full overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <GeofenceGroups geozones={geozones} onGeozonesChanged={fetchGeozones} />
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@
  * Uses react-router-dom NavLink for URL-driven active state.
  */
 import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { usePermissions } from "../../auth/PermissionsContext";
 import { useAuth } from "../../auth/AuthContext";
 import { getModulesForSidebar } from "../../auth/modules";
@@ -31,11 +31,6 @@ const DEFAULT_ITEMS: SidebarItem[] = getModulesForSidebar().map((m) => ({
   permission: m.viewPermission,
 }));
 
-const DEFAULT_TIP: SidebarTip = {
-  title: "Waswa Tip",
-  body:  'Type: "why burn↑" to trace token drains to infra.',
-};
-
 export function Sidebar({
   title    = "Console",
   subtitle = "Primary Ops+Command Center",
@@ -43,7 +38,6 @@ export function Sidebar({
   onSelect,
   open     = false,
 }: SidebarProps) {
-  const navigate = useNavigate();
   const { hasPermission, loading } = usePermissions();
   const { logout } = useAuth();
 

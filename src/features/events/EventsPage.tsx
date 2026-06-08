@@ -74,7 +74,7 @@ function CreateEventDrawer({
   const create = useGuardedMutation("events.create", createEvent);
 
   const handleSubmit = async () => {
-    if (!name.trim() || !description.trim() || !conditionValue.trim()) {
+    if (!name.trim() || !description.trim()) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -200,7 +200,7 @@ function CreateEventDrawer({
           {/* Condition Value */}
           <div>
             <label className="block text-[12px] font-black text-[#111B21] mb-1">
-              Threshold Value *
+              Threshold Value
             </label>
             <input
               value={conditionValue}
@@ -344,7 +344,7 @@ function EditEventDrawer({
 
   const handleSubmit = async () => {
     if (!event) return;
-    if (!name.trim() || !description.trim() || !conditionValue.trim()) {
+    if (!name.trim() || !description.trim()) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -459,7 +459,7 @@ function EditEventDrawer({
           {/* Condition Value */}
           <div>
             <label className="block text-[12px] font-black text-[#111B21] mb-1">
-              Threshold Value *
+              Threshold Value
             </label>
             <input
               value={conditionValue}

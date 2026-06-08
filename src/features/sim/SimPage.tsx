@@ -646,6 +646,8 @@ export function SimPage() {
     type: "pause" | "restore"; imei: string; deviceName: string;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [pkgView, setPkgView] = useState<"grid" | "list">("grid");
+  const [pkgSearch, setPkgSearch] = useState("");
 
   // SECURITY: ownerUid from logged-in user only
   const ownerUid = authState.accountUid || getCookie("_nvxs_account_uid") || "";
@@ -931,16 +933,61 @@ export function SimPage() {
           )}
 
           {/* ── TAB: Buy Tokens ────────────────────────────────────────── */}
-          {tab === "buy" && (
+          {tab === "buy" && (() => {
+            const q = pkgSearch.toLowerCase();
+            const filtered = q
+              ? packages.filter((p) =>
+                  p.token_name?.toLowerCase().includes(q) ||
+                  p.token_type?.toLowerCase().includes(q) ||
+                  (p.variant?.variant_name || "").toLowerCase().includes(q) ||
+                  getPkgCurrency(p).toLowerCase().includes(q)
+                )
+              : packages;
+
+            return (
             <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-[14px] text-[#111B21]">Available Token Packages</h3>
-                <button
-                  onClick={() => { pkgFetched.current = false; fetchPackages(); }}
-                  className="h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all flex items-center gap-1.5"
-                >
-                  <span>&#8635;</span> Refresh
-                </button>
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-black text-[14px] text-[#111B21]">
+                  Available Token Packages
+                  {!pkgLoading && <span className="text-[12px] text-[#667781] font-normal ml-2">({filtered.length})</span>}
+                </h3>
+                <div className="flex items-center gap-2">
+                  {/* View toggle */}
+                  <div className="flex bg-[#F0F2F5] rounded-lg border border-[#E9EDEF] overflow-hidden">
+                    <button
+                      onClick={() => setPkgView("grid")}
+                      title="Grid view"
+                      className={`w-8 h-8 flex items-center justify-center text-[13px] cursor-pointer border-none transition-all ${
+                        pkgView === "grid" ? "bg-[#128C7E] text-white" : "bg-transparent text-[#667781] hover:bg-[#E9EDEF]"
+                      }`}
+                    >&#9638;</button>
+                    <button
+                      onClick={() => setPkgView("list")}
+                      title="List view"
+                      className={`w-8 h-8 flex items-center justify-center text-[13px] cursor-pointer border-none transition-all ${
+                        pkgView === "list" ? "bg-[#128C7E] text-white" : "bg-transparent text-[#667781] hover:bg-[#E9EDEF]"
+                      }`}
+                    >&#9776;</button>
+                  </div>
+                  <button
+                    onClick={() => { pkgFetched.current = false; fetchPackages(); }}
+                    className="h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all flex items-center gap-1.5"
+                  >
+                    <span>&#8635;</span> Refresh
+                  </button>
+                </div>
+              </div>
+
+              {/* Search bar */}
+              <div className="mb-3">
+                <input
+                  type="text"
+                  value={pkgSearch}
+                  onChange={(e) => setPkgSearch(e.target.value)}
+                  placeholder="Search tokens by name, type, or currency..."
+                  className="w-full h-9 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+                />
               </div>
 
               {pkgLoading ? (
@@ -950,21 +997,85 @@ export function SimPage() {
                     <span className="text-[12px] text-[#667781]">Loading packages...</span>
                   </div>
                 </div>
-              ) : packages.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="text-[28px] mb-2">🛒</div>
-                  <p className="text-[13px] font-black text-[#111B21] mb-1">No Packages Available</p>
-                  <p className="text-[12px] text-[#667781]">Token packages are not configured yet. Contact support.</p>
+                  <div className="text-[28px] mb-2">{pkgSearch ? "🔍" : "🛒"}</div>
+                  <p className="text-[13px] font-black text-[#111B21] mb-1">
+                    {pkgSearch ? "No Matching Packages" : "No Packages Available"}
+                  </p>
+                  <p className="text-[12px] text-[#667781]">
+                    {pkgSearch
+                      ? `No packages match "${pkgSearch}". Try a different search.`
+                      : "Token packages are not configured yet. Contact support."}
+                  </p>
+                  {pkgSearch && (
+                    <button
+                      onClick={() => setPkgSearch("")}
+                      className="mt-2 h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all"
+                    >
+                      Clear Search
+                    </button>
+                  )}
                 </div>
-              ) : (
+              ) : pkgView === "grid" ? (
+                /* ── Grid View ─────────────────────────────────────────── */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {packages.map((pkg) => (
+                  {filtered.map((pkg) => (
                     <PackageCard key={pkg.token_id} pkg={pkg} onBuy={setBuyTarget} />
                   ))}
                 </div>
+              ) : (
+                /* ── List View ─────────────────────────────────────────── */
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-[#E9EDEF]">
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Token Name</th>
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Type</th>
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Price</th>
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Billing Period</th>
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((pkg) => {
+                        const price = getPkgPrice(pkg);
+                        const currency = getPkgCurrency(pkg);
+                        const billing = getPkgBillingLabel(pkg);
+                        const variantName = pkg.variant?.variant_name;
+                        return (
+                          <tr key={pkg.token_id} className="border-b border-[#F0F2F5] hover:bg-[#F8F9FA] transition-colors">
+                            <td className="px-3 py-2.5">
+                              <div className="font-black text-[12px] text-[#111B21]">{pkg.token_name}</div>
+                              {variantName && <div className="text-[10px] text-[#667781]">{variantName}</div>}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30">
+                                {pkg.token_type}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-[12px] font-black text-[#128C7E]">
+                              {currency} {price.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2.5 text-[12px] text-[#111B21] font-black">{billing}</td>
+                            <td className="px-3 py-2.5 text-center">
+                              <button
+                                onClick={() => setBuyTarget(pkg)}
+                                className="h-7 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+                              >
+                                Buy Now
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {/* ── TAB: Device Subscriptions ──────────────────────────────── */}
           {tab === "subscriptions" && (
