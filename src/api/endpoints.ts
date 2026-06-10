@@ -166,6 +166,10 @@ export const ENDPOINTS = {
     CREATE: "/users/create",
     ALL: "/users/all",
     ASSIGN_ROLE: "/users",           // append /{user_uid}/assign-role
+    ACTION: "/users/action",         // POST {action: 'active'|'locked', account_uid}
+    RESET_PASSWORD: "/users",        // PUT  /{user_uid}/reset-password
+    CHANGE_PASSWORD: "/users",       // PUT  /{user_uid}/change-password
+    DETAILS: "/users",               // GET  /{user_uid}/details
   },
 
   FLEET: {

@@ -188,3 +188,39 @@ export function getRoleUserCounts(opts?: RequestOptions): Promise<ApiResponse<Re
 export function getPermissionRoleCounts(opts?: RequestOptions): Promise<ApiResponse<Record<string, number>>> {
   return get<Record<string, number>>(ENDPOINTS.RBAC.STATS_PERM_ROLE_COUNTS, opts);
 }
+
+// ── User Actions (Block / Unblock / Reset Password) ─────────────────────
+
+/** Block (lock) a user account. */
+export function blockUser(
+  accountUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string>> {
+  return post<string>(ENDPOINTS.USERS.ACTION, { data: { action: "locked", account_uid: accountUid } }, opts);
+}
+
+/** Unblock (restore) a user account. */
+export function unblockUser(
+  accountUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string>> {
+  return post<string>(ENDPOINTS.USERS.ACTION, { data: { action: "active", account_uid: accountUid } }, opts);
+}
+
+/** Admin reset password — returns a temporary password. */
+export function resetUserPassword(
+  userUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ temporary_password: string; message: string }>> {
+  return put<{ temporary_password: string; message: string }>(
+    `${ENDPOINTS.USERS.RESET_PASSWORD}/${userUid}/reset-password`, {}, opts,
+  );
+}
+
+/** Get single user details. */
+export function getUserDetails(
+  userUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<UserAccount>> {
+  return get<UserAccount>(`${ENDPOINTS.USERS.DETAILS}/${userUid}/details`, opts);
+}
