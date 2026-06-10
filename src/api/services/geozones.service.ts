@@ -22,6 +22,9 @@ import type {
   AttachDevicesRequest,
   DeviceGeozone,
   GeozoneDetails,
+  GeozoneGroup,
+  CreateGeozoneGroupRequest,
+  UpdateGeozoneGroupRequest,
 } from "../types";
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
@@ -121,6 +124,67 @@ export function getDeviceGeozones(
 ): Promise<ApiResponse<DeviceGeozone[]>> {
   return get<DeviceGeozone[]>(
     `${ENDPOINTS.GEOZONES.DEVICE_ZONES}/${deviceUid}/list`,
+    opts,
+  );
+}
+
+// ── Geozone Groups ─────────────────────────────────────────────────────────
+
+/** Create a new geozone group. */
+export function createGeozoneGroup(
+  payload: CreateGeozoneGroupRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ group_uid: string }>> {
+  return post<{ group_uid: string }>(ENDPOINTS.GEOZONES.GROUP_CREATE, { data: payload }, opts);
+}
+
+/** List all geozone groups for an owner. */
+export function getGeozoneGroups(
+  ownerUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<GeozoneGroup[]>> {
+  return get<GeozoneGroup[]>(`${ENDPOINTS.GEOZONES.GROUP_LIST}/${ownerUid}/list`, opts);
+}
+
+/** Update a geozone group. */
+export function updateGeozoneGroup(
+  groupUid: string,
+  payload: UpdateGeozoneGroupRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string>> {
+  return put<string>(`${ENDPOINTS.GEOZONES.GROUP_UPDATE}/${groupUid}/update`, { data: payload }, opts);
+}
+
+/** Delete a geozone group. */
+export function deleteGeozoneGroup(
+  groupUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string>> {
+  return del<string>(`${ENDPOINTS.GEOZONES.GROUP_DELETE}/${groupUid}/delete`, {}, opts);
+}
+
+/** Assign geozones to a group. */
+export function assignGeozonesToGroup(
+  groupUid: string,
+  geozoneUids: string[],
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ updated: number }>> {
+  return post<{ updated: number }>(
+    `${ENDPOINTS.GEOZONES.GROUP_ASSIGN}/${groupUid}/assign`,
+    { data: { geozone_uids: geozoneUids } },
+    opts,
+  );
+}
+
+/** Remove geozones from a group. */
+export function removeGeozonesFromGroup(
+  groupUid: string,
+  geozoneUids: string[],
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ removed: number }>> {
+  return post<{ removed: number }>(
+    `${ENDPOINTS.GEOZONES.GROUP_REMOVE}/${groupUid}/remove`,
+    { data: { geozone_uids: geozoneUids } },
     opts,
   );
 }

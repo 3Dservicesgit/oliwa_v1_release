@@ -122,6 +122,13 @@ export const ENDPOINTS = {
     ATTACH:        "/geozones",           // POST /{geozone_id}/attach
     DETACH:        "/geozones",           // PUT  /{geozone_id}/detach/{device_id}/action
     DEVICE_ZONES:  "/geozones/devices",   // GET  /{device_uid}/list
+    /** Geozone groups */
+    GROUP_CREATE:  "/geozones/groups/create",       // POST
+    GROUP_LIST:    "/geozones/groups",               // GET  /{owner_uid}/list
+    GROUP_UPDATE:  "/geozones/groups",               // PUT  /{group_uid}/update
+    GROUP_DELETE:  "/geozones/groups",               // DELETE /{group_uid}/delete
+    GROUP_ASSIGN:  "/geozones/groups",               // POST /{group_uid}/assign
+    GROUP_REMOVE:  "/geozones/groups",               // POST /{group_uid}/remove
   },
   PORTS: {
     ACTIVITY: "/ports/activity",

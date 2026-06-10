@@ -154,6 +154,10 @@ export type {
   GeozoneDetails,
   LatLng,
   ParsedGeozone,
+  GeozoneGroup,
+  CreateGeozoneGroupRequest,
+  UpdateGeozoneGroupRequest,
+  AssignGeozonesRequest,
 } from "./geozones.types";
 
 export { parseGeozonePoints, serializeGeozonePoints } from "./geozones.types";

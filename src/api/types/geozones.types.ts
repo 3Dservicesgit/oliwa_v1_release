@@ -74,6 +74,32 @@ export interface ParsedGeozone extends Omit<Geozone, "geozone_points"> {
   path: LatLng[];
 }
 
+// ── Geozone Groups ─────────────────────────────────────────────────────────
+
+export interface GeozoneGroup {
+  group_uid: string;
+  group_name: string;
+  group_description: string;
+  group_owner: string;
+  date_created: string;
+  geozone_count: number;
+}
+
+export interface CreateGeozoneGroupRequest {
+  group_name: string;
+  group_description?: string;
+  group_owner: string;
+}
+
+export interface UpdateGeozoneGroupRequest {
+  group_name: string;
+  group_description?: string;
+}
+
+export interface AssignGeozonesRequest {
+  geozone_uids: string[];
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
