@@ -1,82 +1,45 @@
 /**
  * GatehousePage.tsx  (/gatehouse)
- * Fleet Monitoring — Live Vehicle Tracking
+ * Track Playback — Historical Trip Replay
+ *
+ * Layout:
+ *   ┌─────────────────┬──────────────────────────────────┐
+ *   │  Controls        │  Google Map                      │
+ *   │  • Device picker │  • Route polyline                │
+ *   │  • Date range    │  • Start/end markers             │
+ *   │  • Load button   │  • Replay animation              │
+ *   │                  │                                  │
+ *   │  Trip List       │                                  │
+ *   │  • trip cards    │                                  │
+ *   │  • start/end     │                                  │
+ *   │  • distance      │                                  │
+ *   │  • duration      ├──────────────────────────────────┤
+ *   │                  │  Position Detail (bottom strip)  │
+ *   └─────────────────┴──────────────────────────────────┘
+ *
+ * Security: devices scoped to customer's account_root from cookies.
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { getCookie }          from "../../utils/cookies";
 import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
+import type { TripSummary, PositionRecord } from "../../api";
 
-// ─── Fleet env config ─────────────────────────────────────────────────────────
-const FLEET_API = (import.meta.env.VITE_FLEET_API_URL as string) ?? "https://api.fort-track.online";
-const FLEET_SSE = (import.meta.env.VITE_FLEET_SSE_URL as string) ?? "https://socket.fort-track.online";
+// ─── Config ──────────────────────────────────────────────────────────────────
+const FLEET_API = (import.meta.env.VITE_FLEET_API_URL as string) ?? "https://narvas.3dservices.co.ug";
 const GMAPS_KEY = "AIzaSyCxsn8cnwrKUpbgO6Pn_Gdk2-T5HkJRmLY";
-const PAGE_SIZE  = 25;
-
-const ICONS = {
-  moving:  "https://santripe.com/static/moving.png",
-  parked:  "https://santripe.com/static/parked.png",
-  idling:  "https://santripe.com/static/idiling.png",
-  unknown: "https://santripe.com/static/unknown.png",
-};
 
 const DEFAULT_CENTER = { lat: 1.3733, lng: 32.2903 };
 
-// Injected once — strips Google Maps InfoWindow's own background/padding so our
-// HTML becomes fully bleed (header color goes edge-to-edge).
-const IW_CSS = `
-  .gm-style .gm-style-iw-c{
-    padding:0!important;background:transparent!important;
-    border-radius:12px!important;overflow:hidden!important;
-    box-shadow:0 8px 32px rgba(0,0,0,0.28)!important;
-    max-width:none!important;
-  }
-  .gm-style .gm-style-iw-d{
-    overflow:hidden!important;padding:0!important;max-height:none!important;
-  }
-  .gm-style .gm-style-iw-t::after{ display:none!important; }
-  .gm-style .gm-style-iw-chr{
-    position:absolute!important;top:6px!important;right:6px!important;z-index:10!important;
-  }
-  .gm-style .gm-ui-hover-effect{
-    background:rgba(255,255,255,0.2)!important;border-radius:50%!important;
-    width:26px!important;height:26px!important;opacity:1!important;
-  }
-  .gm-style .gm-ui-hover-effect:hover{ background:rgba(255,255,255,0.35)!important; }
-  .gm-style .gm-ui-hover-effect>span{ background-color:white!important; }
-  .gm-style .gm-ui-hover-effect img{ filter:brightness(100)!important; }
-`;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type MotionStatus = "Moving" | "Parked" | "Idling" | "Offline";
-
-interface VehicleUnit {
-  imei:                string;
-  name:                string;
-  subscription_status: string;
-  status:              MotionStatus;
-  speed:               number;
-  motion_state:        string;
-  geocoded_location:   string;
-  coords:              { lat: number; lng: number } | null;
-  last_sync:           string;
-  country:             string;
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface DeviceOption {
+  imei: string;
+  name: string;
+  car_make: string;
+  car_model: string;
 }
 
-interface ClientItem { uid: string; label: string; }
-
-type ToastVariant = "warn" | "error" | "info" | "success";
-interface Toast { id: string; variant: ToastVariant; title: string; body?: string; out?: boolean; }
-
-// ─── Status palette ───────────────────────────────────────────────────────────
-const ST: Record<MotionStatus, { bg: string; dim: string; label: string }> = {
-  Moving:  { bg: "#2E7D32", dim: "rgba(46,125,50,0.88)",   label: "Moving"  },
-  Parked:  { bg: "#C62828", dim: "rgba(198,40,40,0.88)",   label: "Parked"  },
-  Idling:  { bg: "#1565C0", dim: "rgba(21,101,192,0.88)",  label: "Idling"  },
-  Offline: { bg: "#455A64", dim: "rgba(69,90,100,0.85)",   label: "Offline" },
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 async function fleetFetch(method: string, path: string, body?: unknown): Promise<unknown> {
   const token = getStoredAuthToken();
   const hdrs: Record<string, string> = { "Content-Type": "application/json" };
@@ -89,521 +52,178 @@ async function fleetFetch(method: string, path: string, body?: unknown): Promise
   return res.json();
 }
 
-// Fetch account_type + role from the user-details API.
-// Returns null on any error so callers can fall back to cookies.
-async function fetchUserDetails(accountUid: string): Promise<{ account_type: string; role: string } | null> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const j = await fleetFetch("GET", `${ENDPOINTS.FLEET.USER_DETAILS}/${encodeURIComponent(accountUid)}/details`) as any;
-    if (j?.status === "success" && j?.data) {
-      return {
-        account_type: String(j.data.account_type || "").toLowerCase(),
-        role: String(j.data.assigned_role || j.data.role || "").toLowerCase(),
-      };
-    }
-  } catch { /**/ }
-  return null;
+/** Format date as DD-MM-YYYY for backend. */
+function fmtDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
-const sseUrl = (imei: string) =>
-  `${FLEET_SSE}/data-stream/${encodeURIComponent(imei)}/x-location`;
-
-function esc(s: unknown): string {
-  return String(s ?? "")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+/** Format date as YYYY-MM-DD for <input type="date">. */
+function toInputDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
-function normalizeStatus(ms: string, spd: number): MotionStatus {
-  const s = ms.toLowerCase();
-  // motion_state text takes priority — more reliable than speed alone
-  if (s.includes("park") || s.includes("stop")) return "Parked";
-  if (s.includes("idl")  || s === "idle")        return "Idling";
-  if (s.includes("mov")  || s.includes("driv"))  return "Moving";
-  // fall back to speed; threshold of 5 km/h filters out GPS position jitter
-  if (Number.isFinite(spd) && spd >= 5)          return "Moving";
-  if (Number.isFinite(spd) && spd > 0)           return "Idling";
-  return "Offline";
+/** Parse YYYY-MM-DD from input. */
+function parseInputDate(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
-function iconUrl(st: MotionStatus): string {
-  return st === "Moving" ? ICONS.moving : st === "Parked" ? ICONS.parked
-       : st === "Idling" ? ICONS.idling : ICONS.unknown;
-}
-
-function dotColor(st: MotionStatus): string {
-  return st === "Moving" ? "#2E7D32" : st === "Parked" ? "#C62828"
-       : st === "Idling" ? "#1565C0" : "#607D8B";
-}
-
-// ─── InfoWindow HTML builders ─────────────────────────────────────────────────
-// Car SVG used in the header icon circle
-const CAR_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-  <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3
-    12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0
-    1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5
-    13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5
-    1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
-</svg>`;
-
-function row(label: string, value: string): string {
-  return `<div style="display:flex;justify-content:space-between;align-items:center;
-    padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.1)">
-    <span style="font-size:12px;color:rgba(255,255,255,0.65);font-weight:500">${label}</span>
-    <span style="font-size:12px;color:#fff;font-weight:700;
-      max-width:160px;overflow:hidden;text-overflow:ellipsis;
-      white-space:nowrap;text-align:right">${value}</span>
-  </div>`;
-}
-
-function buildPopupHtml(u: VehicleUnit): string {
-  const st      = ST[u.status] ?? ST.Offline;
-  const name    = esc(u.name || u.imei);
-  const imei    = esc(u.imei);
-  const speed   = u.speed > 0 ? `${u.speed} km/h` : "0 km/h";
-  const motion  = esc(u.motion_state || u.status);
-  const loc     = esc(u.geocoded_location || u.country || "—");
-  const sync    = esc(u.last_sync || "—");
-  const mapsHref = u.coords
-    ? `https://www.google.com/maps?q=${u.coords.lat},${u.coords.lng}` : null;
-
-  return `
-<div style="
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  width:280px;background:${st.bg};color:#fff;border-radius:12px;overflow:hidden;
-">
-  <!-- Header -->
-  <div style="padding:14px 40px 12px 14px;
-    display:flex;align-items:flex-start;gap:11px;
-    border-bottom:1px solid rgba(255,255,255,0.18);
-    background:${st.dim};
-  ">
-    <div style="width:40px;height:40px;border-radius:50%;flex-shrink:0;
-      background:rgba(255,255,255,0.18);
-      display:flex;align-items:center;justify-content:center">
-      ${CAR_SVG}
-    </div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:14px;font-weight:800;color:#fff;line-height:1.25;
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:3px;
-        font-family:monospace;letter-spacing:.5px">${imei}</div>
-    </div>
-  </div>
-
-  <!-- Rows -->
-  <div style="padding:4px 14px 2px">
-    ${row("Speed",     speed)}
-    ${row("Motion",    motion)}
-    ${row("Location",  loc)}
-    ${row("Last Sync", sync)}
-  </div>
-
-  <!-- Footer link -->
-  ${mapsHref ? `
-  <div style="padding:8px 14px 12px;text-align:right">
-    <a href="${mapsHref}" target="_blank" rel="noopener noreferrer" style="
-      font-size:11px;color:rgba(255,255,255,0.8);font-weight:700;
-      text-decoration:none;display:inline-flex;align-items:center;gap:3px;
-    ">
-      Open in Google Maps
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-        stroke="rgba(255,255,255,0.8)" stroke-width="2.5" stroke-linecap="round">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-      </svg>
-    </a>
-  </div>` : `<div style="padding-bottom:10px"></div>`}
-</div>`;
-}
-
-function buildWaitingHtml(name: string): string {
-  const bg = ST.Offline.bg;
-  return `
-<div style="
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  width:240px;background:${bg};color:#fff;border-radius:12px;overflow:hidden;
-">
-  <div style="padding:12px 40px 12px 14px;background:${ST.Offline.dim};
-    border-bottom:1px solid rgba(255,255,255,0.18);
-    display:flex;align-items:center;gap:11px">
-    <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
-      background:rgba(255,255,255,0.18);
-      display:flex;align-items:center;justify-content:center">
-      ${CAR_SVG}
-    </div>
-    <div style="font-size:13px;font-weight:800;color:#fff;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
-  </div>
-  <div style="padding:14px;display:flex;align-items:center;gap:10px">
-    <style>@keyframes gw-spin{to{transform:rotate(360deg)}}.gw-s{animation:gw-spin 1s linear infinite;transform-origin:center}</style>
-    <svg class="gw-s" width="18" height="18" viewBox="0 0 24 24" fill="none"
-      stroke="rgba(255,255,255,0.8)" stroke-width="2.5" stroke-linecap="round">
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83
-               M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-    </svg>
-    <span style="font-size:12px;color:rgba(255,255,255,0.8)">Waiting for live GPS fix…</span>
-  </div>
-</div>`;
-}
-
-function buildOfflineHtml(name: string): string {
-  const bg = ST.Offline.bg;
-  return `
-<div style="
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  width:240px;background:${bg};color:#fff;border-radius:12px;overflow:hidden;
-">
-  <div style="padding:12px 40px 12px 14px;background:${ST.Offline.dim};
-    border-bottom:1px solid rgba(255,255,255,0.15);
-    display:flex;align-items:center;gap:11px">
-    <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
-      background:rgba(255,255,255,0.15);
-      display:flex;align-items:center;justify-content:center">
-      ${CAR_SVG}
-    </div>
-    <div style="font-size:13px;font-weight:800;color:#fff;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
-  </div>
-  <div style="padding:12px 14px;font-size:12px;color:rgba(255,255,255,0.75)">
-    No data available — unit may be offline or out of coverage.
-  </div>
-</div>`;
-}
-
-// ─── Shared atoms ─────────────────────────────────────────────────────────────
-const BADGE_COLORS: Record<MotionStatus, { bg: string; color: string }> = {
-  Moving:  { bg: "#E8F5E9", color: "#2E7D32" },
-  Parked:  { bg: "#FFEBEE", color: "#C62828" },
-  Idling:  { bg: "#E3F2FD", color: "#1565C0" },
-  Offline: { bg: "#F1F3F4", color: "#607D8B" },
-};
-
-function StatusBadge({ status }: { status: MotionStatus }) {
-  const c = BADGE_COLORS[status] ?? BADGE_COLORS.Offline;
-  return (
-    <span
-      className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded"
-      style={{ background: c.bg, color: c.color }}
-    >
-      {status}
-    </span>
-  );
-}
-
-function Btn({
-  variant = "teal", onClick, disabled, children,
-}: {
-  variant?: "green" | "teal" | "azure" | "dark";
-  onClick?: () => void; disabled?: boolean; children: React.ReactNode;
-}) {
-  const c: Record<string, string> = {
-    green: "bg-[#25D366] text-[#075E54]",
-    teal:  "bg-[#128C7E] text-white",
-    azure: "bg-[#34B7F1] text-white",
-    dark:  "bg-[#111B21] text-white",
+/** Duration string from two time strings "HH:MM:SS". */
+function durationStr(start: string, end: string): string {
+  const toSec = (t: string) => {
+    const p = t.split(":").map(Number);
+    return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
   };
-  return (
-    <button onClick={onClick} disabled={disabled}
-      className={`h-9 rounded-lg px-3.5 text-[12px] font-extrabold border-none cursor-pointer
-        hover:brightness-105 active:opacity-85 transition-all
-        disabled:opacity-50 disabled:cursor-not-allowed ${c[variant]}`}
-    >{children}</button>
-  );
+  let diff = toSec(end) - toSec(start);
+  if (diff < 0) diff += 86400;
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
-// ─── Toast stack ──────────────────────────────────────────────────────────────
-const TCONF: Record<ToastVariant, { bar: string; icon: string; col: string }> = {
-  warn:    { bar: "bg-[#FB8C00]", icon: "⚠", col: "#FB8C00" },
-  error:   { bar: "bg-[#D93025]", icon: "✕", col: "#D93025" },
-  info:    { bar: "bg-[#34B7F1]", icon: "ℹ", col: "#34B7F1" },
-  success: { bar: "bg-[#128C7E]", icon: "✓", col: "#128C7E" },
-};
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
-  if (!toasts.length) return null;
+function TripCard({ trip, index, selected, onClick }: {
+  trip: TripSummary; index: number; selected: boolean; onClick: () => void;
+}) {
+  const startLoc = trip.start_point_dta?.geocoded_location || "—";
+  const endLoc   = trip.end_point_dta?.geocoded_location   || "—";
+  const startTime = trip.start_point_dta?.local_system_timestamp || trip.start_time || "";
+  const endTime   = trip.end_point_dta?.local_system_timestamp   || trip.end_time || "";
+  const dur = startTime && endTime ? durationStr(startTime, endTime) : "—";
+
   return (
-    <div className="fixed bottom-5 right-5 z-[70] flex flex-col gap-2 items-end pointer-events-none">
-      <style>{`@keyframes toast-drain{from{width:100%}to{width:0%}}`}</style>
-      {toasts.map((t) => {
-        const s = TCONF[t.variant];
-        return (
-          <div key={t.id}
-            className={[
-              "pointer-events-auto flex flex-col w-[300px] rounded-xl overflow-hidden",
-              "bg-white border border-[#E9EDEF] shadow-[0_8px_30px_rgba(0,0,0,0.18)]",
-              `border-l-[4px]`,
-              "transition-all duration-300",
-              t.out ? "opacity-0 translate-x-4" : "opacity-100 translate-x-0",
-            ].join(" ")}
-            style={{ borderLeftColor: s.col }}
-          >
-            <div className="flex items-start gap-3 px-3.5 pt-3 pb-2.5">
-              <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black text-white mt-0.5"
-                style={{ background: s.col }}>{s.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-extrabold text-[#111B21] leading-snug">{t.title}</div>
-                {t.body && <div className="text-[11px] text-[#667781] mt-0.5 leading-snug">{t.body}</div>}
-              </div>
-              <button onClick={() => onDismiss(t.id)}
-                className="shrink-0 text-[#667781] hover:text-[#111B21] bg-transparent border-none cursor-pointer text-[18px] leading-none transition-colors">×</button>
-            </div>
-            <div className="h-[3px] w-full bg-[#F0F2F5]">
-              <div className={`h-full rounded-full ${s.bar}`}
-                style={{ animation: "toast-drain 4s linear forwards" }} />
-            </div>
+    <button
+      onClick={onClick}
+      className={[
+        "w-full text-left px-3 py-3 border-b border-[#E9EDEF] transition-all cursor-pointer",
+        selected
+          ? "bg-[#E7F7EF] border-l-[3px] border-l-[#128C7E]"
+          : "bg-white hover:bg-[#F8F9FA] border-l-[3px] border-l-transparent",
+      ].join(" ")}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[12px] font-black text-[#128C7E]">Trip {index + 1}</span>
+        <span className="text-[10px] font-bold text-[#667781] bg-[#F0F2F5] px-1.5 py-0.5 rounded">
+          {trip.mileage_passed} km
+        </span>
+      </div>
+
+      {/* Timeline */}
+      <div className="flex gap-2">
+        {/* Dots + line */}
+        <div className="flex flex-col items-center pt-0.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] shrink-0" />
+          <span className="w-[2px] flex-1 bg-[#E9EDEF] my-0.5" />
+          <span className="w-2.5 h-2.5 rounded-full bg-[#C62828] shrink-0" />
+        </div>
+
+        {/* Locations */}
+        <div className="flex-1 min-w-0">
+          <div className="mb-2">
+            <div className="text-[10px] text-[#667781] font-bold">START · {startTime.slice(0, 5)}</div>
+            <div className="text-[11px] text-[#111B21] truncate" title={startLoc}>{startLoc}</div>
           </div>
-        );
-      })}
-    </div>
+          <div>
+            <div className="text-[10px] text-[#667781] font-bold">END · {endTime.slice(0, 5)}</div>
+            <div className="text-[11px] text-[#111B21] truncate" title={endLoc}>{endLoc}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer stats */}
+      <div className="flex items-center gap-3 mt-2 text-[10px] text-[#667781]">
+        <span>Duration: <b className="text-[#111B21]">{dur}</b></span>
+        <span>Distance: <b className="text-[#111B21]">{trip.mileage_passed} km</b></span>
+      </div>
+    </button>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────────────────
 export default function GatehousePage() {
-  const [, forceUpdate]     = useState(0);
-  const [loading,        setLoading]       = useState(true);
-  const [listError,      setListError]     = useState<string | null>(null);
-  const [searchQ,        setSearchQ]       = useState("");
-  const [isClientAdmin,  setIsClientAdmin] = useState(false);
-  const [showModal,      setShowModal]     = useState(false);
-  const [clients,        setClients]       = useState<ClientItem[]>([]);
-  const [selClient,      setSelClient]     = useState("");
-  const [toasts,         setToasts]        = useState<Toast[]>([]);
-  const [page,           setPage]          = useState(1);
-  const [statusFilter,   setStatusFilter]  = useState<MotionStatus | "">("");
+  // ── Device list ────────────────────────────────────────────────────────
+  const [devices, setDevices]       = useState<DeviceOption[]>([]);
+  const [devLoading, setDevLoading] = useState(true);
+  const [selImei, setSelImei]       = useState("");
+  const [deviceSearch, setDeviceSearch] = useState("");
 
-  const mapDivRef    = useRef<HTMLDivElement>(null);
-  const gMap         = useRef<unknown>(null);
-  const infoWin      = useRef<unknown>(null);
-  const markers      = useRef(new Map<string, unknown>());
-  const sseConns     = useRef(new Map<string, EventSource>());
-  const units        = useRef(new Map<string, VehicleUnit>());
-  const pendingFocus = useRef<string | null>(null);
-  const activePopup  = useRef<string | null>(null);
+  // ── Date range ─────────────────────────────────────────────────────────
+  const today = new Date();
+  const [fromDate, setFromDate] = useState(toInputDate(today));
+  const [toDate, setToDate]     = useState(toInputDate(today));
 
-  // RAF-based tick: batches all SSE updates within one animation frame into
-  // a single re-render. This prevents rapid SSE messages from interrupting
-  // user input focus (typing in the search box).
-  const rafRef = useRef<number | null>(null);
-  const tick   = useCallback(() => {
-    if (rafRef.current !== null) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      forceUpdate((n) => n + 1);
-    });
-  }, []);
+  // ── Trip data ──────────────────────────────────────────────────────────
+  const [rawData, setRawData]         = useState<PositionRecord[]>([]);
+  const [trips, setTrips]             = useState<TripSummary[]>([]);
+  const [tripLoading, setTripLoading] = useState(false);
+  const [tripError, setTripError]     = useState<string | null>(null);
+  const [selTripIdx, setSelTripIdx]   = useState<number | null>(null);
 
-  // ── Toast helpers ─────────────────────────────────────────────────────────
-  const showToast = useCallback((variant: ToastVariant, title: string, body?: string) => {
-    const id = Math.random().toString(36).slice(2);
-    setToasts((p) => [...p.slice(-2), { id, variant, title, body }]);
-    setTimeout(() => {
-      setToasts((p) => p.map((t) => t.id === id ? { ...t, out: true } : t));
-      setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 320);
-    }, 4000);
-  }, []);
+  // ── Replay ─────────────────────────────────────────────────────────────
+  const [playing, setPlaying]           = useState(false);
+  const [replayIdx, setReplayIdx]       = useState(0);
+  const [replaySpeed, setReplaySpeed]   = useState(1);    // 1x, 2x, 4x
+  const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((p) => p.map((t) => t.id === id ? { ...t, out: true } : t));
-    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 320);
-  }, []);
+  // ── Map refs ───────────────────────────────────────────────────────────
+  const mapDivRef   = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gMap        = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const polyRef     = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const startMarker = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const endMarker   = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const carMarker   = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const infoWin     = useRef<any>(null);
 
-  // Filtered + paginated list — re-derived on every render
-  const q        = searchQ.trim().toLowerCase();
-  const allUnits = Array.from(units.current.values());
-  const list     = allUnits.filter((u) => {
-    const matchQ = !q || u.name.toLowerCase().includes(q)
-      || u.imei.toLowerCase().includes(q)
-      || (u.geocoded_location || u.country || "").toLowerCase().includes(q);
-    const matchSt = !statusFilter || u.status === statusFilter;
-    return matchQ && matchSt;
+  // ── Derived ────────────────────────────────────────────────────────────
+  const filteredDevices = devices.filter((d) => {
+    if (!deviceSearch.trim()) return true;
+    const q = deviceSearch.toLowerCase();
+    return d.name.toLowerCase().includes(q) || d.imei.toLowerCase().includes(q);
   });
 
-  // Per-status counts shown on filter chips (always over all units, ignoring status filter)
-  const statusCounts = allUnits.reduce<Record<string, number>>((acc, u) => {
-    acc[u.status] = (acc[u.status] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const pagedList  = list.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  // ── Map helpers ───────────────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function ensureMarker(u: VehicleUnit): any {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const G = (window as any).google?.maps;
-    if (!gMap.current || !u.coords || !G) return null;
-    if (String(u.subscription_status).toLowerCase() === "expired") {
-      const m = markers.current.get(u.imei);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (m) { try { (m as any).setMap(null); } catch { /**/ } markers.current.delete(u.imei); }
-      return null;
-    }
-    const icon = { url: iconUrl(u.status), scaledSize: new G.Size(32, 32), anchor: new G.Point(16, 16) };
-    let m = markers.current.get(u.imei);
-    if (!m) {
-      m = new G.Marker({ position: u.coords, map: gMap.current, title: u.name || u.imei, icon });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (m as any).addListener("click", () => openPopup(u.imei, true));
-      markers.current.set(u.imei, m);
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (m as any).setPosition(u.coords); (m as any).setIcon(icon);
-    }
-    return m;
-  }
-
-  function openPopup(imei: string, fromMarker: boolean) {
-    const u = units.current.get(imei);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const IW = infoWin.current as any; const GM = gMap.current as any;
-    if (!u || !GM || !IW) return;
-    activePopup.current = imei;
-    if (!u.coords) {
-      pendingFocus.current = imei;
-      IW.setPosition(GM.getCenter());
-      IW.setContent(buildWaitingHtml(u.name || imei));
-      IW.open(GM); return;
-    }
-    const m = ensureMarker(u); if (!m) return;
-    IW.setContent(buildPopupHtml(u));
-    IW.open({ map: GM, anchor: m });
-    if (!fromMarker) { GM.panTo(u.coords); GM.setZoom(15); }
-  }
-
-  // ── SSE ───────────────────────────────────────────────────────────────────
-  function stopAll() {
-    sseConns.current.forEach((es) => { try { es.close(); } catch { /**/ } });
-    sseConns.current.clear();
-  }
-
-  function openStream(imei: string) {
-    let es: EventSource;
-    try { es = new EventSource(sseUrl(imei)); } catch { return; }
-    sseConns.current.set(imei, es);
-
-    es.onmessage = (ev) => {
-      const u = units.current.get(imei); if (!u) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let res: any; try { res = JSON.parse(ev.data); } catch { return; }
-      if (res.status === "heartbeat") return;
-
-      if (res.status === "no_data") {
-        u.status = "Offline"; tick();
-        const m = ensureMarker(u);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const IW = infoWin.current as any; const GM = gMap.current as any;
-        if (activePopup.current === imei && IW && GM) {
-          if (m) { IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m }); }
-          else   { IW.setContent(buildOfflineHtml(u.name || imei)); IW.open(GM); }
-        }
-        if (pendingFocus.current === imei && IW && GM) {
-          IW.setContent(buildOfflineHtml(u.name || imei));
-          IW.open(GM); pendingFocus.current = null;
-        }
-        return;
+  // Points for the current view (selected trip or all data)
+  const activePoints: PositionRecord[] = (() => {
+    if (selTripIdx !== null && trips[selTripIdx]) {
+      const t = trips[selTripIdx];
+      const startIdx = t.start_point_dta?.data_idx;
+      const endIdx   = t.end_point_dta?.data_idx;
+      if (startIdx != null && endIdx != null) {
+        return rawData.filter((r) => r.data_idx <= startIdx && r.data_idx >= endIdx);
       }
+    }
+    return rawData;
+  })();
 
-      if (res.status !== "success" || !res.data) return;
-      const d = res.data;
-      const lat = parseFloat(d.data_latitude), lng = parseFloat(d.data_longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  // ── Stop replay helper ─────────────────────────────────────────────────
+  const stopReplay = useCallback(() => {
+    if (replayTimer.current) clearInterval(replayTimer.current);
+    replayTimer.current = null;
+    setPlaying(false);
+  }, []);
 
-      u.speed             = Number(d.speed_log) || 0;
-      u.motion_state      = d.motion_state || "";
-      u.status            = normalizeStatus(u.motion_state, u.speed);
-      u.coords            = { lat, lng };
-      u.geocoded_location = d.geocoded_location || u.geocoded_location || "";
-      u.last_sync         = `${d.local_system_datestamp || ""} ${d.local_system_timestamp || ""}`.trim();
-
-      tick();
-      const m = ensureMarker(u);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const IW = infoWin.current as any; const GM = gMap.current as any;
-      if (activePopup.current === imei && IW && GM && m) {
-        IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m });
-      }
-      if (pendingFocus.current === imei) { pendingFocus.current = null; openPopup(imei, false); }
-    };
-
-    es.onerror = () => {
-      try { es.close(); } catch { /**/ }
-      sseConns.current.delete(imei);
-      setTimeout(() => openStream(imei), 4000);
-    };
-  }
-
-  function startAll() { stopAll(); units.current.forEach((_, i) => openStream(i)); }
-
-  // ── API ───────────────────────────────────────────────────────────────────
-  async function enrichSubs() {
-    await Promise.all(
-      Array.from(units.current.entries()).map(async ([imei, u]) => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const j = await fleetFetch("GET", `${ENDPOINTS.FLEET.CHECK_IMEI}/${encodeURIComponent(imei)}`) as any;
-          if (j?.status !== "success" || !j.data) return;
-          const d = j.data;
-          const expired = d.is_expired === true || String(d.is_expired).toLowerCase() === "true" || String(d.is_expired) === "1";
-          const valid   = d.is_valid   === true || String(d.is_valid).toLowerCase()   === "true" || String(d.is_valid)   === "1";
-          u.subscription_status = expired ? "expired" : valid ? "running"
-            : String(d.validity_status || d.subscription_status || "unknown").toLowerCase();
-        } catch { /**/ }
-      })
-    );
-  }
-
-  async function loadUnits(dataLevel: string, accountUid: string) {
-    setLoading(true); setListError(null);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const resp = await fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
-        data: { data_level: dataLevel, account_uid: accountUid },
-      }) as any;
-      if (!resp || resp.status !== "success" || !Array.isArray(resp.data)) {
-        setListError("Failed to load units."); setLoading(false); return;
-      }
-      units.current.clear();
-      setPage(1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      resp.data.forEach((u: any) => {
-        if (!u.device_imei) return;
-        units.current.set(u.device_imei, {
-          imei: u.device_imei, name: u.device_name || u.device_imei,
-          subscription_status: u.subscription_status || "",
-          status: "Offline", speed: 0, motion_state: "",
-          geocoded_location: "", coords: null, last_sync: "", country: "",
-        });
-      });
-      tick(); setLoading(false);
-      try { await enrichSubs(); tick(); } catch { /**/ }
-      startAll();
-    } catch { setListError("API error loading units."); setLoading(false); }
-  }
-
-  // ── Bootstrap ─────────────────────────────────────────────────────────────
+  // ── Map init ───────────────────────────────────────────────────────────
   useEffect(() => {
     const initMap = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const G = (window as any).google?.maps;
       if (!mapDivRef.current || gMap.current || !G) return;
-
-      // Inject InfoWindow style override once — makes content full-bleed edge-to-edge
-      if (!document.getElementById("navas-iw-css")) {
-        const el = document.createElement("style");
-        el.id = "navas-iw-css";
-        el.textContent = IW_CSS;
-        document.head.appendChild(el);
-      }
-
-      gMap.current    = new G.Map(mapDivRef.current, {
-        zoom: 6, center: DEFAULT_CENTER, mapTypeId: "roadmap",
-        gestureHandling: "greedy", zoomControl: true, fullscreenControl: false,
+      gMap.current = new G.Map(mapDivRef.current, {
+        zoom: 7, center: DEFAULT_CENTER, mapTypeId: "roadmap",
+        gestureHandling: "greedy", zoomControl: true, fullscreenControl: true,
+        streetViewControl: false, mapTypeControl: true,
       });
-      infoWin.current = new G.InfoWindow({ maxWidth: 300, disableAutoPan: false });
+      infoWin.current = new G.InfoWindow({ maxWidth: 280 });
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -613,8 +233,8 @@ export default function GatehousePage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__gatehouseMapInit = initMap;
       const s = Object.assign(document.createElement("script"), {
-        id:    "gmaps-gatehouse",
-        src:   `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&callback=__gatehouseMapInit&loading=async`,
+        id: "gmaps-gatehouse",
+        src: `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&callback=__gatehouseMapInit&loading=async`,
         async: true, defer: true,
       });
       document.head.appendChild(s);
@@ -622,239 +242,475 @@ export default function GatehousePage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__gatehouseMapInit = initMap;
     }
+  }, []);
 
+  // ── Load devices ───────────────────────────────────────────────────────
+  useEffect(() => {
     (async () => {
       const rawUid = getCookie("_nvxs_account_uid") ?? "";
-      if (!rawUid) { setListError("Missing session — please log in."); setLoading(false); return; }
-
-      // Fetch account type and role from API; fall back to cookies (mirrors PHP loadUserDataLevel + loadUserRole)
-      const details  = await fetchUserDetails(rawUid);
-      const type     = details?.account_type || (getCookie("_nvxs_account_type") ?? "client").toLowerCase();
-      const role     = details?.role         || (getCookie("_nvxs_account_role") ?? "").toLowerCase();
-      if (type === "client" && role === "admin") setIsClientAdmin(true);
-
-      const dataLevel  = type;
-      const accountUid = dataLevel === "client"
-        ? (getCookie("_nvxs_account_root") ?? rawUid)
-        : rawUid;
-      await loadUnits(dataLevel, accountUid);
-    })();
-
-    return () => {
-      stopAll();
-      if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
-  function onUnitClick(imei: string) {
-    const u = units.current.get(imei);
-    if (!u) return;
-    if (String(u.subscription_status).toLowerCase() === "expired") {
-      showToast("warn", "Subscription Expired",
-        `${u.name || imei} — renew the subscription to enable live tracking.`);
-      return;
-    }
-    openPopup(imei, false);
-  }
-
-  async function onOpenModal() {
-    const primary = getCookie("_nvxs_account_root") || getCookie("_nvxs_account_uid") || "";
-    if (!primary) return;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const j = await fleetFetch("GET", `${ENDPOINTS.FLEET.CLIENTS_ALL}/${encodeURIComponent(primary)}/all`) as any;
-      if (j?.status === "success" && Array.isArray(j?.data)) {
+      if (!rawUid) { setDevLoading(false); return; }
+      const accountType = (getCookie("_nvxs_account_type") ?? "client").toLowerCase();
+      const accountUid  = accountType === "client"
+        ? (getCookie("_nvxs_account_root") ?? rawUid) : rawUid;
+      try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setClients(j.data.map((c: any) => ({
-          uid: c.client_uid || c.uid || "",
-          label: c.client_name || c.label || c.client_uid || "",
-        })));
-      }
-    } catch { /**/ }
-    setShowModal(true);
-  }
+        const resp = await fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
+          data: { data_level: accountType, account_uid: accountUid },
+        }) as any;
+        if (resp?.status === "success" && Array.isArray(resp.data)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const devs: DeviceOption[] = resp.data.map((u: any) => ({
+            imei:      u.device_imei || "",
+            name:      u.device_name || u.device_imei || "",
+            car_make:  u.car_make || "",
+            car_model: u.car_model || "",
+          })).filter((d: DeviceOption) => d.imei);
+          setDevices(devs);
+          if (devs.length === 1) setSelImei(devs[0].imei);
+        }
+      } catch { /**/ }
+      setDevLoading(false);
+    })();
+  }, []);
 
-  async function onLoadClientUnits() {
-    if (!selClient) {
-      showToast("info", "No client selected", "Please choose a client from the dropdown.");
-      return;
-    }
-    setShowModal(false);
-    stopAll();
+  // ── Draw route on map ──────────────────────────────────────────────────
+  const drawRoute = useCallback((points: PositionRecord[]) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    markers.current.forEach((m) => { try { (m as any).setMap(null); } catch { /**/ } });
-    markers.current.clear();
-    await loadUnits("client", selClient);
+    const G = (window as any).google?.maps;
+    const map = gMap.current;
+    if (!G || !map) return;
+
+    // Clear previous
+    if (polyRef.current) polyRef.current.setMap(null);
+    if (startMarker.current) startMarker.current.setMap(null);
+    if (endMarker.current) endMarker.current.setMap(null);
+    if (carMarker.current) carMarker.current.setMap(null);
+
+    if (!points.length) return;
+
+    // Build path (reversed since backend returns newest first)
+    const path = [...points].reverse().map((p) => ({
+      lat: parseFloat(p.data_latitude),
+      lng: parseFloat(p.data_longitude),
+    })).filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
+
+    if (!path.length) return;
+
+    // Polyline
+    polyRef.current = new G.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: "#128C7E",
+      strokeOpacity: 0.9,
+      strokeWeight: 4,
+      map,
+    });
+
+    // Start marker (green)
+    startMarker.current = new G.Marker({
+      position: path[0],
+      map,
+      title: "Start",
+      icon: {
+        path: G.SymbolPath.CIRCLE,
+        fillColor: "#25D366",
+        fillOpacity: 1,
+        strokeColor: "#fff",
+        strokeWeight: 2,
+        scale: 8,
+      },
+    });
+
+    // End marker (red)
+    if (path.length > 1) {
+      endMarker.current = new G.Marker({
+        position: path[path.length - 1],
+        map,
+        title: "End",
+        icon: {
+          path: G.SymbolPath.CIRCLE,
+          fillColor: "#C62828",
+          fillOpacity: 1,
+          strokeColor: "#fff",
+          strokeWeight: 2,
+          scale: 8,
+        },
+      });
+    }
+
+    // Fit bounds
+    const bounds = new G.LatLngBounds();
+    path.forEach((p) => bounds.extend(p));
+    map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+  }, []);
+
+  // Redraw when active points change
+  useEffect(() => {
+    drawRoute(activePoints);
+    setReplayIdx(0);
+    stopReplay();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selTripIdx, rawData]);
+
+  // ── Load trips ─────────────────────────────────────────────────────────
+  async function loadTrips() {
+    if (!selImei) return;
+    setTripLoading(true);
+    setTripError(null);
+    setTrips([]);
+    setRawData([]);
+    setSelTripIdx(null);
+    stopReplay();
+
+    try {
+      const from = parseInputDate(fromDate);
+      const to   = parseInputDate(toDate);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const resp = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_HISTORY, {
+        data: {
+          device_imei:  selImei,
+          from_date:    fmtDate(from),
+          to_date:      fmtDate(to),
+          offset_log:   0,
+          record_count: 10000,
+        },
+      }) as any;
+
+      if (resp?.status === "success" && resp.data) {
+        const rd: PositionRecord[] = resp.data.raw_data || [];
+        const td: TripSummary[]    = resp.data.trips_data || [];
+        setRawData(rd);
+        setTrips(td);
+        drawRoute(rd);
+        if (td.length === 0 && rd.length === 0) {
+          setTripError("No trips found for this date range.");
+        }
+      } else {
+        setTripError(resp?.message || "No trips found for this date range.");
+      }
+    } catch {
+      setTripError("Failed to load trip data. Please try again.");
+    }
+    setTripLoading(false);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Replay controls ────────────────────────────────────────────────────
+  function startReplay() {
+    const points = [...activePoints].reverse();
+    if (points.length < 2) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps;
+    const map = gMap.current;
+    if (!G || !map) return;
+
+    setPlaying(true);
+    let idx = replayIdx;
+
+    // Create or reposition car marker
+    const pos = {
+      lat: parseFloat(points[idx]?.data_latitude),
+      lng: parseFloat(points[idx]?.data_longitude),
+    };
+
+    if (!carMarker.current) {
+      carMarker.current = new G.Marker({
+        position: pos,
+        map,
+        title: "Vehicle",
+        icon: { url: "https://santripe.com/static/moving.png", scaledSize: new G.Size(36, 36), anchor: new G.Point(18, 18) },
+        zIndex: 999,
+      });
+    } else {
+      carMarker.current.setPosition(pos);
+      carMarker.current.setMap(map);
+    }
+
+    const interval = Math.max(50, 300 / replaySpeed);
+    replayTimer.current = setInterval(() => {
+      idx++;
+      if (idx >= points.length) {
+        stopReplay();
+        setReplayIdx(points.length - 1);
+        return;
+      }
+      setReplayIdx(idx);
+      const p = {
+        lat: parseFloat(points[idx].data_latitude),
+        lng: parseFloat(points[idx].data_longitude),
+      };
+      if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+        carMarker.current.setPosition(p);
+        map.panTo(p);
+      }
+    }, interval);
+  }
+
+  function toggleReplay() {
+    if (playing) { stopReplay(); return; }
+    const pts = [...activePoints].reverse();
+    if (replayIdx >= pts.length - 1) setReplayIdx(0);
+    startReplay();
+  }
+
+  // Cleanup on unmount
+  useEffect(() => () => stopReplay(), [stopReplay]);
+
+  // Current replay point info
+  const replayPoints = [...activePoints].reverse();
+  const currentPoint = replayPoints[replayIdx] || null;
+
+  // ── Quick stats for loaded data ────────────────────────────────────────
+  const totalDistance = trips.reduce((s, t) => s + (t.mileage_passed || 0), 0);
+  const totalPoints  = rawData.length;
+  const selectedDevice = devices.find((d) => d.imei === selImei);
+
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F0F2F5]">
 
       {/* Header */}
       <div className="shrink-0 px-5 pt-4 pb-3">
-        <div className="text-[10px] text-[#667781] mb-0.5">Home › Fleet › Live Monitoring</div>
-        <h1 className="text-[20px] font-black text-[#111B21] m-0 leading-tight">
-          Fleet Monitoring — Live Vehicle Tracking
-        </h1>
+        <div className="text-[10px] text-[#667781] mb-0.5">Home &rsaquo; Track Report</div>
+        <h1 className="text-[20px] font-black text-[#111B21] m-0 leading-tight">Track Playback</h1>
         <p className="text-[12px] text-[#667781] m-0 mt-0.5">
-          Real-time GPS via SSE · Click a unit to focus the map · Expired subscriptions are locked.
+          View historical routes, replay trips, and analyze past journeys for any device.
         </p>
       </div>
 
-      {/* Two-panel body */}
-      <div className="flex-1 min-h-0 grid xl:grid-cols-[360px_1fr] gap-3 px-5 pb-5 overflow-hidden">
+      {/* Body */}
+      <div className="flex-1 min-h-0 grid xl:grid-cols-[340px_1fr] gap-3 px-5 pb-5 overflow-hidden">
 
-        {/* Vehicle list */}
-        <div className="min-h-0 flex flex-col bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-          <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-[#E9EDEF]">
-            <div>
-              <div className="font-black text-[15px] text-[#111B21]">Vehicle Units</div>
-              <div className="text-[12px] text-[#667781] mt-0.5">
-                {list.length} unit{list.length !== 1 ? "s" : ""}{(q || statusFilter) ? " (filtered)" : ""}
-              </div>
+        {/* ══ Left: Controls + Trip List ══════════════════════════════════ */}
+        <div className="min-h-0 flex flex-col gap-3 overflow-hidden">
+
+          {/* Controls card */}
+          <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
+            <div className="px-4 py-2.5 border-b border-[#E9EDEF]">
+              <div className="font-black text-[14px] text-[#111B21]">Select Device & Date</div>
             </div>
-            <span className="shrink-0 text-[11px] font-extrabold text-white px-2.5 py-1 rounded-full bg-[#25D366]">LIVE</span>
+            <div className="p-4 flex flex-col gap-3">
+              {/* Device picker */}
+              <div>
+                <label className="text-[11px] font-bold text-[#667781] block mb-1">Device</label>
+                {devLoading ? (
+                  <div className="h-9 rounded-lg border border-[#E9EDEF] bg-[#F8F9FA] flex items-center px-3 text-[12px] text-[#667781]">Loading devices…</div>
+                ) : (
+                  <>
+                    {devices.length > 5 && (
+                      <input
+                        type="search"
+                        value={deviceSearch}
+                        onChange={(e) => setDeviceSearch(e.target.value)}
+                        placeholder="Filter devices…"
+                        className="w-full h-8 rounded-lg border border-[#E9EDEF] px-3 text-[11px] text-[#111B21]
+                          placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors mb-1.5"
+                      />
+                    )}
+                    <select
+                      value={selImei}
+                      onChange={(e) => setSelImei(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
+                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA] cursor-pointer"
+                    >
+                      <option value="">— Select a device —</option>
+                      {filteredDevices.map((d) => (
+                        <option key={d.imei} value={d.imei}>
+                          {d.name} ({d.imei.slice(-6)})
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-[#667781] block mb-1">From</label>
+                  <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
+                      text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#667781] block mb-1">To</label>
+                  <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
+                      text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                </div>
+              </div>
+
+              {/* Load button */}
+              <button
+                onClick={loadTrips}
+                disabled={!selImei || tripLoading}
+                className="h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-extrabold
+                  border-none cursor-pointer hover:brightness-110 active:opacity-85
+                  disabled:opacity-50 disabled:cursor-not-allowed transition-all
+                  flex items-center justify-center gap-2"
+              >
+                {tripLoading ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Loading…
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    Load Track History
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          <div className="shrink-0 px-4 pt-3 pb-2 flex gap-2">
-            <input
-              type="search"
-              value={searchQ}
-              onChange={(e) => { setSearchQ(e.target.value); setPage(1); }}
-              placeholder="Search name, IMEI, location…"
-              className="flex-1 h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21]
-                placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors"
-            />
-            {isClientAdmin && <Btn variant="azure" onClick={onOpenModal}>Load Client</Btn>}
-          </div>
+          {/* Quick stats strip */}
+          {rawData.length > 0 && (
+            <div className="shrink-0 grid grid-cols-3 gap-2">
+              {[
+                { label: "Trips", value: String(trips.length) },
+                { label: "Distance", value: `${totalDistance} km` },
+                { label: "Points", value: totalPoints.toLocaleString() },
+              ].map((s) => (
+                <div key={s.label} className="bg-white border border-[#E9EDEF] rounded-lg px-3 py-2 text-center">
+                  <div className="text-[14px] font-black text-[#128C7E]">{s.value}</div>
+                  <div className="text-[10px] text-[#667781] font-bold">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
-          {/* Status filter chips */}
-          <div className="shrink-0 px-4 pb-2 flex flex-wrap gap-1.5">
-            {([["", "All"], ["Moving", "Moving"], ["Parked", "Parked"], ["Idling", "Idling"], ["Offline", "Offline"]] as [MotionStatus | "", string][]).map(([val, label]) => {
-              const active  = statusFilter === val;
-              const c       = val ? BADGE_COLORS[val as MotionStatus] : { bg: "#E9EDEF", color: "#111B21" };
-              const count   = val ? (statusCounts[val] ?? 0) : allUnits.length;
-              return (
-                <button
-                  key={val}
-                  onClick={() => { setStatusFilter(val); setPage(1); }}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition-all cursor-pointer"
-                  style={active
-                    ? { background: c.color, color: "#fff", borderColor: c.color }
-                    : { background: "transparent", color: c.color, borderColor: c.color }}
-                >
-                  {val && <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? "#fff" : c.color }} />}
-                  {label}
-                  <span className="opacity-75">{count}</span>
+          {/* Trip list */}
+          <div className="flex-1 min-h-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm flex flex-col">
+            <div className="shrink-0 px-4 py-2.5 border-b border-[#E9EDEF] flex items-center justify-between">
+              <div className="font-black text-[13px] text-[#111B21]">
+                Trips {trips.length > 0 && <span className="text-[#667781] font-normal">({trips.length})</span>}
+              </div>
+              {selTripIdx !== null && (
+                <button onClick={() => setSelTripIdx(null)}
+                  className="text-[10px] font-bold text-[#128C7E] bg-[#E7F7EF] px-2 py-0.5 rounded cursor-pointer border-none hover:bg-[#D0F0E0] transition-colors">
+                  Show All
                 </button>
-              );
-            })}
+              )}
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+              {tripLoading && (
+                <div className="px-4 py-8 text-center">
+                  <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[#128C7E] rounded-full animate-spin" />
+                  <div className="text-[12px] text-[#667781] mt-2">Loading trip data…</div>
+                </div>
+              )}
+              {tripError && !tripLoading && (
+                <div className="px-4 py-6 text-center text-[12px] text-[#667781]">{tripError}</div>
+              )}
+              {!tripLoading && !tripError && trips.length === 0 && rawData.length === 0 && (
+                <div className="px-4 py-8 text-center text-[12px] text-[#667781]">
+                  Select a device and date range, then click <b>Load Track History</b>.
+                </div>
+              )}
+              {!tripLoading && trips.length === 0 && rawData.length > 0 && (
+                <div className="px-4 py-6 text-center text-[12px] text-[#667781]">
+                  {rawData.length} position records found but no distinct trips detected.
+                  The route is shown on the map.
+                </div>
+              )}
+              {trips.map((t, i) => (
+                <TripCard
+                  key={t.trip_number}
+                  trip={t}
+                  index={i}
+                  selected={selTripIdx === i}
+                  onClick={() => setSelTripIdx(selTripIdx === i ? null : i)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ══ Right: Map + Replay Controls + Detail ═══════════════════════ */}
+        <div className="min-h-0 flex flex-col gap-3 overflow-hidden">
+
+          {/* Map */}
+          <div className="flex-1 min-h-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm flex flex-col">
+            {/* Map header with replay controls */}
+            <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-[#E9EDEF]">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-[14px] text-[#111B21]">Route Map</span>
+                {selectedDevice && (
+                  <span className="text-[11px] text-[#667781]">{selectedDevice.name}</span>
+                )}
+              </div>
+
+              {/* Replay controls */}
+              {activePoints.length >= 2 && (
+                <div className="flex items-center gap-2">
+                  {/* Speed selector */}
+                  <div className="flex items-center gap-1 bg-[#F0F2F5] rounded-lg p-0.5">
+                    {[1, 2, 4].map((s) => (
+                      <button key={s} onClick={() => setReplaySpeed(s)}
+                        className={[
+                          "px-2 py-0.5 rounded text-[10px] font-extrabold border-none cursor-pointer transition-all",
+                          replaySpeed === s
+                            ? "bg-[#128C7E] text-white"
+                            : "bg-transparent text-[#667781] hover:text-[#111B21]",
+                        ].join(" ")}
+                      >{s}x</button>
+                    ))}
+                  </div>
+
+                  {/* Play/pause */}
+                  <button onClick={toggleReplay}
+                    className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-extrabold
+                      border-none cursor-pointer hover:brightness-110 transition-all flex items-center gap-1.5"
+                  >
+                    {playing ? (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause</>
+                    ) : (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Replay</>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            {activePoints.length >= 2 && (
+              <div className="shrink-0 h-1.5 bg-[#E9EDEF]">
+                <div className="h-full bg-[#128C7E] transition-all duration-200"
+                  style={{ width: `${(replayIdx / Math.max(1, replayPoints.length - 1)) * 100}%` }} />
+              </div>
+            )}
+
+            <div ref={mapDivRef} className="flex-1 min-h-[300px] w-full" />
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-            {loading   && <div className="px-4 py-3 text-[12px] text-[#667781] italic">Loading units…</div>}
-            {listError && <div className="px-4 py-3 text-[12px] text-[#D93025]">{listError}</div>}
-            {!loading && !listError && list.length === 0 && (
-              <div className="px-4 py-3 text-[12px] text-[#667781] italic">No units found.</div>
-            )}
-            {pagedList.map((u, i) => {
-              const expired = String(u.subscription_status).toLowerCase() === "expired";
-              const loc     = u.geocoded_location || u.country || "—";
-              return (
-                <div key={u.imei} onClick={() => onUnitClick(u.imei)}
-                  className={[
-                    "flex items-center justify-between gap-3 px-4 py-2.5 cursor-pointer",
-                    "border-b border-[#E9EDEF] last:border-b-0 hover:bg-[#F0F2F5] transition-colors",
-                    i % 2 === 0 ? "bg-white" : "bg-[#FAFAFA]",
-                    expired ? "opacity-60" : "",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor(u.status) }} />
-                    <div className="min-w-0">
-                      <div className="font-extrabold text-[12px] text-[#111B21] truncate">{u.name || u.imei}</div>
-                      <div className="text-[11px] text-[#667781] truncate max-w-[200px]" title={loc}>{loc}</div>
+          {/* Position detail strip */}
+          {currentPoint && activePoints.length > 0 && (
+            <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-px bg-[#E9EDEF]">
+                {[
+                  { label: "Speed", value: `${currentPoint.speed_log || 0} km/h` },
+                  { label: "Location", value: currentPoint.geocoded_location || "—" },
+                  { label: "Time", value: `${currentPoint.local_system_datestamp} ${currentPoint.local_system_timestamp}` },
+                  { label: "Coordinates", value: `${parseFloat(currentPoint.data_latitude).toFixed(5)}, ${parseFloat(currentPoint.data_longitude).toFixed(5)}` },
+                  { label: "Satellites", value: String(currentPoint.data_connected_satelites || "—") },
+                  { label: "HDOP", value: currentPoint.data_hdop || "—" },
+                ].map((item) => (
+                  <div key={item.label} className="bg-white px-3 py-2.5">
+                    <div className="text-[10px] text-[#667781] font-bold">{item.label}</div>
+                    <div className="text-[12px] text-[#111B21] font-semibold mt-0.5 truncate" title={item.value}>
+                      {item.value}
                     </div>
                   </div>
-                  <StatusBadge status={u.status} />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Pagination footer */}
-          <div className="shrink-0 flex items-center justify-between px-4 py-2 border-t border-[#E9EDEF] bg-white">
-            <span className="text-[11px] text-[#667781]">
-              {list.length === 0
-                ? "0 units"
-                : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, list.length)} of ${list.length}`}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1}
-                className="w-7 h-7 rounded flex items-center justify-center text-[18px] leading-none
-                  text-[#667781] disabled:opacity-30 hover:bg-[#F0F2F5] transition-colors
-                  border-none bg-transparent cursor-pointer disabled:cursor-not-allowed"
-              >‹</button>
-              <span className="text-[11px] font-extrabold text-[#111B21] min-w-[52px] text-center">
-                {safePage} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage >= totalPages}
-                className="w-7 h-7 rounded flex items-center justify-center text-[18px] leading-none
-                  text-[#667781] disabled:opacity-30 hover:bg-[#F0F2F5] transition-colors
-                  border-none bg-transparent cursor-pointer disabled:cursor-not-allowed"
-              >›</button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
-
-        {/* Map */}
-        <div className="min-h-0 flex flex-col bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-          <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-[#E9EDEF]">
-            <div>
-              <div className="font-black text-[15px] text-[#111B21]">Unit Locations</div>
-              <div className="text-[12px] text-[#667781] mt-0.5">Click a unit to pan &amp; zoom</div>
-            </div>
-            <span className="shrink-0 text-[11px] font-extrabold text-white px-2.5 py-1 rounded-full bg-[#34B7F1]">MAP</span>
-          </div>
-          <div ref={mapDivRef} className="flex-1 min-h-0 w-full" />
-        </div>
-
       </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-[320px] overflow-hidden border border-[#E9EDEF]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#E9EDEF]">
-              <div className="font-black text-[15px] text-[#111B21]">Load Client Units</div>
-              <button onClick={() => setShowModal(false)}
-                className="text-[#667781] hover:text-[#111B21] text-xl font-bold bg-transparent border-none cursor-pointer leading-none">×</button>
-            </div>
-            <div className="p-4">
-              <label className="text-[12px] font-extrabold text-[#667781] block mb-1.5">Select Client</label>
-              <select value={selClient} onChange={(e) => setSelClient(e.target.value)}
-                className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                  text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]">
-                <option value="">— Select a client —</option>
-                {clients.map((c) => <option key={c.uid} value={c.uid}>{c.label}</option>)}
-              </select>
-            </div>
-            <div className="flex justify-end gap-2 px-4 pb-4">
-              <Btn variant="dark" onClick={() => setShowModal(false)}>Cancel</Btn>
-              <Btn variant="teal" onClick={onLoadClientUnits} disabled={!selClient}>Load Units</Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toasts */}
-      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

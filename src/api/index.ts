@@ -113,6 +113,14 @@ export type {
   ExportAuditPackRequest,
   ExportAuditPackResponse,
   AuditFilters,
+  TripHistoryRequest,
+  PositionRecord,
+  EndUserData,
+  TripSummary,
+  TripHistoryResponse,
+  ReplayRecord,
+  GeocodeRequest,
+  GeocodeResponse,
 } from "./types";
 
 // ── Domain services ──────────────────────────────────────────────────────────
@@ -149,3 +157,4 @@ export { createClient, getAllClients, getClientsByProvider, updateClient, trashC
 export { getActiveSubscriptions, getPausedSubscriptions, getHighSubClients, getChurnRate, getExpiringSubscriptions, getClientTransactions } from "./services/billing.service";
 export { getAllRoles, getRoleByUid, createRole, updateRole, deleteRole, getAllPermissions, getUserPermissions, createUser, getAllUsers, assignUserRole, createPermission, updatePermission, deletePermission, getActiveRolesCount, getTotalPermissionsCount, getActiveClientsCount, getActive3dClientsCount, getClientUsersCount, getRoleUserCounts, getPermissionRoleCounts, blockUser, unblockUser, resetUserPassword, getUserDetails } from "./services/rbac.service";
 export { getAuditEvents, getAuditKpis, getHashChain, getAuditApprovals, approveAuditRequest, rejectAuditRequest, getComplianceSnapshot, requestAuditExport } from "./services/audit.service";
+export { getTripHistory, getTripReplay, reverseGeocode } from "./services/tracking.service";

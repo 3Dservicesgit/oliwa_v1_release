@@ -210,6 +210,14 @@ export const ENDPOINTS = {
     DETAILS:  "/events",           // append /{event_id}/details
     DELETE:   "/events",           // append /{event_uid}/delete
   },
+  TRACKING: {
+    /** Trip history with IO events: POST /data-stream/trips/history */
+    TRIPS_HISTORY:  "/data-stream/trips/history",
+    /** Trip replay (positions only): POST /data-stream/trips/history/replay */
+    TRIPS_REPLAY:   "/data-stream/trips/history/replay",
+    /** Reverse geocode: POST /data-stream/location/geocoding */
+    GEOCODE:        "/data-stream/location/geocoding",
+  },
   AUDIT: {
     /** CMS-wide audit event stream (all modules). Supports ?domain=&severity=&range= query params */
     EVENTS:         "/audit/events",

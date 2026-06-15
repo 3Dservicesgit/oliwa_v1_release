@@ -192,3 +192,14 @@ export {
   EVENT_CONDITION_LABELS,
   EVENT_CONDITION_DESCRIPTIONS,
 } from "./events.types";
+
+export type {
+  TripHistoryRequest,
+  PositionRecord,
+  EndUserData,
+  TripSummary,
+  TripHistoryResponse,
+  ReplayRecord,
+  GeocodeRequest,
+  GeocodeResponse,
+} from "./tracking.types";
