@@ -112,7 +112,7 @@ const BUILT_MODULES: ModuleDef[] = [
   {
     id: "gatehouse",
     name: "Track Report",
-    navLabel: "Track Report",
+    navLabel: "Track Playback",
     navGlyph: "G",
     route: "/gatehouse",
     viewPermission: "track.playback.view",
