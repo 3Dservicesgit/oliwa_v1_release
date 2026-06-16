@@ -66,9 +66,9 @@ export default function App() {
           <Route path="/aegis"          element={<AegisDashboardPage />} />
 
           {/* ── Built pages (permission-guarded) ─────────────────────── */}
-          <Route path="/noc-bridge"     element={<ProtectedRoute permission="noc.view"><NocBridgePage /></ProtectedRoute>} />
+          <Route path="/noc-bridge"     element={<ProtectedRoute permission="live.monitoring.view"><NocBridgePage /></ProtectedRoute>} />
           <Route path="/ops"            element={<ProtectedRoute permission="ops.view"><OpsWarRoomPage /></ProtectedRoute>} />
-          <Route path="/gatehouse"      element={<ProtectedRoute permission="gatehouse.view"><GatehousePage /></ProtectedRoute>} />
+          <Route path="/gatehouse"      element={<ProtectedRoute permission="track.playback.view"><GatehousePage /></ProtectedRoute>} />
           <Route path="/alarms-factory" element={<ProtectedRoute permission="alarms.view"><AlarmFactoryPage /></ProtectedRoute>} />
           <Route path="/tenant-tower"   element={<ProtectedRoute permission="tenants.view"><TenantTowerPage /></ProtectedRoute>} />
           <Route path="/billing-invoicing" element={<ProtectedRoute permission="billing.view"><BillingInvoicingPage /></ProtectedRoute>} />

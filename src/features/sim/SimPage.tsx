@@ -39,11 +39,12 @@ import type {
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 
-type Tab = "balance" | "buy" | "subscriptions" | "transactions";
+type Tab = "balance" | "buy" | "budget" | "subscriptions" | "transactions";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "balance",       label: "Token Balance",   icon: "💰" },
   { key: "buy",           label: "Buy Tokens",      icon: "🛒" },
+  { key: "budget",        label: "Buy by Budget",   icon: "💵" },
   { key: "subscriptions", label: "Subscriptions",   icon: "📡" },
   { key: "transactions",  label: "Transactions",    icon: "📋" },
 ];
@@ -621,6 +622,489 @@ function subStatusLabel(status: string) {
   return s || "unknown";
 }
 
+// ── Budget Tab ─────────────────────────────────────────────────────────────
+
+type BudgetCurrency = "UGX" | "KES";
+
+function BudgetTab({
+  packages, pkgLoading, devices, devicesLoading, ownerUid, onSuccess,
+}: {
+  packages: TokenPackage[]; pkgLoading: boolean;
+  devices: ClientDevice[]; devicesLoading: boolean;
+  ownerUid: string; onSuccess: (msg: string) => void;
+}) {
+  const [currency, setCurrency] = useState<BudgetCurrency>("UGX");
+  const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
+  const [budgetStr, setBudgetStr] = useState("");
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [deviceSearch, setDeviceSearch] = useState("");
+  const [phone, setPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const budget = parseFloat(budgetStr) || 0;
+
+  // Find packages matching the selected currency
+  const currencyPkgs = packages.filter((p) => getPkgCurrency(p) === currency);
+
+  // Auto-select first package when currency changes and current selection is invalid
+  useEffect(() => {
+    if (currencyPkgs.length > 0) {
+      const stillValid = selectedPkgId && currencyPkgs.some((p) => p.token_id === selectedPkgId);
+      if (!stillValid) setSelectedPkgId(currencyPkgs[0].token_id);
+    } else {
+      setSelectedPkgId(null);
+    }
+  }, [currency, packages]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Selected package
+  const selectedPkg = currencyPkgs.find((p) => p.token_id === selectedPkgId) ?? null;
+
+  const unitPrice = selectedPkg ? getPkgPrice(selectedPkg) : 0;
+  const tokenCount = unitPrice > 0 ? Math.floor(budget / unitPrice) : 0;
+  const totalCost = tokenCount * unitPrice;
+  const change = budget - totalCost;
+
+  // Filter devices
+  const filteredDevices = devices.filter((d) => {
+    const q = deviceSearch.toLowerCase();
+    if (!q) return true;
+    return (
+      d.device_imei?.toLowerCase().includes(q) ||
+      d.device_name?.toLowerCase().includes(q) ||
+      d.car_make?.toLowerCase().includes(q) ||
+      d.car_model?.toLowerCase().includes(q)
+    );
+  });
+
+  const toggleDevice = (imei: string) => {
+    setSelectedDevices((prev) =>
+      prev.includes(imei) ? prev.filter((i) => i !== imei) : [...prev, imei],
+    );
+  };
+
+  const selectAllFiltered = () => {
+    const allImeis = filteredDevices.map((d) => d.device_imei);
+    const allSelected = allImeis.every((i) => selectedDevices.includes(i));
+    if (allSelected) {
+      setSelectedDevices((prev) => prev.filter((i) => !allImeis.includes(i)));
+    } else {
+      setSelectedDevices((prev) => [...new Set([...prev, ...allImeis])]);
+    }
+  };
+
+  // ── Payment handler ──────────────────────────────────────────────────
+  const handlePay = async () => {
+    if (!selectedPkg || tokenCount <= 0 || selectedDevices.length === 0 || !phone || phone.length < 9) return;
+    setSubmitting(true);
+    setStatus(null);
+    try {
+      const res = await buyTokens({
+        token_buyer: ownerUid,
+        token_uid: selectedPkg.token_id,
+        mobile_money_number: phone,
+        token_quantity: tokenCount,
+      });
+
+      const txnId = res?.data?.transaction_id;
+      if (txnId) {
+        setPolling(true);
+        setStatus("pending");
+        let attempts = 0;
+        pollRef.current = setInterval(async () => {
+          attempts++;
+          try {
+            const statusRes = await getPaymentStatus(txnId);
+            const txnStatus = statusRes?.data?.transaction_status;
+            if (txnStatus === "success" || txnStatus === "successful") {
+              if (pollRef.current) clearInterval(pollRef.current);
+              setPolling(false);
+              setStatus("success");
+              onSuccess(
+                `Payment successful! ${tokenCount} token(s) purchased for ${currency} ${totalCost.toLocaleString()} across ${selectedDevices.length} device${selectedDevices.length > 1 ? "s" : ""}.`,
+              );
+            } else if (txnStatus === "failed") {
+              if (pollRef.current) clearInterval(pollRef.current);
+              setPolling(false);
+              setStatus("failed");
+            }
+          } catch { /* keep polling */ }
+          if (attempts >= 36) {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setPolling(false);
+            setStatus((prev) => (prev === "success" ? prev : "timeout"));
+          }
+        }, 5000);
+      } else {
+        onSuccess("Purchase initiated! Your balance will update shortly.");
+      }
+    } catch {
+      setStatus("failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const canPay = tokenCount > 0 && selectedDevices.length > 0 && phone.length >= 9 && !submitting && !polling && status !== "success";
+
+  return (
+    <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-black text-[14px] text-[#111B21]">Buy by Budget</h3>
+          <p className="text-[11px] text-[#667781] mt-0.5">Enter your budget and we'll calculate how many tokens you can get.</p>
+        </div>
+      </div>
+
+      {pkgLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+            <span className="text-[12px] text-[#667781]">Loading token pricing...</span>
+          </div>
+        </div>
+      ) : packages.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-[28px] mb-2">🛒</div>
+          <p className="text-[13px] font-black text-[#111B21] mb-1">No Packages Available</p>
+          <p className="text-[12px] text-[#667781]">Token packages are not configured yet. Contact support.</p>
+        </div>
+      ) : (
+        <div className="grid xl:grid-cols-[1fr_340px] gap-5">
+
+          {/* ══ Left: Budget Calculator ════════════════════════════════ */}
+          <div className="flex flex-col gap-4">
+
+            {/* Step 1: Currency */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">1</span>
+                <label className="text-[12px] font-black text-[#111B21]">Select Currency</label>
+              </div>
+              <div className="flex gap-2">
+                {(["UGX", "KES"] as BudgetCurrency[]).map((c) => {
+                  const hasPkgs = packages.some((p) => getPkgCurrency(p) === c);
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => { setCurrency(c); setBudgetStr(""); }}
+                      disabled={!hasPkgs}
+                      className={[
+                        "h-10 px-5 rounded-lg text-[13px] font-black border cursor-pointer transition-all",
+                        currency === c
+                          ? "bg-[#128C7E] border-[#128C7E] text-white"
+                          : hasPkgs
+                            ? "bg-white border-[#E9EDEF] text-[#667781] hover:bg-[#F0F2F5]"
+                            : "bg-[#F0F2F5] border-[#E9EDEF] text-[#CCC] cursor-not-allowed",
+                      ].join(" ")}
+                    >
+                      {c}
+                      {!hasPkgs && <span className="text-[9px] ml-1">(N/A)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 2: Select Package */}
+            {currencyPkgs.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
+                  <label className="text-[12px] font-black text-[#111B21]">Select Package</label>
+                </div>
+                <div className="grid gap-2">
+                  {currencyPkgs.map((pkg) => {
+                    const price = getPkgPrice(pkg);
+                    const isSelected = pkg.token_id === selectedPkgId;
+                    return (
+                      <button
+                        key={pkg.token_id}
+                        onClick={() => { setSelectedPkgId(pkg.token_id); setBudgetStr(""); }}
+                        className={[
+                          "w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer",
+                          isSelected
+                            ? "bg-[#128C7E]/5 border-[#128C7E] ring-1 ring-[#128C7E]/30"
+                            : "bg-white border-[#E9EDEF] hover:bg-[#F8F9FA]",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={[
+                              "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
+                              isSelected ? "border-[#128C7E]" : "border-[#CCC]",
+                            ].join(" ")}>
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-[#128C7E]" />}
+                            </div>
+                            <div>
+                              <div className="text-[13px] font-black text-[#111B21]">{pkg.token_name}</div>
+                              {pkg.token_type && (
+                                <div className="text-[10px] text-[#667781] mt-0.5">{pkg.token_type}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[13px] font-black text-[#128C7E]">
+                              {currency} {price.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-[#667781]">per token</div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Budget Input */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                <label className="text-[12px] font-black text-[#111B21]">Enter Your Budget</label>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-black text-[#667781]">{currency}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={budgetStr}
+                  onChange={(e) => setBudgetStr(e.target.value)}
+                  placeholder={currency === "UGX" ? "e.g. 50000" : "e.g. 5000"}
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[18px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all placeholder:text-[#CCC] placeholder:font-normal"
+                />
+              </div>
+              {unitPrice > 0 && (
+                <p className="text-[10px] text-[#667781] mt-1.5">
+                  Token rate: <b className="text-[#128C7E]">{currency} {unitPrice.toLocaleString()}</b> per token
+                  {selectedPkg && <span> ({selectedPkg.token_name})</span>}
+                </p>
+              )}
+              {unitPrice === 0 && (
+                <p className="text-[10px] text-[#F97316] mt-1.5 font-black">
+                  No token packages available in {currency}. Try a different currency.
+                </p>
+              )}
+            </div>
+
+            {/* Calculation Result */}
+            {budget > 0 && unitPrice > 0 && (
+              <div className="bg-[#128C7E]/5 border border-[#128C7E]/20 rounded-xl p-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <div className="text-[10px] text-[#667781] font-bold uppercase tracking-wide">Tokens</div>
+                    <div className="text-[28px] font-black text-[#128C7E] leading-tight">{tokenCount}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[#667781] font-bold uppercase tracking-wide">Cost</div>
+                    <div className="text-[18px] font-black text-[#111B21] leading-tight mt-1">
+                      {currency} {totalCost.toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[#667781] font-bold uppercase tracking-wide">Change</div>
+                    <div className="text-[18px] font-black text-[#667781] leading-tight mt-1">
+                      {currency} {change.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+                {tokenCount === 0 && budget > 0 && (
+                  <p className="text-[11px] text-[#F97316] font-black mt-3 text-center">
+                    Budget too low. Minimum: {currency} {unitPrice.toLocaleString()} for 1 token.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 4: Select Devices */}
+            {tokenCount > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">4</span>
+                  <label className="text-[12px] font-black text-[#111B21]">
+                    Select Devices ({selectedDevices.length} selected)
+                  </label>
+                  {filteredDevices.length > 0 && (
+                    <button onClick={selectAllFiltered} className="text-[10px] font-black text-[#128C7E] cursor-pointer bg-transparent border-none hover:underline ml-auto">
+                      {filteredDevices.every((d) => selectedDevices.includes(d.device_imei)) ? "Deselect All" : "Select All"}
+                    </button>
+                  )}
+                </div>
+
+                {devices.length > 5 && (
+                  <input
+                    type="search"
+                    value={deviceSearch}
+                    onChange={(e) => setDeviceSearch(e.target.value)}
+                    placeholder="Filter devices..."
+                    className="w-full h-8 px-3 mb-2 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[11px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                  />
+                )}
+
+                {devicesLoading ? (
+                  <div className="py-4 text-center text-[12px] text-[#667781]">Loading devices...</div>
+                ) : filteredDevices.length === 0 ? (
+                  <div className="py-4 text-center text-[12px] text-[#667781]">No devices found.</div>
+                ) : (
+                  <div className="max-h-[200px] overflow-y-auto border border-[#E9EDEF] rounded-lg [scrollbar-width:thin]">
+                    {filteredDevices.map((d) => {
+                      const checked = selectedDevices.includes(d.device_imei);
+                      return (
+                        <label
+                          key={d.device_imei}
+                          className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors border-b border-[#F0F2F5] last:border-b-0 ${
+                            checked ? "bg-[#128C7E]/5" : "hover:bg-[#F8F9FA]"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleDevice(d.device_imei)}
+                            className="w-4 h-4 accent-[#128C7E] shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-[12px] font-black text-[#111B21] truncate">
+                              {d.device_name || d.device_imei}
+                            </div>
+                            <div className="text-[10px] text-[#667781]">
+                              {d.car_make} {d.car_model} · {d.device_imei.slice(-6)}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 5: Phone Number */}
+            {tokenCount > 0 && selectedDevices.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">5</span>
+                  <label className="text-[12px] font-black text-[#111B21]">Mobile Money Number</label>
+                </div>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ""))}
+                  placeholder={currency === "UGX" ? "e.g. 0771234567" : "e.g. 0712345678"}
+                  maxLength={15}
+                  className="w-full h-10 px-3 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+                />
+                <p className="text-[10px] text-[#667781] mt-1">
+                  A payment prompt will be sent to this number via Mobile Money.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ══ Right: Order Summary ═══════════════════════════════════ */}
+          <div className="xl:border-l xl:border-[#E9EDEF] xl:pl-5">
+            <div className="sticky top-0">
+              <h4 className="font-black text-[13px] text-[#111B21] mb-3">Order Summary</h4>
+              <div className="bg-[#F8F9FA] border border-[#E9EDEF] rounded-xl p-4 flex flex-col gap-3">
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-[#667781]">Currency</span>
+                  <span className="font-black text-[#111B21]">{currency}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-[#667781]">Budget</span>
+                  <span className="font-black text-[#111B21]">{currency} {budget.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-[#667781]">Token Rate</span>
+                  <span className="font-black text-[#111B21]">{unitPrice > 0 ? `${currency} ${unitPrice.toLocaleString()} / token` : "—"}</span>
+                </div>
+                {selectedPkg && (
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-[#667781]">Package</span>
+                    <span className="font-black text-[#111B21]">{selectedPkg.token_name}</span>
+                  </div>
+                )}
+                <div className="border-t border-[#E9EDEF] pt-3 flex justify-between text-[13px]">
+                  <span className="font-black text-[#111B21]">Tokens</span>
+                  <span className="font-black text-[#128C7E] text-[18px]">{tokenCount}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-[#667781]">Devices</span>
+                  <span className="font-black text-[#111B21]">{selectedDevices.length}</span>
+                </div>
+                <div className="border-t border-[#E9EDEF] pt-3 flex justify-between text-[14px]">
+                  <span className="font-black text-[#111B21]">Total</span>
+                  <span className="font-black text-[#128C7E]">{currency} {totalCost.toLocaleString()}</span>
+                </div>
+                {change > 0 && (
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[#667781]">Unused from budget</span>
+                    <span className="text-[#667781]">{currency} {change.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status messages */}
+              {status === "pending" && (
+                <div className="mt-3 bg-[#F97316]/10 border border-[#F97316]/30 rounded-lg px-3 py-2.5 flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[#F97316]/30 border-t-[#F97316] rounded-full animate-spin shrink-0" />
+                  <span className="text-[11px] text-[#F97316] font-black">Waiting for Mobile Money confirmation...</span>
+                </div>
+              )}
+              {status === "failed" && (
+                <div className="mt-3 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2 text-[11px] text-[#EF4444] font-black">
+                  Payment failed. Please try again.
+                </div>
+              )}
+              {status === "timeout" && (
+                <div className="mt-3 bg-[#F97316]/10 border border-[#F97316]/30 rounded-lg px-3 py-2 text-[11px] text-[#F97316] font-black">
+                  Payment is still processing. Check your Transactions tab for updates.
+                </div>
+              )}
+              {status === "success" && (
+                <div className="mt-3 bg-[#25D366]/10 border border-[#25D366]/30 rounded-lg px-3 py-2 text-[11px] text-[#128C7E] font-black">
+                  Payment successful! Tokens added to your account.
+                </div>
+              )}
+
+              {/* Pay button */}
+              <button
+                onClick={handlePay}
+                disabled={!canPay}
+                className="w-full mt-4 h-11 rounded-xl bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-110 active:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : polling ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Awaiting Payment...
+                  </>
+                ) : (
+                  <>Pay {currency} {totalCost.toLocaleString()} via Mobile Money</>
+                )}
+              </button>
+
+              {tokenCount === 0 && budget > 0 && unitPrice > 0 && (
+                <p className="text-[10px] text-[#667781] mt-2 text-center">
+                  Increase your budget to at least {currency} {unitPrice.toLocaleString()} to purchase 1 token.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export function SimPage() {
@@ -736,11 +1220,11 @@ export function SimPage() {
       balanceFetched.current = true;
       fetchBalance();
     }
-    if (tab === "buy" && !pkgFetched.current) {
+    if ((tab === "buy" || tab === "budget") && !pkgFetched.current) {
       pkgFetched.current = true;
       fetchPackages();
     }
-    if ((tab === "buy" || tab === "subscriptions") && !devicesFetched.current) {
+    if ((tab === "buy" || tab === "budget" || tab === "subscriptions") && !devicesFetched.current) {
       devicesFetched.current = true;
       fetchDevices();
     }
@@ -1076,6 +1560,23 @@ export function SimPage() {
             </div>
             );
           })()}
+
+          {/* ── TAB: Buy by Budget ──────────────────────────────────────── */}
+          {tab === "budget" && (
+            <BudgetTab
+              packages={packages}
+              pkgLoading={pkgLoading}
+              devices={devices}
+              devicesLoading={devicesLoading}
+              ownerUid={ownerUid}
+              onSuccess={(msg) => {
+                showToast(msg, "success");
+                balanceFetched.current = false;
+                txnFetched.current = false;
+                fetchBalance();
+              }}
+            />
+          )}
 
           {/* ── TAB: Device Subscriptions ──────────────────────────────── */}
           {tab === "subscriptions" && (
