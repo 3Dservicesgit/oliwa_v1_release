@@ -173,7 +173,7 @@ export const ENDPOINTS = {
   },
 
   FLEET: {
-    LIST_UNITS:       "/system32/devices/configured/all",  // POST {data:{data_level,account_uid}}
+    LIST_UNITS:       "/devices/configured/all",  // POST {data:{data_level,account_uid}}
     CHECK_IMEI:       "/system32/payment/check-imei",      // GET  append /{imei}
     CLIENTS_ALL:      "/clients",                          // GET  append /{primary_uid}/all
     USER_DETAILS:     "/users",                            // GET  append /{account_uid}/details

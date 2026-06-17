@@ -555,7 +555,7 @@ export default function NocBridgePage() {
         setLoading(false);
         return;
       }
-      const accountType = (getCookie("_nvxs_account_type") ?? "client").toLowerCase();
+      const accountType = "client";
       const dataLevel   = accountType;
       const accountUid  = dataLevel === "client"
         ? (getCookie("_nvxs_account_root") ?? rawUid)
