@@ -25,6 +25,7 @@ import {
   getClientBalance,
   getClientDevices,
   buyTokens,
+  getBudgetOffer,
   pauseSubscription,
   restoreSubscription,
   getPaymentStatus,
@@ -184,30 +185,26 @@ function BalanceCard({ b }: { b: ClientTokenBalance }) {
 
 // ── Package pricing helpers ────────────────────────────────────────────────
 
-/** Extract price from variant (preferred) or legacy flat fields. */
+/** Price is defined at token level (legacy fallback: variant). */
 function getPkgPrice(pkg: TokenPackage): number {
-  return pkg.variant?.billing_amount ?? pkg.token_amount ?? 0;
+  return pkg.token_amount ?? pkg.variant?.billing_amount ?? 0;
 }
 function getPkgCurrency(pkg: TokenPackage): string {
-  return pkg.variant?.billing_currency || pkg.token_currency || "—";
+  return pkg.token_currency || pkg.variant?.billing_currency || "—";
 }
-/** Format the billing_type into a human-readable label. */
-function getPkgBillingLabel(pkg: TokenPackage): string {
-  const bt = pkg.variant?.billing_type || "";
-  if (bt === "recurring") return "Recurring";
-  // Numeric billing_type = days (e.g. "60" → "60 days", "180" → "180 days")
-  const numDays = parseInt(bt, 10);
-  if (!isNaN(numDays) && numDays > 0) return `${numDays} days`;
-  // "h2", "h6" etc. = hour-based codes
-  if (bt.startsWith("h")) {
-    const hrs = parseInt(bt.slice(1), 10);
-    if (!isNaN(hrs) && hrs > 0) return `${hrs} hours`;
-  }
-  if (bt) return bt;
-  // Fallback to legacy token_validity (seconds)
-  const secs = pkg.token_validity ?? 0;
-  if (secs > 0) return `${Math.round(secs / 86400)} days`;
-  return "—";
+/** Billing unit — the metering unit a token is charged per (hour, event, km, mb, ...). */
+function getPkgBillingUnit(pkg: TokenPackage): string {
+  return pkg.billing_unit || "—";
+}
+/** "per hour", "per event", etc. */
+function getPkgBillingUnitLabel(pkg: TokenPackage): string {
+  return pkg.billing_unit ? `per ${pkg.billing_unit}` : "—";
+}
+function getPkgBillingTrigger(pkg: TokenPackage): string {
+  return pkg.billing_trigger || "—";
+}
+function getPkgBillingScope(pkg: TokenPackage): string {
+  return pkg.billing_scope || "—";
 }
 
 // ── Token Package Card ─────────────────────────────────────────────────────
@@ -219,37 +216,56 @@ function PackageCard({
 }) {
   const price = getPkgPrice(pkg);
   const currency = getPkgCurrency(pkg);
-  const billingLabel = getPkgBillingLabel(pkg);
-  const variantName = pkg.variant?.variant_name;
+  const billingUnit = getPkgBillingUnit(pkg);
+  const productName = pkg.product?.product_name;
+  const trigger = pkg.billing_trigger;
+  const scope = pkg.billing_scope;
 
   return (
     <div className="bg-white border border-[#E9EDEF] rounded-xl p-4 flex flex-col gap-3 hover:border-[#128C7E]/40 hover:shadow-sm transition-all">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <span className="font-black text-[13px] text-[#111B21]">{pkg.token_name}</span>
-          {variantName && (
-            <div className="text-[10px] text-[#667781] mt-0.5">{variantName}</div>
+          {productName && (
+            <div className="text-[10px] text-[#667781] mt-0.5 uppercase tracking-wide truncate">{productName}</div>
           )}
         </div>
-        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30">
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 shrink-0">
           {pkg.token_type}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">Price</div>
+          <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">Cost</div>
           <div className="text-[18px] font-black text-[#128C7E] leading-tight">
             {currency} {price.toLocaleString()}
           </div>
+          <div className="text-[10px] text-[#667781]">{getPkgBillingUnitLabel(pkg)}</div>
         </div>
         <div>
-          <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">Billing Period</div>
-          <div className="text-[18px] font-black text-[#111B21] leading-tight">
-            {billingLabel}
+          <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">Billing Unit</div>
+          <div className="text-[18px] font-black text-[#111B21] leading-tight capitalize">
+            {billingUnit}
           </div>
         </div>
       </div>
+
+      {/* Billing meta */}
+      {(trigger || scope) && (
+        <div className="flex flex-wrap gap-1.5">
+          {trigger && (
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#667781] border border-[#E9EDEF]">
+              ⚡ {trigger}
+            </span>
+          )}
+          {scope && (
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#667781] border border-[#E9EDEF] capitalize">
+              ⊞ {scope}
+            </span>
+          )}
+        </div>
+      )}
 
       <button
         onClick={() => onBuy(pkg)}
@@ -280,8 +296,8 @@ function BuyDrawer({
 
   const price = getPkgPrice(pkg);
   const currency = getPkgCurrency(pkg);
-  const billingLabel = getPkgBillingLabel(pkg);
-  const variantName = pkg.variant?.variant_name;
+  const billingUnit = getPkgBillingUnit(pkg);
+  const productName = pkg.product?.product_name;
   const total = price * qty;
 
   // Currency determines payment method
@@ -401,17 +417,33 @@ function BuyDrawer({
 
           {/* ── Package summary ─────────────────────────────────────── */}
           <div className="bg-[#128C7E]/5 border border-[#128C7E]/20 rounded-xl p-3 mb-3">
-            <div className="font-black text-[14px] text-[#111B21] mb-1">{pkg.token_name}</div>
-            {variantName && <div className="text-[11px] text-[#667781] mb-2">{variantName}</div>}
-            <div className="grid grid-cols-2 gap-2 text-[12px]">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="font-black text-[14px] text-[#111B21]">{pkg.token_name}</div>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 shrink-0 capitalize">
+                {pkg.token_type}
+              </span>
+            </div>
+            {productName && <div className="text-[11px] text-[#667781] uppercase tracking-wide mb-2">{productName}</div>}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
               <div>
-                <span className="text-[#667781]">Price: </span>
+                <span className="text-[#667781]">Cost: </span>
                 <span className="font-black text-[#128C7E]">{currency} {price.toLocaleString()}</span>
               </div>
               <div>
-                <span className="text-[#667781]">Billing: </span>
-                <span className="font-black">{billingLabel}</span>
+                <span className="text-[#667781]">Billing Unit: </span>
+                <span className="font-black capitalize">{billingUnit}</span>
               </div>
+              <div>
+                <span className="text-[#667781]">Trigger: </span>
+                <span className="font-black">{getPkgBillingTrigger(pkg)}</span>
+              </div>
+              <div>
+                <span className="text-[#667781]">Scope: </span>
+                <span className="font-black capitalize">{getPkgBillingScope(pkg)}</span>
+              </div>
+            </div>
+            <div className="mt-2 pt-2 border-t border-[#128C7E]/15 text-[11px] text-[#667781]">
+              Charged <span className="font-black text-[#111B21]">{currency} {price.toLocaleString()}</span> {getPkgBillingUnitLabel(pkg)}
             </div>
           </div>
 
@@ -644,25 +676,68 @@ function BudgetTab({
   const [status, setStatus] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Tokens that fit the budget — resolved by the backend /tokens/budget-offer endpoint
+  const [offers, setOffers] = useState<TokenPackage[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [offersError, setOffersError] = useState<string | null>(null);
+
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const budget = parseFloat(budgetStr) || 0;
 
-  // Find packages matching the selected currency
-  const currencyPkgs = packages.filter((p) => getPkgCurrency(p) === currency);
-
-  // Auto-select first package when currency changes and current selection is invalid
+  // ── Fetch budget offers from the backend (debounced) ──────────────────────
   useEffect(() => {
-    if (currencyPkgs.length > 0) {
-      const stillValid = selectedPkgId && currencyPkgs.some((p) => p.token_id === selectedPkgId);
-      if (!stillValid) setSelectedPkgId(currencyPkgs[0].token_id);
+    if (budget <= 0) {
+      setOffers([]);
+      setOffersError(null);
+      setOffersLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setOffersLoading(true);
+    setOffersError(null);
+    const handle = setTimeout(async () => {
+      try {
+        const res = await getBudgetOffer({ currency, amount: budget });
+        if (cancelled) return;
+        const tokens = res?.data?.tokens ?? [];
+        // Map budget-offer rows into TokenPackage shape so the existing helpers/UI work
+        const mapped: TokenPackage[] = tokens.map((t) => ({
+          token_id: t.token_id,
+          token_name: t.token_name,
+          token_type: t.token_type,
+          token_parameters: [],
+          date_created: "",
+          token_product_uid: t.token_product_uid ?? undefined,
+          product: t.product_name ? { product_uid: t.token_product_uid ?? "", product_name: t.product_name } : undefined,
+          token_amount: t.token_amount,
+          token_currency: t.token_currency,
+          billing_unit: t.billing_unit,
+          billing_trigger: t.billing_trigger,
+          billing_scope: t.billing_scope,
+        }));
+        setOffers(mapped);
+      } catch {
+        if (!cancelled) { setOffers([]); setOffersError("Could not load token offers. Please try again."); }
+      } finally {
+        if (!cancelled) setOffersLoading(false);
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [currency, budget]);
+
+  // Auto-select the cheapest offer (backend returns ascending by price) when selection is invalid
+  useEffect(() => {
+    if (offers.length > 0) {
+      const stillValid = selectedPkgId && offers.some((p) => p.token_id === selectedPkgId);
+      if (!stillValid) setSelectedPkgId(offers[0].token_id);
     } else {
       setSelectedPkgId(null);
     }
-  }, [currency, packages]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [offers]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Selected package
-  const selectedPkg = currencyPkgs.find((p) => p.token_id === selectedPkgId) ?? null;
+  // Selected token (from the affordable offers)
+  const selectedPkg = offers.find((p) => p.token_id === selectedPkgId) ?? null;
 
   const unitPrice = selectedPkg ? getPkgPrice(selectedPkg) : 0;
   const tokenCount = unitPrice > 0 ? Math.floor(budget / unitPrice) : 0;
@@ -810,61 +885,10 @@ function BudgetTab({
               </div>
             </div>
 
-            {/* Step 2: Select Package */}
-            {currencyPkgs.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
-                  <label className="text-[12px] font-black text-[#111B21]">Select Package</label>
-                </div>
-                <div className="grid gap-2">
-                  {currencyPkgs.map((pkg) => {
-                    const price = getPkgPrice(pkg);
-                    const isSelected = pkg.token_id === selectedPkgId;
-                    return (
-                      <button
-                        key={pkg.token_id}
-                        onClick={() => { setSelectedPkgId(pkg.token_id); setBudgetStr(""); }}
-                        className={[
-                          "w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer",
-                          isSelected
-                            ? "bg-[#128C7E]/5 border-[#128C7E] ring-1 ring-[#128C7E]/30"
-                            : "bg-white border-[#E9EDEF] hover:bg-[#F8F9FA]",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={[
-                              "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
-                              isSelected ? "border-[#128C7E]" : "border-[#CCC]",
-                            ].join(" ")}>
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-[#128C7E]" />}
-                            </div>
-                            <div>
-                              <div className="text-[13px] font-black text-[#111B21]">{pkg.token_name}</div>
-                              {pkg.token_type && (
-                                <div className="text-[10px] text-[#667781] mt-0.5">{pkg.token_type}</div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[13px] font-black text-[#128C7E]">
-                              {currency} {price.toLocaleString()}
-                            </div>
-                            <div className="text-[10px] text-[#667781]">per token</div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Budget Input */}
+            {/* Step 2: Budget Input */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
                 <label className="text-[12px] font-black text-[#111B21]">Enter Your Budget</label>
               </div>
               <div className="relative">
@@ -879,18 +903,80 @@ function BudgetTab({
                   className="w-full h-12 pl-12 pr-4 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[18px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all placeholder:text-[#CCC] placeholder:font-normal"
                 />
               </div>
+              {offersLoading && (
+                <p className="text-[10px] text-[#667781] mt-1.5 flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                  Finding tokens within your budget…
+                </p>
+              )}
+              {offersError && (
+                <p className="text-[10px] text-[#EF4444] mt-1.5 font-black">{offersError}</p>
+              )}
+              {!offersLoading && !offersError && budget > 0 && offers.length === 0 && (
+                <p className="text-[10px] text-[#F97316] mt-1.5 font-black">
+                  No tokens fit within {currency} {budget.toLocaleString()}. Try increasing your budget or another currency.
+                </p>
+              )}
               {unitPrice > 0 && (
                 <p className="text-[10px] text-[#667781] mt-1.5">
-                  Token rate: <b className="text-[#128C7E]">{currency} {unitPrice.toLocaleString()}</b> per token
+                  Token rate: <b className="text-[#128C7E]">{currency} {unitPrice.toLocaleString()}</b> {getPkgBillingUnitLabel(selectedPkg!)}
                   {selectedPkg && <span> ({selectedPkg.token_name})</span>}
                 </p>
               )}
-              {unitPrice === 0 && (
-                <p className="text-[10px] text-[#F97316] mt-1.5 font-black">
-                  No token packages available in {currency}. Try a different currency.
-                </p>
-              )}
             </div>
+
+            {/* Step 3: Select Token (within budget — from backend) */}
+            {offers.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                  <label className="text-[12px] font-black text-[#111B21]">Select Token</label>
+                  <span className="text-[10px] text-[#667781] ml-auto">{offers.length} fit your budget</span>
+                </div>
+                <div className="grid gap-2">
+                  {offers.map((pkg) => {
+                    const price = getPkgPrice(pkg);
+                    const isSelected = pkg.token_id === selectedPkgId;
+                    const maxQty = price > 0 ? Math.floor(budget / price) : 0;
+                    return (
+                      <button
+                        key={pkg.token_id}
+                        onClick={() => setSelectedPkgId(pkg.token_id)}
+                        className={[
+                          "w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer",
+                          isSelected
+                            ? "bg-[#128C7E]/5 border-[#128C7E] ring-1 ring-[#128C7E]/30"
+                            : "bg-white border-[#E9EDEF] hover:bg-[#F8F9FA]",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={[
+                              "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
+                              isSelected ? "border-[#128C7E]" : "border-[#CCC]",
+                            ].join(" ")}>
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-[#128C7E]" />}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[13px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
+                              <div className="text-[10px] text-[#667781] mt-0.5 capitalize">
+                                {pkg.token_type}{pkg.billing_unit ? ` · per ${pkg.billing_unit}` : ""}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-[13px] font-black text-[#128C7E]">
+                              {currency} {price.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-[#667781]">up to {maxQty} token{maxQty !== 1 ? "s" : ""}</div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Calculation Result */}
             {budget > 0 && unitPrice > 0 && (
@@ -1423,7 +1509,8 @@ export function SimPage() {
               ? packages.filter((p) =>
                   p.token_name?.toLowerCase().includes(q) ||
                   p.token_type?.toLowerCase().includes(q) ||
-                  (p.variant?.variant_name || "").toLowerCase().includes(q) ||
+                  (p.product?.product_name || "").toLowerCase().includes(q) ||
+                  (p.billing_unit || "").toLowerCase().includes(q) ||
                   getPkgCurrency(p).toLowerCase().includes(q)
                 )
               : packages;
@@ -1516,8 +1603,8 @@ export function SimPage() {
                       <tr className="border-b border-[#E9EDEF]">
                         <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Token Name</th>
                         <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Type</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Price</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Billing Period</th>
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Cost</th>
+                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Billing Unit</th>
                         <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide text-center">Action</th>
                       </tr>
                     </thead>
@@ -1525,13 +1612,13 @@ export function SimPage() {
                       {filtered.map((pkg) => {
                         const price = getPkgPrice(pkg);
                         const currency = getPkgCurrency(pkg);
-                        const billing = getPkgBillingLabel(pkg);
-                        const variantName = pkg.variant?.variant_name;
+                        const billingUnit = getPkgBillingUnit(pkg);
+                        const productName = pkg.product?.product_name;
                         return (
                           <tr key={pkg.token_id} className="border-b border-[#F0F2F5] hover:bg-[#F8F9FA] transition-colors">
                             <td className="px-3 py-2.5">
                               <div className="font-black text-[12px] text-[#111B21]">{pkg.token_name}</div>
-                              {variantName && <div className="text-[10px] text-[#667781]">{variantName}</div>}
+                              {productName && <div className="text-[10px] text-[#667781] uppercase tracking-wide">{productName}</div>}
                             </td>
                             <td className="px-3 py-2.5">
                               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30">
@@ -1540,8 +1627,9 @@ export function SimPage() {
                             </td>
                             <td className="px-3 py-2.5 text-[12px] font-black text-[#128C7E]">
                               {currency} {price.toLocaleString()}
+                              <span className="text-[10px] text-[#667781] font-normal"> {getPkgBillingUnitLabel(pkg)}</span>
                             </td>
-                            <td className="px-3 py-2.5 text-[12px] text-[#111B21] font-black">{billing}</td>
+                            <td className="px-3 py-2.5 text-[12px] text-[#111B21] font-black capitalize">{billingUnit}</td>
                             <td className="px-3 py-2.5 text-center">
                               <button
                                 onClick={() => setBuyTarget(pkg)}

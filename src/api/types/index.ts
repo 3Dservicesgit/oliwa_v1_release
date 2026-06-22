@@ -58,11 +58,15 @@ export type {
   ExpiredSubscription,
   ExpiredTokensResponse,
   TokenPackage,
+  TokenProduct,
   ClientTokenBalance,
   BuyTokensRequest,
   BuyTokensResponse,
   TransferTokensRequest,
   TransferTokensResponse,
+  BudgetOfferRequest,
+  BudgetOfferToken,
+  BudgetOfferResponse,
 } from "./clients.types";
 
 export type {
