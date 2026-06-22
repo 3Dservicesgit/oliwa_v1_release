@@ -3,7 +3,8 @@
  *
  * Capabilities:
  *   - Renders existing geofence polygons
- *   - Drawing mode: user draws a polygon, coordinates extracted on complete
+ *   - Drawing mode: click-to-place vertices, then "Finish" to create polygon
+ *     (DrawingManager was removed from Google Maps API v3.65+)
  *   - Edit mode: selected polygon becomes editable/draggable
  *   - Click-to-select: clicking a polygon highlights it and notifies parent
  *   - Fit bounds: auto-zooms to show all polygons on load
@@ -13,11 +14,9 @@ import {
   GoogleMap,
   useJsApiLoader,
   Polygon,
-  DrawingManager,
+  Marker,
 } from "@react-google-maps/api";
 import type { LatLng, ParsedGeozone } from "../../../api/types";
-
-const MAP_LIBRARIES: ("drawing")[] = ["drawing"];
 
 const MAP_CONTAINER: React.CSSProperties = { width: "100%", height: "100%" };
 
@@ -77,12 +76,19 @@ export function GeofenceMap({
 }: GeofenceMapProps) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: MAP_LIBRARIES,
   });
 
   const mapRef = useRef<google.maps.Map | null>(null);
   const polygonRefs = useRef<Record<string, google.maps.Polygon>>({});
   const [mapReady, setMapReady] = useState(false);
+
+  // ── Click-to-draw state ─────────────────────────────────────────────────
+  const [drawPoints, setDrawPoints] = useState<LatLng[]>([]);
+
+  // Reset draw points when leaving drawing mode
+  useEffect(() => {
+    if (!drawingMode) setDrawPoints([]);
+  }, [drawingMode]);
 
   // ── Fit bounds to show all polygons ─────────────────────────────────────
   const fitBounds = useCallback(() => {
@@ -114,19 +120,27 @@ export function GeofenceMap({
     mapRef.current.fitBounds(bounds, 80);
   }, [selectedUid, geozones]);
 
-  // ── Drawing complete handler ────────────────────────────────────────────
-  const handleDrawingComplete = useCallback(
-    (polygon: google.maps.Polygon) => {
-      const path = polygon
-        .getPath()
-        .getArray()
-        .map((p) => ({ lat: p.lat(), lng: p.lng() }));
-      // Remove the drawing overlay — we'll render it as a controlled Polygon
-      polygon.setMap(null);
-      onPolygonComplete?.(path);
+  // ── Map click handler — places points in drawing mode ──────────────────
+  const handleMapClick = useCallback(
+    (e: google.maps.MapMouseEvent) => {
+      if (!drawingMode) return;
+      if (!e.latLng) return;
+      const pt: LatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      setDrawPoints((prev) => [...prev, pt]);
     },
-    [onPolygonComplete],
+    [drawingMode],
   );
+
+  const handleFinishDraw = useCallback(() => {
+    if (drawPoints.length >= 3) {
+      onPolygonComplete?.(drawPoints);
+    }
+    setDrawPoints([]);
+  }, [drawPoints, onPolygonComplete]);
+
+  const handleUndoPoint = useCallback(() => {
+    setDrawPoints((prev) => prev.slice(0, -1));
+  }, []);
 
   // ── Edit complete handler ───────────────────────────────────────────────
   const handleEditEnd = useCallback(
@@ -146,7 +160,6 @@ export function GeofenceMap({
   const onPolygonLoad = useCallback(
     (uid: string, poly: google.maps.Polygon) => {
       polygonRefs.current[uid] = poly;
-      // Apply editable/draggable immediately when the polygon loads
       const shouldEdit = uid === editingUid;
       poly.setEditable(shouldEdit);
       poly.setDraggable(shouldEdit);
@@ -179,64 +192,121 @@ export function GeofenceMap({
   }
 
   return (
-    <GoogleMap
-      mapContainerStyle={MAP_CONTAINER}
-      center={DEFAULT_CENTER}
-      zoom={DEFAULT_ZOOM}
-      onLoad={(map) => {
-        mapRef.current = map;
-        setMapReady(true);
-      }}
-      options={{
-        disableDefaultUI: false,
-        zoomControl: true,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true,
-        styles: [
-          { featureType: "poi", stylers: [{ visibility: "off" }] },
-        ],
-      }}
-    >
-      {/* ── Existing polygons ──────────────────────────────────────── */}
-      {geozones.map((gz) => {
-        const isSelected = gz.geozone_uid === selectedUid;
-        const isEditing = gz.geozone_uid === editingUid;
-        return (
-          <Polygon
-            key={`${gz.geozone_uid}-${isEditing ? "edit" : "view"}`}
-            paths={gz.path}
-            options={{
-              ...(isSelected ? POLYGON_SELECTED : POLYGON_DEFAULT),
-              editable: isEditing,
-              draggable: isEditing,
-              clickable: true,
-              zIndex: isSelected ? 2 : 1,
-            }}
-            onClick={() => onSelectGeozone?.(gz.geozone_uid)}
-            onLoad={(poly) => onPolygonLoad(gz.geozone_uid, poly)}
-            onUnmount={() => onPolygonUnmount(gz.geozone_uid)}
-            onMouseUp={() => {
-              if (isEditing) handleEditEnd(gz.geozone_uid);
-            }}
-            onDragEnd={() => {
-              if (isEditing) handleEditEnd(gz.geozone_uid);
-            }}
-          />
-        );
-      })}
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <GoogleMap
+        mapContainerStyle={MAP_CONTAINER}
+        center={DEFAULT_CENTER}
+        zoom={DEFAULT_ZOOM}
+        onLoad={(map) => {
+          mapRef.current = map;
+          setMapReady(true);
+        }}
+        onClick={handleMapClick}
+        options={{
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true,
+          draggableCursor: drawingMode ? "crosshair" : undefined,
+          styles: [
+            { featureType: "poi", stylers: [{ visibility: "off" }] },
+          ],
+        }}
+      >
+        {/* ── Existing polygons ──────────────────────────────────────── */}
+        {geozones.map((gz) => {
+          const isSelected = gz.geozone_uid === selectedUid;
+          const isEditing = gz.geozone_uid === editingUid;
+          return (
+            <Polygon
+              key={`${gz.geozone_uid}-${isEditing ? "edit" : "view"}`}
+              paths={gz.path}
+              options={{
+                ...(isSelected ? POLYGON_SELECTED : POLYGON_DEFAULT),
+                editable: isEditing,
+                draggable: isEditing,
+                clickable: true,
+                zIndex: isSelected ? 2 : 1,
+              }}
+              onClick={() => onSelectGeozone?.(gz.geozone_uid)}
+              onLoad={(poly) => onPolygonLoad(gz.geozone_uid, poly)}
+              onUnmount={() => onPolygonUnmount(gz.geozone_uid)}
+              onMouseUp={() => {
+                if (isEditing) handleEditEnd(gz.geozone_uid);
+              }}
+              onDragEnd={() => {
+                if (isEditing) handleEditEnd(gz.geozone_uid);
+              }}
+            />
+          );
+        })}
 
-      {/* ── Drawing manager ────────────────────────────────────────── */}
+        {/* ── Drawing preview polygon ──────────────────────────────── */}
+        {drawingMode && drawPoints.length >= 2 && (
+          <Polygon
+            paths={drawPoints}
+            options={{ ...POLYGON_DRAWING, editable: false, clickable: false, zIndex: 5 }}
+          />
+        )}
+
+        {/* ── Vertex markers while drawing ─────────────────────────── */}
+        {drawingMode &&
+          drawPoints.map((pt, i) => (
+            <Marker
+              key={`draw-pt-${i}`}
+              position={pt}
+              icon={{
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: "#25D366",
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 2,
+              }}
+            />
+          ))}
+      </GoogleMap>
+
+      {/* ── Drawing toolbar (overlaid on map) ───────────────────────── */}
       {drawingMode && (
-        <DrawingManager
-          drawingMode={google.maps.drawing.OverlayType.POLYGON}
-          onPolygonComplete={handleDrawingComplete}
-          options={{
-            drawingControl: false,
-            polygonOptions: POLYGON_DRAWING,
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 10,
           }}
-        />
+        >
+          <div className="bg-white rounded-xl shadow-lg border border-[#E9EDEF] px-4 py-2.5 flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+            <span className="text-[12px] text-[#667781]">
+              {drawPoints.length === 0
+                ? "Click on the map to start placing vertices"
+                : `${drawPoints.length} point${drawPoints.length !== 1 ? "s" : ""} placed`}
+            </span>
+            {drawPoints.length > 0 && (
+              <button
+                type="button"
+                onClick={handleUndoPoint}
+                className="h-7 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[11px] font-extrabold text-[#667781] cursor-pointer hover:bg-[#F0F2F5]"
+              >
+                Undo
+              </button>
+            )}
+            {drawPoints.length >= 3 && (
+              <button
+                type="button"
+                onClick={handleFinishDraw}
+                className="h-7 px-3 rounded-lg border-0 bg-[#128C7E] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[#0D7466]"
+              >
+                Finish Drawing
+              </button>
+            )}
+          </div>
+        </div>
       )}
-    </GoogleMap>
+    </div>
   );
 }

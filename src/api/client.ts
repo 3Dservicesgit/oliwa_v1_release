@@ -31,10 +31,12 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
  * is still in the interim (pre-JWT) phase.
  */
 let accessToken: string | null = null;
+let lastTokenSetTime = 0;
 
 /** Set the in-memory access token (called after login or refresh). */
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  if (token) lastTokenSetTime = Date.now();
 }
 
 /** Check whether we currently hold a valid in-memory JWT. */
@@ -61,12 +63,19 @@ export function getStoredAuthToken(): string | null {
 // ── Token refresh ────────────────────────────────────────────────────────────
 
 let refreshPromise: Promise<boolean> | null = null;
+let lastRefreshTime = 0;
+let lastRefreshResult = false;
 
 /**
  * Attempt a silent token refresh.
  * Deduplicates concurrent refresh attempts (only one in-flight at a time).
+ * Caches the result for 5 seconds to prevent token-rotation races when
+ * multiple 401 responses arrive in quick succession.
  */
 async function tryRefresh(): Promise<boolean> {
+  // If we refreshed recently, return the cached result
+  if (Date.now() - lastRefreshTime < 5000) return lastRefreshResult;
+
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -78,15 +87,25 @@ async function tryRefresh(): Promise<boolean> {
         headers: { "Content-Type": "application/json" },
       });
 
-      if (!resp.ok) return false;
+      if (!resp.ok) {
+        lastRefreshResult = false;
+        lastRefreshTime = Date.now();
+        return false;
+      }
 
       const json = await resp.json();
       if (json?.data?.access_token) {
         setAccessToken(json.data.access_token);
+        lastRefreshResult = true;
+        lastRefreshTime = Date.now();
         return true;
       }
+      lastRefreshResult = false;
+      lastRefreshTime = Date.now();
       return false;
     } catch {
+      lastRefreshResult = false;
+      lastRefreshTime = Date.now();
       return false;
     } finally {
       refreshPromise = null;
@@ -150,11 +169,15 @@ async function baseFetch(
       });
     }
 
-    // Refresh failed — session is dead, force logout
-    clearAllCookies();
-    setAccessToken(null);
-    sessionStorage.removeItem("_nvxs_redirect_in_progress");
-    window.location.href = "/";
+    // Refresh failed — session is dead, force logout.
+    // BUT: if a new token was set very recently (e.g. login just completed),
+    // don't nuke the session — the 401 was from a stale request.
+    if (Date.now() - lastTokenSetTime > 3000) {
+      clearAllCookies();
+      setAccessToken(null);
+      sessionStorage.removeItem("_nvxs_redirect_in_progress");
+      setTimeout(() => { window.location.href = "/"; }, 100);
+    }
   }
 
   return response;

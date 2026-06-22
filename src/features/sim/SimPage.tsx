@@ -1138,6 +1138,12 @@ export function SimPage() {
   const ownerUidRef = useRef(ownerUid);
   if (ownerUid) ownerUidRef.current = ownerUid;
 
+  // Devices belong to the CLIENT, not the individual user.
+  // accountRoot = the client UID assigned when the customer user was created.
+  const clientUid = authState.accountRoot || getCookie("_nvxs_account_root") || "";
+  const clientUidRef = useRef(clientUid);
+  if (clientUid) clientUidRef.current = clientUid;
+
   const showToast = useCallback((msg: string, type: "success" | "error") => {
     setToast({ msg, type });
   }, []);
@@ -1178,13 +1184,13 @@ export function SimPage() {
     }
   }, []);
 
-  // ── Fetch devices ──────────────────────────────────────────────────────
+  // ── Fetch devices (uses client UID, not individual user UID) ───────────
   const fetchDevices = useCallback(async () => {
-    const uid = ownerUidRef.current;
-    if (!uid) return;
+    const cuid = clientUidRef.current;
+    if (!cuid) return;
     setDevicesLoading(true);
     try {
-      const res = await getClientDevices(uid);
+      const res = await getClientDevices(cuid);
       setDevices(res?.data ?? []);
     } catch {
       // Keep existing

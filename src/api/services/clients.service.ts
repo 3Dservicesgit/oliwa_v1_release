@@ -9,7 +9,7 @@
  *   PATCH /clients/{client_uid}/trash             → trashClient
  *   POST  /clients/{client_uid}/restore           → restoreClient
  *   GET   /clients/trashed                        → getTrashedClients
- *   GET   /devices/configured/{client_uid}/client → getClientDevices
+ *   POST  /devices/configured/all                 → getClientDevices
  *   GET   /tokens/{client_uid}/balance            → getClientBalance
  *   POST  /payments/tokens/buy                    → buyTokens
  *   POST  /tokens/transfer                        → transferTokens
@@ -87,7 +87,10 @@ export function getClientDevices(
   clientUid: string,
   opts?: RequestOptions,
 ): Promise<ApiResponse<ClientDevice[]>> {
-  return get<ClientDevice[]>(`${ENDPOINTS.CLIENTS.DEVICES}/${clientUid}/client`, opts);
+  return post<ClientDevice[]>(ENDPOINTS.FLEET.LIST_UNITS, {
+    ...opts,
+    data: { data_level: "client", account_uid: clientUid },
+  });
 }
 
 /** Fetch all available token packages from the registry. */

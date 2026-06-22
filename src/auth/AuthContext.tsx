@@ -17,9 +17,11 @@ import React, {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
+  useState,
   ReactNode,
 } from "react";
-import { post, setAccessToken } from "../api/client";
+import { post, setAccessToken, hasAccessToken } from "../api/client";
 import { ENDPOINTS } from "../api/endpoints";
 import { getCookie, setCookie, clearAllCookies } from "../utils/cookies";
 import { broadcastLogout } from "../api/services/auth.service";
@@ -151,6 +153,75 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const [authReady, setAuthReady] = useState(false);
+
+  /**
+   * Boot-time JWT refresh.
+   * On page refresh the in-memory JWT is lost. If we have cookies (user was
+   * logged in), proactively refresh the JWT BEFORE any API calls fire.
+   * This prevents the 401 → refresh → retry cascade on every page load.
+   */
+  useEffect(() => {
+    if (hasAccessToken()) {
+      setAuthReady(true);
+      return;
+    }
+
+    const uid = getCookie("_nvxs_account_uid");
+    if (!uid) {
+      setAuthReady(true);
+      return;
+    }
+
+    // Have cookies but no JWT — silently refresh
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    (async () => {
+      try {
+        const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+        const url = new URL("/auth/refresh", BASE_URL);
+        const resp = await fetch(url.toString(), {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+        });
+
+        if (cancelled) return;
+
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json?.data?.access_token) {
+            setAccessToken(json.data.access_token);
+          } else {
+            // Token response was OK but missing access_token — treat as failure
+            clearAllCookies();
+            dispatch({ type: "LOGOUT" });
+          }
+        } else {
+          // Refresh failed — clear stale cookies so user sees login page
+          clearAllCookies();
+          dispatch({ type: "LOGOUT" });
+        }
+      } catch {
+        if (cancelled) return;
+        // Network error or timeout — clear stale session
+        clearAllCookies();
+        dispatch({ type: "LOGOUT" });
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setAuthReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, []);
 
   /**
    * login — Submit email + password to the backend.
@@ -166,7 +237,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Email and password are required.");
     }
 
-    const res = await post<{
+    // Use raw fetch instead of post() to bypass the 401 interceptor.
+    // The login endpoint doesn't need auth, and the interceptor can
+    // interfere (clear cookies, schedule redirects) if anything goes wrong.
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+    const url = new URL(ENDPOINTS.AUTH.LOGIN, BASE_URL);
+
+    const resp = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // so backend can set HttpOnly refresh cookie
+      body: JSON.stringify({ data: { username: email, password } }),
+    });
+
+    let json: { status: string; message: string; data: {
       account_uid: string;
       account_type: string;
       account_root: string;
@@ -174,14 +258,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       account_name: string;
       primary_account: string;
       access_token: string;
-    }>(ENDPOINTS.AUTH.LOGIN, {
-      data: { username: email, password },
-    });
+    }};
 
-    const d = res.data;
+    try {
+      json = await resp.json();
+    } catch {
+      throw new Error("Server error — could not parse response");
+    }
+
+    if (!resp.ok || json.status !== "success") {
+      throw new Error(json.message || "Invalid credentials, try again");
+    }
+
+    const d = json.data;
 
     if (!d?.account_uid) {
-      throw new Error(res.message || "Invalid credentials, try again");
+      throw new Error(json.message || "Invalid credentials, try again");
     }
 
     // Store JWT access token in memory (not in cookies/localStorage for XSS resistance).
@@ -266,6 +358,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "LOGOUT" });
     window.location.href = "/";
   }, []);
+
+  // Don't render children until the boot-time JWT refresh completes.
+  // This prevents a storm of 401s from every component on page refresh.
+  if (!authReady) {
+    return null; // Brief flash — refresh typically takes <200ms
+  }
 
   return (
     <AuthContext.Provider value={{ state, login, verifyMfa, resendMfa, logout }}>

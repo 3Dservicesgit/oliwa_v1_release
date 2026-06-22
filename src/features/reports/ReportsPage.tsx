@@ -729,6 +729,13 @@ export function ReportsPage() {
   const ownerUidRef = useRef(ownerUid);
   if (ownerUid) ownerUidRef.current = ownerUid;
 
+  // Devices belong to the CLIENT, not the individual user.
+  // accountRoot = the client UID assigned when the customer user was created.
+  const clientUid =
+    authState.accountRoot || getCookie("_nvxs_account_root") || "";
+  const clientUidRef = useRef(clientUid);
+  if (clientUid) clientUidRef.current = clientUid;
+
   // ── Fetch available report types from backend ──────────────────────────
   const typesFetchedRef = useRef(false);
   useEffect(() => {
@@ -747,17 +754,18 @@ export function ReportsPage() {
     })();
   }, []);
 
-  // ── Fetch devices for this customer (runs once) ────────────────────────
+  // ── Fetch devices for this customer's CLIENT (runs once) ───────────────
+  // Devices belong to the client, not the individual user. Use clientUid.
   const devicesFetchedRef = useRef(false);
   useEffect(() => {
-    const uid = ownerUidRef.current;
-    if (!uid || devicesFetchedRef.current) return;
+    const cuid = clientUidRef.current;
+    if (!cuid || devicesFetchedRef.current) return;
     devicesFetchedRef.current = true;
 
     (async () => {
       setDevicesLoading(true);
       try {
-        const res = await getClientDevices(uid);
+        const res = await getClientDevices(cuid);
         setDevices(res.data ?? []);
       } catch {
         setDevices([]);
@@ -765,7 +773,7 @@ export function ReportsPage() {
         setDevicesLoading(false);
       }
     })();
-  }, [ownerUid]);
+  }, [clientUid]);
 
   // ── Fetch previous reports ──────────────────────────────────────────────
   const reportsFetchedRef = useRef(false);

@@ -24,8 +24,9 @@ export function AegisDashboard() {
   const [topupOpen, setTopupOpen] = useState(false);
   const [airlockOpen, setAirlockOpen] = useState(() => !getCookie("_nvxs_account_uid"));
 
-  // Customer's ownerUid
+  // Customer's ownerUid (individual user) and clientUid (the client they belong to)
   const ownerUid = state.accountUid || getCookie("_nvxs_account_uid") || "";
+  const clientUid = state.accountRoot || getCookie("_nvxs_account_root") || "";
   const customerName = getCookie("_nvxs_account_type") || "Customer";
 
   // Stats state
@@ -35,40 +36,60 @@ export function AegisDashboard() {
   const [loading, setLoading] = useState(true);
 
   // Fetch customer-specific stats
+  // Devices belong to the CLIENT (accountRoot), not the individual user.
   useEffect(() => {
-    if (!ownerUid) return;
+    if (!ownerUid) { setLoading(false); return; }
+    // Must have a valid clientUid to fetch devices
+    if (!clientUid) { setLoading(false); return; }
+
+    let cancelled = false;
 
     const fetchStats = async () => {
       setLoading(true);
-      try {
-        const [devRes, balRes, txnRes] = await Promise.allSettled([
-          getClientDevices(ownerUid),
-          getClientBalance(ownerUid),
-          getClientTransactions(ownerUid),
-        ]);
+      console.log("[Dashboard] Fetching stats — ownerUid:", ownerUid, "clientUid:", clientUid);
 
-        if (devRes.status === "fulfilled") {
-          setDevices(devRes.value?.data ?? []);
+      // Helper: call an API with a 10-second timeout.
+      // Returns data on success, null on any error (incl. 400 "no data" or timeout).
+      const safeFetch = async <T,>(fn: () => Promise<{ data: T }>, label: string): Promise<T | null> => {
+        try {
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 10000),
+          );
+          const res = await Promise.race([fn(), timeout]) as { data: T };
+          console.log(`[Dashboard] ${label} OK`);
+          return res.data;
+        } catch (err) {
+          console.warn(`[Dashboard] ${label} failed:`, err);
+          return null;
         }
+      };
 
-        if (balRes.status === "fulfilled") {
-          const d = balRes.value?.data;
-          if (Array.isArray(d)) setBalances(d);
-          else if (d && typeof d === "object") setBalances([d as ClientTokenBalance]);
-        }
+      // Use allSettled so one hanging/slow call doesn't block the rest
+      const results = await Promise.allSettled([
+        safeFetch(() => getClientDevices(clientUid), "devices"),
+        safeFetch(() => getClientBalance(clientUid), "balance"),
+        safeFetch(() => getClientTransactions(clientUid), "transactions"),
+      ]);
 
-        if (txnRes.status === "fulfilled") {
-          setTransactions(Array.isArray(txnRes.value?.data) ? txnRes.value.data : []);
-        }
-      } catch {
-        // Keep defaults
-      } finally {
-        setLoading(false);
+      if (cancelled) return;
+
+      const devData = results[0].status === "fulfilled" ? results[0].value : null;
+      const balData = results[1].status === "fulfilled" ? results[1].value : null;
+      const txnData = results[2].status === "fulfilled" ? results[2].value : null;
+
+      if (devData) setDevices(Array.isArray(devData) ? devData : []);
+      if (balData) {
+        if (Array.isArray(balData)) setBalances(balData);
+        else if (typeof balData === "object") setBalances([balData as ClientTokenBalance]);
       }
+      if (txnData) setTransactions(Array.isArray(txnData) ? txnData : []);
+
+      if (!cancelled) setLoading(false);
     };
 
     fetchStats();
-  }, [ownerUid]);
+    return () => { cancelled = true; };
+  }, [ownerUid, clientUid]);
 
   // Derived stats
   const totalDevices = devices.length;

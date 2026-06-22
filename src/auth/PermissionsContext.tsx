@@ -30,7 +30,7 @@ import { getCookie } from "../utils/cookies";
 
 // ── Bypass roles (full access, no permission checks needed) ──────────────────
 
-const BYPASS_ROLES = ["super_admin", "system"];
+const BYPASS_ROLES = ["super_admin", "system", "customer_tracker"];
 
 // ── Context shape ────────────────────────────────────────────────────────────
 

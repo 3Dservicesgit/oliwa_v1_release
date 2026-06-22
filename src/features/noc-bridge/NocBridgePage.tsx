@@ -458,13 +458,22 @@ export default function NocBridgePage() {
   // ── Load units ───────────────────────────────────────────────────────────
   async function loadUnits(dataLevel: string, accountUid: string) {
     setLoading(true); setListError(null);
+    console.log("[LiveMonitoring] loadUnits — dataLevel:", dataLevel, "accountUid:", accountUid);
     try {
+      // 15-second timeout so a hanging backend doesn't freeze the UI forever
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Device fetch timed out after 15 seconds")), 15000),
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const resp = await fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
-        data: { data_level: dataLevel, account_uid: accountUid },
-      }) as any;
+      const resp = await Promise.race([
+        fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
+          data: { data_level: dataLevel, account_uid: accountUid },
+        }),
+        timeout,
+      ]) as any;
+      console.log("[LiveMonitoring] fleetFetch response status:", resp?.status, "data count:", Array.isArray(resp?.data) ? resp.data.length : "not-array");
       if (!resp || resp.status !== "success" || !Array.isArray(resp.data)) {
-        setListError("No devices found for this account.");
+        setListError(resp?.message || "No devices found for this account.");
         setLoading(false);
         return;
       }
@@ -503,7 +512,8 @@ export default function NocBridgePage() {
       setLoading(false);
       try { await enrichSubs(); tick(); } catch { /**/ }
       startAll();
-    } catch {
+    } catch (err) {
+      console.error("[LiveMonitoring] loadUnits error:", err);
       setListError("Failed to load devices. Please try again.");
       setLoading(false);
     }
@@ -555,9 +565,9 @@ export default function NocBridgePage() {
         setLoading(false);
         return;
       }
-      const accountType = "client";
+      const accountType = "inhouse";
       const dataLevel   = accountType;
-      const accountUid  = dataLevel === "client"
+      const accountUid  = dataLevel === "inhouse"
         ? (getCookie("_nvxs_account_root") ?? rawUid)
         : rawUid;
       await loadUnits(dataLevel, accountUid);

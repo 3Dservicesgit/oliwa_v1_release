@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { createUser, getAllRoles } from "../../../../api";
-import type { RbacRole } from "../../../../api";
+import { createUser, getAllRoles, getAllClients } from "../../../../api";
+import type { RbacRole, Client } from "../../../../api";
 import { useAuth } from "../../../../auth/AuthContext";
 import { MSection, Field, StepSuccessBanner, ErrorBanner, INPUT_CLS, SELECT_CLS, BTN_PRIMARY } from "./WizardShared";
 
@@ -25,6 +25,9 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
 
   const [roles, setRoles] = useState<RbacRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [selectedClientUid, setSelectedClientUid] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -46,6 +49,22 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
       .finally(() => setRolesLoading(false));
   }, []);
 
+  // Fetch clients when account type is Customer
+  useEffect(() => {
+    if (accountType !== "Customer") return;
+    setClientsLoading(true);
+    getAllClients()
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setClients(list);
+        if (list.length > 0 && !selectedClientUid) {
+          setSelectedClientUid(list[0].client_uid);
+        }
+      })
+      .catch(() => setClients([]))
+      .finally(() => setClientsLoading(false));
+  }, [accountType]);
+
   async function handleSubmit() {
     if (!accountName.trim() || !username.trim() || !email.trim() || !password.trim()) return;
     setSubmitting(true);
@@ -59,7 +78,7 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
         assigned_role: assignedRole,
         email: email.trim(),
         password,
-        root_account: accountRoot ?? "engine",
+        root_account: accountType === "Customer" ? selectedClientUid : (accountRoot ?? "engine"),
         author: accountUid ?? "engine",
         billing_type: billingType,
       });
@@ -78,7 +97,8 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
   }
 
   const canSubmit = accountName.trim() && username.trim() && email.trim() && password.trim()
-    && assignedRole && !submitting;
+    && assignedRole && !submitting
+    && (accountType !== "Customer" || selectedClientUid);
 
   return (
     <div>
@@ -122,6 +142,23 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
                 <option value="Customer">Customer</option>
               </select>
             </Field>
+            {accountType === "Customer" && (
+              <Field label="Client" required>
+                {clientsLoading ? (
+                  <div className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#667781] bg-white flex items-center">Loading clients...</div>
+                ) : clients.length === 0 ? (
+                  <div className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#667781] bg-white flex items-center">No clients found</div>
+                ) : (
+                  <select value={selectedClientUid} onChange={(e) => setSelectedClientUid(e.target.value)} className={SELECT_CLS}>
+                    {clients.map((c) => (
+                      <option key={c.client_uid} value={c.client_uid}>
+                        {c.client_name ?? c.client_uid}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+            )}
             <Field label="Assigned Role" required>
               {rolesLoading ? (
                 <div className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#667781] bg-white flex items-center">Loading roles...</div>
