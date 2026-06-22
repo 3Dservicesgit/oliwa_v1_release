@@ -103,18 +103,57 @@ export interface TokenVariant {
   billing_type:     string;   // period code: "h2","h6","60","180","recurring", etc.
 }
 
+export interface TokenProduct {
+  product_uid:  string;
+  product_name: string;
+}
+
 export interface TokenPackage {
   token_id:         string;
   token_name:       string;
-  token_type:       string;   // "parameter" | "dynamic" | "veba"
+  token_type:       string;   // "parameter" | "dynamic" | "veba" | "time" | ...
   token_parameters: unknown[];
   date_created:     string;
+  // Product the token is tagged to (name only)
+  token_product_uid?: string;
+  product?:         TokenProduct;
+  // Billing (defined at token level)
+  token_amount?:    number | null;   // price
+  token_currency?:  string | null;   // UGX, KES, USD
+  billing_unit?:    string | null;   // hour, unit, event, km, mb, image, ...
+  billing_trigger?: string | null;   // continuous, on_read, on_event, ...
+  billing_scope?:   string | null;   // asset, driver, fleet, shipment
+  // Legacy / deprecated
   token_product_variant_uid?: string;
   variant?:         TokenVariant;
-  // Legacy flat fields (may be null if variant is present)
   token_validity?:  number | null;
-  token_currency?:  string | null;
-  token_amount?:    number | null;
+}
+
+// ── Buy by Budget ────────────────────────────────────────────────────────────
+
+export interface BudgetOfferRequest {
+  currency: string;
+  amount:   number;
+}
+
+export interface BudgetOfferToken {
+  token_id:                string;
+  token_name:              string;
+  token_type:              string;
+  token_product_uid:       string | null;
+  product_name:            string | null;
+  billing_unit:            string | null;
+  billing_trigger:         string | null;
+  billing_scope:           string | null;
+  token_amount:            number;
+  token_currency:          string;
+  max_quantity_affordable: number;
+}
+
+export interface BudgetOfferResponse {
+  currency: string;
+  budget:   number;
+  tokens:   BudgetOfferToken[];
 }
 
 // ── Token wallet ────────────────────────────────────────────────────────────

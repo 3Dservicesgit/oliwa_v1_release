@@ -24,6 +24,7 @@ import type {
   TokenPackage,
   ClientTokenBalance, BuyTokensRequest, BuyTokensResponse,
   TransferTokensRequest, TransferTokensResponse,
+  BudgetOfferRequest, BudgetOfferResponse,
 } from "../types";
 
 /** Create a new client. */
@@ -98,6 +99,14 @@ export function getAllTokens(
   opts?: RequestOptions,
 ): Promise<ApiResponse<TokenPackage[]>> {
   return get<TokenPackage[]>(ENDPOINTS.TOKENS.GET_ALL, opts);
+}
+
+/** Fetch the tokens that fit within a given budget (currency + amount). */
+export function getBudgetOffer(
+  payload: BudgetOfferRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<BudgetOfferResponse>> {
+  return post<BudgetOfferResponse>(ENDPOINTS.TOKENS.BUDGET_OFFER, { data: payload }, opts);
 }
 
 /** Fetch token balance for a client. */
