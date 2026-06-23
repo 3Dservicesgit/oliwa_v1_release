@@ -100,6 +100,39 @@ function ConfirmDialog({
   );
 }
 
+// ── Payment Authorising Overlay ────────────────────────────────────────────
+
+/** Full-screen preloader shown while we poll the payment status endpoint and
+ *  wait for the customer to authorise the Mobile Money prompt on their phone. */
+function PaymentAuthorizingOverlay({ amountLabel, phone }: { amountLabel?: string; phone?: string }) {
+  return (
+    <div className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[#E9EDEF] w-full max-w-[360px] p-6 flex flex-col items-center text-center gap-4">
+        {/* Spinner */}
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 rounded-full border-4 border-[#128C7E]/15" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#128C7E] animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center text-[22px]">📲</div>
+        </div>
+
+        <div>
+          <h3 className="font-black text-[16px] text-[#111B21] mb-1.5">Authorise the Payment</h3>
+          <p className="text-[12px] text-[#667781] leading-relaxed">
+            A payment request{amountLabel ? <> for <span className="font-black text-[#128C7E]">{amountLabel}</span></> : null} has been sent
+            {phone ? <> to <span className="font-black text-[#111B21]">{phone}</span></> : null}. Check your phone and enter your
+            Mobile Money PIN to approve the transaction.
+          </p>
+        </div>
+
+        <div className="w-full bg-[#F0F2F5] rounded-lg px-3 py-2.5 flex items-center gap-2.5">
+          <span className="inline-block w-4 h-4 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin shrink-0" />
+          <span className="text-[11px] text-[#667781] font-black text-left">Waiting for confirmation… please keep this window open.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Balance Card ───────────────────────────────────────────────────────────
 
 function BalanceCard({ b }: { b: ClientTokenBalance }) {
@@ -280,15 +313,13 @@ function PackageCard({
 // ── Buy Drawer ─────────────────────────────────────────────────────────────
 
 function BuyDrawer({
-  pkg, ownerUid, devices, onClose, onSuccess,
+  pkg, ownerUid, onClose, onSuccess,
 }: {
-  pkg: TokenPackage; ownerUid: string; devices: ClientDevice[];
+  pkg: TokenPackage; ownerUid: string;
   onClose: () => void; onSuccess: (msg: string) => void;
 }) {
   const [phone, setPhone] = useState("");
   const [qty, setQty] = useState(1);
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [deviceSearch, setDeviceSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -303,41 +334,13 @@ function BuyDrawer({
   // Currency determines payment method
   const isMobileMoney = currency === "UGX" || currency === "KES";
 
-  // Filter devices for search
-  const filteredDevices = devices.filter((d) => {
-    const q = deviceSearch.toLowerCase();
-    if (!q) return true;
-    return (
-      d.device_imei?.toLowerCase().includes(q) ||
-      d.device_name?.toLowerCase().includes(q) ||
-      d.car_make?.toLowerCase().includes(q) ||
-      d.car_model?.toLowerCase().includes(q)
-    );
-  });
-
-  const toggleDevice = (imei: string) => {
-    setSelectedDevices((prev) =>
-      prev.includes(imei) ? prev.filter((i) => i !== imei) : [...prev, imei],
-    );
-  };
-
-  const selectAllFiltered = () => {
-    const allImeis = filteredDevices.map((d) => d.device_imei);
-    const allSelected = allImeis.every((i) => selectedDevices.includes(i));
-    if (allSelected) {
-      setSelectedDevices((prev) => prev.filter((i) => !allImeis.includes(i)));
-    } else {
-      setSelectedDevices((prev) => [...new Set([...prev, ...allImeis])]);
-    }
-  };
-
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
   // ── Mobile Money payment handler ─────────────────────────────────────
   const handleMoMoPay = async () => {
-    if (!phone || phone.length < 9 || selectedDevices.length === 0) return;
+    if (!phone || phone.length < 9) return;
     setSubmitting(true);
     setStatus(null);
     try {
@@ -363,7 +366,7 @@ function BuyDrawer({
               setPolling(false);
               setStatus("success");
               onSuccess(
-                `Payment successful! ${qty} × ${pkg.token_name} tokens have been added to your account for ${selectedDevices.length} device${selectedDevices.length > 1 ? "s" : ""}.`,
+                `Payment successful! ${qty} × ${pkg.token_name} token${qty > 1 ? "s have" : " has"} been added to your account.`,
               );
             } else if (txnStatus === "failed") {
               if (pollRef.current) clearInterval(pollRef.current);
@@ -391,7 +394,7 @@ function BuyDrawer({
   };
 
   // Can the user proceed?
-  const canPay = selectedDevices.length > 0 && !submitting && !polling && status !== "success";
+  const canPay = !submitting && !polling && status !== "success";
   const canPayMomo = canPay && phone.length >= 9;
 
   return (
@@ -459,74 +462,12 @@ function BuyDrawer({
             </div>
           </div>
 
-          {/* ── Select Devices ──────────────────────────────────────── */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[11px] font-black text-[#667781] uppercase tracking-wide">
-                Attach to Devices ({selectedDevices.length} selected)
-              </label>
-              {filteredDevices.length > 0 && (
-                <button onClick={selectAllFiltered} className="text-[10px] font-black text-[#128C7E] cursor-pointer bg-transparent border-none hover:underline">
-                  {filteredDevices.every((d) => selectedDevices.includes(d.device_imei)) ? "Deselect All" : "Select All"}
-                </button>
-              )}
-            </div>
-
-            {/* Search */}
-            <input
-              type="text"
-              value={deviceSearch}
-              onChange={(e) => setDeviceSearch(e.target.value)}
-              placeholder="Search by name, IMEI, or vehicle..."
-              className="w-full h-9 px-3 mb-2 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
-            />
-
-            {/* Device list */}
-            <div className="border border-[#E9EDEF] rounded-xl max-h-[160px] overflow-y-auto [scrollbar-width:thin]">
-              {devices.length === 0 ? (
-                <div className="p-4 text-center text-[12px] text-[#667781]">No devices found for this account.</div>
-              ) : filteredDevices.length === 0 ? (
-                <div className="p-4 text-center text-[12px] text-[#667781]">No devices match your search.</div>
-              ) : (
-                filteredDevices.map((d) => {
-                  const checked = selectedDevices.includes(d.device_imei);
-                  return (
-                    <label
-                      key={d.device_imei}
-                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-b border-[#F0F2F5] last:border-b-0 transition-colors ${
-                        checked ? "bg-[#128C7E]/5" : "hover:bg-[#F8F9FA]"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleDevice(d.device_imei)}
-                        className="w-4 h-4 accent-[#128C7E] cursor-pointer"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[12px] font-black text-[#111B21] truncate">
-                          {d.device_name || d.device_imei}
-                        </div>
-                        <div className="text-[10px] text-[#667781] truncate">
-                          {d.car_make} {d.car_model} {d.car_make || d.car_model ? "·" : ""} IMEI: {d.device_imei}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-            {selectedDevices.length === 0 && devices.length > 0 && (
-              <p className="text-[10px] text-[#E17055] mt-1 font-black">Please select at least one device.</p>
-            )}
-          </div>
-
           {/* ── Total Cost ──────────────────────────────────────────── */}
           <div className="bg-[#F0F2F5] rounded-xl p-4 mb-4">
             <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide mb-1">Total Cost</div>
             <div className="text-[24px] font-black text-[#128C7E]">{currency} {total.toLocaleString()}</div>
             <div className="text-[11px] text-[#667781]">
-              {qty} × {currency} {price.toLocaleString()} · {selectedDevices.length} device{selectedDevices.length !== 1 ? "s" : ""}
+              {qty} × {currency} {price.toLocaleString()}
             </div>
           </div>
 
@@ -566,8 +507,6 @@ function BuyDrawer({
                     <span className="font-black text-[#111B21]">{qty}</span>
                     <span className="text-[#667781]">Amount:</span>
                     <span className="font-black text-[#3B82F6]">{currency} {total.toLocaleString()}</span>
-                    <span className="text-[#667781]">Devices:</span>
-                    <span className="font-black text-[#111B21]">{selectedDevices.length}</span>
                   </div>
                 </div>
               </div>
@@ -575,20 +514,12 @@ function BuyDrawer({
           )}
 
           {/* ── Status indicators ───────────────────────────────────── */}
-          {status === "pending" && (
-            <div className="bg-[#F97316]/10 border border-[#F97316]/20 rounded-xl p-4 mb-4 text-center">
-              <div className="w-6 h-6 border-2 border-[#F97316] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <div className="text-[12px] font-black text-[#F97316]">Waiting for payment confirmation...</div>
-              <div className="text-[10px] text-[#667781] mt-1">Please check your phone and enter your PIN</div>
-            </div>
-          )}
           {status === "success" && (
             <div className="bg-[#128C7E]/10 border border-[#128C7E]/20 rounded-xl p-4 mb-4 text-center">
               <div className="text-[24px] mb-1">&#10003;</div>
               <div className="text-[13px] font-black text-[#128C7E] mb-1">Payment Successful!</div>
               <div className="text-[11px] text-[#667781]">
-                {qty} × {pkg.token_name} tokens have been added to your account
-                for {selectedDevices.length} device{selectedDevices.length !== 1 ? "s" : ""}.
+                {qty} × {pkg.token_name} token{qty !== 1 ? "s have" : " has"} been added to your account.
               </div>
             </div>
           )}
@@ -621,7 +552,7 @@ function BuyDrawer({
               onClick={() => {
                 if (!canPay) return;
                 setStatus("invoice_sent");
-                onSuccess(`Invoice for ${currency} ${total.toLocaleString()} has been sent to your registered email for ${selectedDevices.length} device${selectedDevices.length !== 1 ? "s" : ""}.`);
+                onSuccess(`Invoice for ${currency} ${total.toLocaleString()} has been sent to your registered email.`);
               }}
               disabled={!canPay}
               className="w-full h-10 rounded-lg bg-[#3B82F6] text-white text-[13px] font-black cursor-pointer border-none hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
@@ -631,6 +562,11 @@ function BuyDrawer({
           )}
         </div>
       </div>
+
+      {/* Authorise-payment preloader while we poll the status endpoint */}
+      {status === "pending" && (
+        <PaymentAuthorizingOverlay amountLabel={`${currency} ${total.toLocaleString()}`} phone={phone} />
+      )}
     </>
   );
 }
@@ -659,17 +595,14 @@ function subStatusLabel(status: string) {
 type BudgetCurrency = "UGX" | "KES";
 
 function BudgetTab({
-  packages, pkgLoading, devices, devicesLoading, ownerUid, onSuccess,
+  packages, pkgLoading, ownerUid, onSuccess,
 }: {
   packages: TokenPackage[]; pkgLoading: boolean;
-  devices: ClientDevice[]; devicesLoading: boolean;
   ownerUid: string; onSuccess: (msg: string) => void;
 }) {
   const [currency, setCurrency] = useState<BudgetCurrency>("UGX");
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
   const [budgetStr, setBudgetStr] = useState("");
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [deviceSearch, setDeviceSearch] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -744,37 +677,9 @@ function BudgetTab({
   const totalCost = tokenCount * unitPrice;
   const change = budget - totalCost;
 
-  // Filter devices
-  const filteredDevices = devices.filter((d) => {
-    const q = deviceSearch.toLowerCase();
-    if (!q) return true;
-    return (
-      d.device_imei?.toLowerCase().includes(q) ||
-      d.device_name?.toLowerCase().includes(q) ||
-      d.car_make?.toLowerCase().includes(q) ||
-      d.car_model?.toLowerCase().includes(q)
-    );
-  });
-
-  const toggleDevice = (imei: string) => {
-    setSelectedDevices((prev) =>
-      prev.includes(imei) ? prev.filter((i) => i !== imei) : [...prev, imei],
-    );
-  };
-
-  const selectAllFiltered = () => {
-    const allImeis = filteredDevices.map((d) => d.device_imei);
-    const allSelected = allImeis.every((i) => selectedDevices.includes(i));
-    if (allSelected) {
-      setSelectedDevices((prev) => prev.filter((i) => !allImeis.includes(i)));
-    } else {
-      setSelectedDevices((prev) => [...new Set([...prev, ...allImeis])]);
-    }
-  };
-
   // ── Payment handler ──────────────────────────────────────────────────
   const handlePay = async () => {
-    if (!selectedPkg || tokenCount <= 0 || selectedDevices.length === 0 || !phone || phone.length < 9) return;
+    if (!selectedPkg || tokenCount <= 0 || !phone || phone.length < 9) return;
     setSubmitting(true);
     setStatus(null);
     try {
@@ -800,7 +705,7 @@ function BudgetTab({
               setPolling(false);
               setStatus("success");
               onSuccess(
-                `Payment successful! ${tokenCount} token(s) purchased for ${currency} ${totalCost.toLocaleString()} across ${selectedDevices.length} device${selectedDevices.length > 1 ? "s" : ""}.`,
+                `Payment successful! ${tokenCount} token(s) purchased for ${currency} ${totalCost.toLocaleString()}.`,
               );
             } else if (txnStatus === "failed") {
               if (pollRef.current) clearInterval(pollRef.current);
@@ -824,7 +729,7 @@ function BudgetTab({
     }
   };
 
-  const canPay = tokenCount > 0 && selectedDevices.length > 0 && phone.length >= 9 && !submitting && !polling && status !== "success";
+  const canPay = tokenCount > 0 && phone.length >= 9 && !submitting && !polling && status !== "success";
 
   return (
     <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
@@ -1007,73 +912,11 @@ function BudgetTab({
               </div>
             )}
 
-            {/* Step 4: Select Devices */}
+            {/* Step 4: Phone Number */}
             {tokenCount > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">4</span>
-                  <label className="text-[12px] font-black text-[#111B21]">
-                    Select Devices ({selectedDevices.length} selected)
-                  </label>
-                  {filteredDevices.length > 0 && (
-                    <button onClick={selectAllFiltered} className="text-[10px] font-black text-[#128C7E] cursor-pointer bg-transparent border-none hover:underline ml-auto">
-                      {filteredDevices.every((d) => selectedDevices.includes(d.device_imei)) ? "Deselect All" : "Select All"}
-                    </button>
-                  )}
-                </div>
-
-                {devices.length > 5 && (
-                  <input
-                    type="search"
-                    value={deviceSearch}
-                    onChange={(e) => setDeviceSearch(e.target.value)}
-                    placeholder="Filter devices..."
-                    className="w-full h-8 px-3 mb-2 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[11px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
-                  />
-                )}
-
-                {devicesLoading ? (
-                  <div className="py-4 text-center text-[12px] text-[#667781]">Loading devices...</div>
-                ) : filteredDevices.length === 0 ? (
-                  <div className="py-4 text-center text-[12px] text-[#667781]">No devices found.</div>
-                ) : (
-                  <div className="max-h-[200px] overflow-y-auto border border-[#E9EDEF] rounded-lg [scrollbar-width:thin]">
-                    {filteredDevices.map((d) => {
-                      const checked = selectedDevices.includes(d.device_imei);
-                      return (
-                        <label
-                          key={d.device_imei}
-                          className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors border-b border-[#F0F2F5] last:border-b-0 ${
-                            checked ? "bg-[#128C7E]/5" : "hover:bg-[#F8F9FA]"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleDevice(d.device_imei)}
-                            className="w-4 h-4 accent-[#128C7E] shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <div className="text-[12px] font-black text-[#111B21] truncate">
-                              {d.device_name || d.device_imei}
-                            </div>
-                            <div className="text-[10px] text-[#667781]">
-                              {d.car_make} {d.car_model} · {d.device_imei.slice(-6)}
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 5: Phone Number */}
-            {tokenCount > 0 && selectedDevices.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">5</span>
                   <label className="text-[12px] font-black text-[#111B21]">Mobile Money Number</label>
                 </div>
                 <input
@@ -1118,10 +961,6 @@ function BudgetTab({
                   <span className="font-black text-[#111B21]">Tokens</span>
                   <span className="font-black text-[#128C7E] text-[18px]">{tokenCount}</span>
                 </div>
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-[#667781]">Devices</span>
-                  <span className="font-black text-[#111B21]">{selectedDevices.length}</span>
-                </div>
                 <div className="border-t border-[#E9EDEF] pt-3 flex justify-between text-[14px]">
                   <span className="font-black text-[#111B21]">Total</span>
                   <span className="font-black text-[#128C7E]">{currency} {totalCost.toLocaleString()}</span>
@@ -1135,12 +974,6 @@ function BudgetTab({
               </div>
 
               {/* Status messages */}
-              {status === "pending" && (
-                <div className="mt-3 bg-[#F97316]/10 border border-[#F97316]/30 rounded-lg px-3 py-2.5 flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#F97316]/30 border-t-[#F97316] rounded-full animate-spin shrink-0" />
-                  <span className="text-[11px] text-[#F97316] font-black">Waiting for Mobile Money confirmation...</span>
-                </div>
-              )}
               {status === "failed" && (
                 <div className="mt-3 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2 text-[11px] text-[#EF4444] font-black">
                   Payment failed. Please try again.
@@ -1186,6 +1019,11 @@ function BudgetTab({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Authorise-payment preloader while we poll the status endpoint */}
+      {status === "pending" && (
+        <PaymentAuthorizingOverlay amountLabel={`${currency} ${totalCost.toLocaleString()}`} phone={phone} />
       )}
     </div>
   );
@@ -1371,7 +1209,6 @@ export function SimPage() {
         <BuyDrawer
           pkg={buyTarget}
           ownerUid={ownerUid}
-          devices={devices}
           onClose={() => setBuyTarget(null)}
           onSuccess={(msg) => {
             setBuyTarget(null);
@@ -1660,8 +1497,6 @@ export function SimPage() {
             <BudgetTab
               packages={packages}
               pkgLoading={pkgLoading}
-              devices={devices}
-              devicesLoading={devicesLoading}
               ownerUid={ownerUid}
               onSuccess={(msg) => {
                 showToast(msg, "success");
