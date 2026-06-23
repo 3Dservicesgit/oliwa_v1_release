@@ -7,7 +7,7 @@
  *   BOTTOM: Price Rule Versions + Trash → HITL box → Audit Log
  *   MODAL:  Create Token Definition wizard (Step 2/4, sections A–E)
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { getRaw, post, put, del } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -870,6 +870,58 @@ const MODAL_PARAMS = [
   { param:"kyc_verify",             origin:"VEBA", rps:"8.7", bill:"Yes", state:"ON"   },
 ];
 
+// ─── Token type → icon/colour metadata (Explorer-style file icons) ───────────
+const TOKEN_TYPE_META: Record<string, { icon: string; tint: string; text: string }> = {
+  time:        { icon: "⏱",  tint: "bg-[#128C7E]/10", text: "text-[#0E7A6D]" },
+  parameter:   { icon: "⚙",  tint: "bg-[#34B7F1]/10", text: "text-[#1E88B5]" },
+  event:       { icon: "⚡", tint: "bg-[#F97316]/10", text: "text-[#C2570B]" },
+  volume:      { icon: "🛢", tint: "bg-[#3B82F6]/10", text: "text-[#2563EB]" },
+  distance:    { icon: "📏", tint: "bg-[#8B5CF6]/10", text: "text-[#7C3AED]" },
+  video:       { icon: "🎬", tint: "bg-[#EF4444]/10", text: "text-[#DC2626]" },
+  conditional: { icon: "🔀", tint: "bg-[#F59E0B]/10", text: "text-[#B45309]" },
+  action:      { icon: "⌘",  tint: "bg-[#0EA5E9]/10", text: "text-[#0284C7]" },
+  compliance:  { icon: "📋", tint: "bg-[#10B981]/10", text: "text-[#059669]" },
+};
+function tokenMeta(type?: string) {
+  return TOKEN_TYPE_META[(type || "").toLowerCase()] || { icon: "🎫", tint: "bg-[#E9EDEF]", text: "text-[#667781]" };
+}
+
+// ─── Explorer "View" menu options + per-view layout config ────────────────────
+type TokenView = "xl" | "large" | "medium" | "small" | "list" | "details" | "tiles" | "content";
+
+const TOKEN_VIEW_OPTIONS: { key: TokenView; label: string; glyph: string }[] = [
+  { key: "xl",      label: "Extra large icons", glyph: "▦" },
+  { key: "large",   label: "Large icons",       glyph: "▦" },
+  { key: "medium",  label: "Medium icons",      glyph: "▧" },
+  { key: "small",   label: "Small icons",       glyph: "▤" },
+  { key: "list",    label: "List",              glyph: "≣" },
+  { key: "details", label: "Details",           glyph: "☰" },
+  { key: "tiles",   label: "Tiles",             glyph: "◨" },
+  { key: "content", label: "Content",           glyph: "▭" },
+];
+
+const TOKEN_VIEW_GRID: Record<TokenView, string> = {
+  xl:      "[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]",
+  large:   "[grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]",
+  medium:  "[grid-template-columns:repeat(auto-fill,minmax(120px,1fr))]",
+  small:   "[grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]",
+  list:    "[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]",
+  tiles:   "[grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]",
+  content: "grid-cols-1",
+  details: "",
+};
+
+const TOKEN_ICON_SIZE: Record<TokenView, { box: string; text: string }> = {
+  xl:      { box: "w-20 h-20", text: "text-[42px]" },
+  large:   { box: "w-16 h-16", text: "text-[32px]" },
+  medium:  { box: "w-12 h-12", text: "text-[24px]" },
+  small:   { box: "w-7 h-7",   text: "text-[14px]" },
+  list:    { box: "w-6 h-6",   text: "text-[12px]" },
+  tiles:   { box: "w-11 h-11", text: "text-[22px]" },
+  content: { box: "w-12 h-12", text: "text-[24px]" },
+  details: { box: "w-8 h-8",   text: "text-[15px]" },
+};
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 export function TokensPage() {
   const [selected, setSelected] = useState("BODA_LEAD_UNLOCK");
@@ -888,6 +940,13 @@ export function TokensPage() {
   // Tokens list state
   const [tokens, setTokens] = useState<any[]>([]);
   const [tokensLoading, setTokensLoading] = useState(true);
+
+  // Explorer-style listing controls
+  const [tokenView, setTokenView] = useState<TokenView>("details");
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const [tokenSearch, setTokenSearch] = useState("");
+  const [tokenSort, setTokenSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "date_created", dir: "desc" });
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
 
   // Create token form state
   const [createForm, setCreateForm] = useState({
@@ -1084,6 +1143,153 @@ export function TokensPage() {
     fetchTokens();
   }, []);
 
+  // ── Filtered + sorted tokens for the Explorer-style listing ───────────────
+  const visibleTokens = useMemo(() => {
+    const q = tokenSearch.trim().toLowerCase();
+    let list = tokens;
+    if (q) {
+      list = list.filter((t) =>
+        (t.token_name || "").toLowerCase().includes(q) ||
+        (t.token_type || "").toLowerCase().includes(q) ||
+        (t.product?.product_name || "").toLowerCase().includes(q) ||
+        (t.token_currency || "").toLowerCase().includes(q) ||
+        (t.billing_unit || "").toLowerCase().includes(q)
+      );
+    }
+    const { key, dir } = tokenSort;
+    const factor = dir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let av: any, bv: any;
+      if (key === "amount") { av = Number(a.token_amount) || 0; bv = Number(b.token_amount) || 0; }
+      else if (key === "product") { av = (a.product?.product_name || "").toLowerCase(); bv = (b.product?.product_name || "").toLowerCase(); }
+      else { av = (a[key] ?? "").toString().toLowerCase(); bv = (b[key] ?? "").toString().toLowerCase(); }
+      if (av < bv) return -1 * factor;
+      if (av > bv) return 1 * factor;
+      return 0;
+    });
+  }, [tokens, tokenSearch, tokenSort]);
+
+  const toggleSort = (key: string) =>
+    setTokenSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  const sortArrow = (key: string) => (tokenSort.key === key ? (tokenSort.dir === "asc" ? "▲" : "▼") : "");
+
+  const fmtAmount = (t: any) =>
+    t.token_amount != null && t.token_amount !== ""
+      ? `${(t.token_currency || "").toUpperCase()} ${Number(t.token_amount).toLocaleString()}`
+      : "—";
+  const fmtDate = (t: any) => (t.date_created ? String(t.date_created).split(" ")[0] : "—");
+
+  // Inline row/tile actions (stops propagation so clicks don't toggle selection)
+  const renderTokenActions = (token: any) => (
+    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => handleViewToken(token.token_id)}
+        title="Details"
+        className="w-7 h-7 grid place-items-center rounded-md bg-[#34B7F1]/10 text-[#1E88B5] text-[12px] hover:bg-[#34B7F1]/20 transition-colors border-none cursor-pointer"
+      >⊙</button>
+      <PermissionGate permission="tokens.update">
+        <button
+          onClick={() => handleEditToken(token.token_id)}
+          title="Edit"
+          className="w-7 h-7 grid place-items-center rounded-md bg-[#F97316]/10 text-[#C2570B] text-[12px] hover:bg-[#F97316]/20 transition-colors border-none cursor-pointer"
+        >✎</button>
+      </PermissionGate>
+      <PermissionGate permission="tokens.delete">
+        <button
+          onClick={() => handleDeleteToken(token.token_id)}
+          title="Delete"
+          className="w-7 h-7 grid place-items-center rounded-md bg-[#EF4444]/10 text-[#DC2626] text-[12px] hover:bg-[#EF4444]/20 transition-colors border-none cursor-pointer"
+        >🗑</button>
+      </PermissionGate>
+    </div>
+  );
+
+  // Renders a single token for the non-Details views (icons / list / tiles / content)
+  const renderTokenItem = (token: any, i: number) => {
+    const meta = tokenMeta(token.token_type);
+    const isSel = selectedTokenId === token.token_id;
+    const sz = TOKEN_ICON_SIZE[tokenView];
+    const iconEl = (
+      <div className={`${sz.box} rounded-xl ${meta.tint} ${meta.text} grid place-items-center ${sz.text} shrink-0`}>{meta.icon}</div>
+    );
+    const rowSel = isSel ? "bg-[#128C7E]/10 ring-1 ring-inset ring-[#128C7E]/30" : "hover:bg-[#F8FAFC]";
+    const cardSel = isSel ? "border-[#128C7E] bg-[#128C7E]/5 ring-1 ring-[#128C7E]/30" : "border-[#E9EDEF] bg-white hover:border-[#128C7E]/40 hover:shadow-sm";
+    const actionFade = `transition-opacity ${isSel ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`;
+    const common = {
+      key: token.token_id || i,
+      onClick: () => setSelectedTokenId(token.token_id),
+      onDoubleClick: () => handleViewToken(token.token_id),
+    };
+
+    // Icon views — centered tile
+    if (tokenView === "xl" || tokenView === "large" || tokenView === "medium") {
+      return (
+        <div {...common} className={`group relative rounded-xl p-3 flex flex-col items-center text-center gap-2 cursor-default transition-colors ${rowSel}`}>
+          <div className={`absolute top-1.5 right-1.5 ${actionFade}`}>{renderTokenActions(token)}</div>
+          {iconEl}
+          <div className="min-w-0 w-full">
+            <div className="text-[12px] font-black text-[#111B21] truncate">{token.token_name}</div>
+            <div className="text-[10px] text-[#667781] truncate">{fmtAmount(token)}</div>
+            {tokenView !== "medium" && (
+              <div className="text-[9px] text-[#9AA5AD] truncate capitalize">{token.token_type || ""}</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Small icons / List — compact horizontal item
+    if (tokenView === "small" || tokenView === "list") {
+      return (
+        <div {...common} className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-default transition-colors ${rowSel}`}>
+          {iconEl}
+          <div className="text-[12px] font-bold text-[#111B21] truncate flex-1 min-w-0">{token.token_name}</div>
+          <div className={`shrink-0 ${actionFade}`}>{renderTokenActions(token)}</div>
+        </div>
+      );
+    }
+
+    // Tiles — icon + meta + price card
+    if (tokenView === "tiles") {
+      return (
+        <div {...common} className={`group flex items-start gap-3 rounded-xl border p-3 cursor-default transition-all ${cardSel}`}>
+          {iconEl}
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-black text-[#111B21] truncate">{token.token_name}</div>
+            <div className="text-[10px] text-[#667781] truncate capitalize">
+              {token.token_type || "—"}{token.product?.product_name ? ` · ${String(token.product.product_name).toUpperCase()}` : ""}
+            </div>
+            <div className="text-[12px] font-black text-[#128C7E] mt-1 truncate">{fmtAmount(token)}</div>
+          </div>
+          <div className={`shrink-0 ${actionFade}`}>{renderTokenActions(token)}</div>
+        </div>
+      );
+    }
+
+    // Content — full-width detailed row
+    return (
+      <div {...common} className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-default transition-colors ${rowSel}`}>
+        {iconEl}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] font-black text-[#111B21] truncate">{token.token_name}</span>
+            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black ${meta.tint} ${meta.text} capitalize shrink-0`}>{token.token_type || "—"}</span>
+          </div>
+          <div className="text-[10px] text-[#667781] truncate mt-0.5">
+            {token.product?.product_name ? `Product ${String(token.product.product_name).toUpperCase()}` : "No product"}
+            {token.billing_unit ? ` · per ${token.billing_unit}` : ""}
+            {token.billing_scope ? ` · ${token.billing_scope}` : ""}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[12px] font-black text-[#111B21]">{fmtAmount(token)}</div>
+          <div className="text-[10px] text-[#9AA5AD]">{fmtDate(token)}</div>
+        </div>
+        <div className={`shrink-0 ${actionFade}`}>{renderTokenActions(token)}</div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1136,97 +1342,159 @@ export function TokensPage() {
             )}
           </div>
 
-          {/* ── Usage Event Metering ──────────────────────────────────────────── */}
-          <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#E9EDEF] flex items-center justify-between">
-              <div>
-                <div className="font-black text-[13px] text-[#111B21]">Tokens List</div>
-                <div className="text-[11px] text-[#667781] mt-0.5">Kafka → Cassandra (immutable) • Denominator enforced • idempotent keys</div>
+          {/* ── Tokens (Explorer-style) ───────────────────────────────────────── */}
+          <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden flex flex-col min-h-0">
+
+            {/* Command bar */}
+            <div className="px-3 py-2.5 border-b border-[#E9EDEF] flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0 mr-auto">
+                <span className="font-black text-[13px] text-[#111B21]">Tokens</span>
+                <span className="text-[11px] text-[#667781] bg-[#F0F2F5] rounded-full px-2 py-0.5 font-black">{visibleTokens.length}</span>
               </div>
+
+              {/* Search */}
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9AA5AD] text-[12px] pointer-events-none">⌕</span>
+                <input
+                  value={tokenSearch}
+                  onChange={(e) => setTokenSearch(e.target.value)}
+                  placeholder="Search tokens…"
+                  className="h-8 w-[200px] max-w-[42vw] pl-7 pr-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+                />
+              </div>
+
+              {/* View menu (Explorer-style) */}
+              <div className="relative">
+                <button
+                  onClick={() => setViewMenuOpen((o) => !o)}
+                  title="Change view"
+                  className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${viewMenuOpen ? "bg-[#128C7E] text-white border-[#128C7E]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                >
+                  <span className="text-[13px] leading-none">{TOKEN_VIEW_OPTIONS.find((o) => o.key === tokenView)?.glyph}</span>
+                  View
+                  <span className="text-[8px]">▾</span>
+                </button>
+                {viewMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[40]" onClick={() => setViewMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white rounded-xl shadow-xl border border-[#E9EDEF] py-1">
+                      {TOKEN_VIEW_OPTIONS.map((o) => (
+                        <button
+                          key={o.key}
+                          onClick={() => { setTokenView(o.key); setViewMenuOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                        >
+                          <span className="w-3 text-[#128C7E] text-[10px]">{tokenView === o.key ? "●" : ""}</span>
+                          <span className="w-4 text-[14px] text-[#667781] text-center">{o.glyph}</span>
+                          <span className={tokenView === o.key ? "font-black text-[#111B21]" : "text-[#111B21]"}>{o.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
               <PermissionGate permission="tokens.create">
                 <button
                   onClick={() => setCreateBladeOpen(true)}
-                  className="h-7 px-3 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105"
+                  className="h-8 px-3 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105 flex items-center gap-1"
                 >
-                  + Create Token
+                  <span className="text-[15px] leading-none">+</span> New Token
                 </button>
               </PermissionGate>
             </div>
-            <table className="w-full text-[11px] table-fixed">
-              <thead><tr className="bg-[#F8FAFC] border-b border-[#E9EDEF]">
-                {["ID","Name","Type","Amount","Validity","Status","Actions"].map(h => (
-                  <th key={h} className="text-left px-3 py-2 font-black text-[#667781]">{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {tokensLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-[#E9EDEF] last:border-0">
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                      <td className="px-3 py-2"><div className="h-3 bg-[#E9EDEF] rounded animate-pulse"></div></td>
-                    </tr>
-                  ))
-                ) : tokens.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-[#667781] italic">
-                      No tokens found
-                    </td>
-                  </tr>
+
+            {/* Body */}
+            <div className="p-2">
+              {tokensLoading ? (
+                tokenView !== "details" ? (
+                  <div className={`grid gap-2 ${TOKEN_VIEW_GRID[tokenView] || ""}`}>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="rounded-xl border border-[#E9EDEF] p-3 animate-pulse">
+                        <div className="w-10 h-10 rounded-xl bg-[#E9EDEF] mb-3" />
+                        <div className="h-3 bg-[#E9EDEF] rounded w-2/3 mb-2" />
+                        <div className="h-2.5 bg-[#E9EDEF] rounded w-1/2" />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  tokens.map((token: any, i) => (
-                    <tr key={token.token_id || i} className="border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8FAFC]">
-                      <td className="px-3 py-2 font-mono text-[#667781]">{token.token_id}</td>
-                      <td className="px-3 py-2 text-[#111B21] truncate">{token.token_name}</td>
-                      <td className="px-3 py-2 text-[#667781]">{token.token_type}</td>
-                      <td className="px-3 py-2 font-extrabold text-[#111B21]">{token.token_currency?.toUpperCase()} {token.token_amount}</td>
-                      <td className="px-3 py-2 font-black text-[#EF4444]">{token.token_validity} Hours</td>
-                      <td className="px-3 py-2 text-[#667781]">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-black ${
-                          token.token_type === 'active' ? 'bg-[#25D366] text-white' :
-                          token.token_type === 'expired' ? 'bg-[#EF4444] text-white' :
-                          'bg-[#F97316] text-white'
-                        }`}>
-                          {token.token_type || 'active'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleViewToken(token.token_id)}
-                            className="px-2 py-1 text-[10px] bg-[#34B7F1] text-white rounded hover:bg-[#2C9BCF] transition-colors"
-                          >
-                            Details
-                          </button>
-                          <PermissionGate permission="tokens.update">
-                            <button
-                              onClick={() => handleEditToken(token.token_id)}
-                              className="px-2 py-1 text-[10px] bg-[#F97316] text-white rounded hover:bg-[#E55A0F] transition-colors"
-                            >
-                              Edit
-                            </button>
-                          </PermissionGate>
-                          <PermissionGate permission="tokens.delete">
-                            <button
-                              onClick={() => handleDeleteToken(token.token_id)}
-                              className="px-2 py-1 text-[10px] bg-[#EF4444] text-white rounded hover:bg-[#D32F2F] transition-colors"
-                            >
-                              Delete
-                            </button>
-                          </PermissionGate>
+                  <div className="flex flex-col gap-1">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 px-3 py-2.5 animate-pulse">
+                        <div className="w-8 h-8 rounded-lg bg-[#E9EDEF] shrink-0" />
+                        <div className="h-3 bg-[#E9EDEF] rounded w-1/4" />
+                        <div className="h-3 bg-[#E9EDEF] rounded w-16 ml-auto" />
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : visibleTokens.length === 0 ? (
+                <div className="text-center py-14">
+                  <div className="text-[34px] mb-2">{tokenSearch ? "\U0001F50D" : "\U0001F3AB"}</div>
+                  <p className="text-[13px] font-black text-[#111B21] mb-1">{tokenSearch ? "No matching tokens" : "No tokens yet"}</p>
+                  <p className="text-[12px] text-[#667781]">
+                    {tokenSearch ? `Nothing matches "${tokenSearch}".` : "Create your first token to get started."}
+                  </p>
+                  {tokenSearch && (
+                    <button onClick={() => setTokenSearch("")} className="mt-3 h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF]">Clear search</button>
+                  )}
+                </div>
+              ) : tokenView === "details" ? (
+                <div>
+                  <div className="grid grid-cols-[minmax(0,2.4fr)_0.9fr_1.1fr_1.1fr_0.9fr_auto] items-center gap-2 px-3 py-1.5 border-b border-[#E9EDEF]">
+                    {[
+                      { key: "token_name", label: "Name" },
+                      { key: "token_type", label: "Type" },
+                      { key: "product", label: "Product" },
+                      { key: "amount", label: "Amount" },
+                      { key: "date_created", label: "Created" },
+                    ].map((c) => (
+                      <button key={c.key} onClick={() => toggleSort(c.key)} className="text-left flex items-center gap-1 text-[10px] font-black text-[#667781] uppercase tracking-wide bg-transparent border-none cursor-pointer hover:text-[#128C7E] transition-colors">
+                        {c.label}<span className="text-[8px] text-[#128C7E]">{sortArrow(c.key)}</span>
+                      </button>
+                    ))}
+                    <span className="text-[10px] font-black text-[#667781] uppercase tracking-wide text-right pr-1">Actions</span>
+                  </div>
+                  <div className="flex flex-col">
+                    {visibleTokens.map((token: any, i: number) => {
+                      const meta = tokenMeta(token.token_type);
+                      const isSel = selectedTokenId === token.token_id;
+                      return (
+                        <div key={token.token_id || i} onClick={() => setSelectedTokenId(token.token_id)} onDoubleClick={() => handleViewToken(token.token_id)} className={`group grid grid-cols-[minmax(0,2.4fr)_0.9fr_1.1fr_1.1fr_0.9fr_auto] items-center gap-2 px-3 py-2 rounded-lg cursor-default transition-colors ${isSel ? "bg-[#128C7E]/10 ring-1 ring-inset ring-[#128C7E]/30" : "hover:bg-[#F8FAFC]"}`}>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg ${meta.tint} ${meta.text} grid place-items-center text-[15px] shrink-0`}>{meta.icon}</div>
+                            <div className="min-w-0">
+                              <div className="text-[12px] font-black text-[#111B21] truncate">{token.token_name}</div>
+                              <div className="text-[9px] text-[#9AA5AD] font-mono truncate">{token.token_id ? `${String(token.token_id).slice(0, 8)}...` : ""}</div>
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black ${meta.tint} ${meta.text} capitalize truncate max-w-full`}>{token.token_type || "-"}</span>
+                          </div>
+                          <div className="text-[11px] text-[#667781] uppercase tracking-wide truncate">{token.product?.product_name ? String(token.product.product_name).toUpperCase() : "-"}</div>
+                          <div className="min-w-0">
+                            <div className="text-[12px] font-black text-[#111B21] truncate">{fmtAmount(token)}</div>
+                            {token.billing_unit && <div className="text-[9px] text-[#9AA5AD] truncate">per {token.billing_unit}</div>}
+                          </div>
+                          <div className="text-[11px] text-[#667781] truncate">{fmtDate(token)}</div>
+                          <div className={`justify-self-end transition-opacity ${isSel ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                            {renderTokenActions(token)}
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div className="px-4 py-2 text-[10px] text-[#667781] italic border-t border-[#E9EDEF]">
-              Tip: RBAC governs *who sees cost* vs *who sees raw params*.
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className={`grid gap-2 ${TOKEN_VIEW_GRID[tokenView] || ""}`}>
+                  {visibleTokens.map((token: any, i: number) => renderTokenItem(token, i))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-4 py-2 text-[10px] text-[#9AA5AD] border-t border-[#E9EDEF] flex items-center justify-between">
+              <span>Double-click a token to open its details.</span>
+              <span>{visibleTokens.length} item{visibleTokens.length !== 1 ? "s" : ""}</span>
             </div>
           </div>
         </div>

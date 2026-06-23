@@ -176,9 +176,12 @@ export interface BuyTokensRequest {
 }
 
 export interface BuyTokensResponse {
-  client_uid:   string;
-  new_balance:  number;
-  transaction_id: string;
+  client_uid?:   string;
+  new_balance?:  number;
+  /** Returned by /payments/tokens/buy — used to poll the payment status endpoint. */
+  transaction_uid?: string;
+  /** Legacy alias. */
+  transaction_id?: string;
 }
 
 export interface TransferTokensRequest {
