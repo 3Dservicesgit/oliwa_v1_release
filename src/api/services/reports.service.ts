@@ -57,21 +57,165 @@ export function formatDateForApi(date: Date): string {
 // ── Generate report ─────────────────────────────────────────────────────────
 
 /**
- * Queue a report generation job.
- * The server responds immediately with a file_url — the actual file is
- * generated asynchronously and its progress can be polled via the
- * listing endpoints.
+ * Fetch trip data from the lightweight endpoint in data_stream blueprint,
+ * then generate PDF or Excel client-side.
+ *
+ * Falls back to the legacy /data-house/ endpoint if the new one isn't
+ * available, but that endpoint requires server-side deps (WeasyPrint etc.)
+ * that may not be installed on all deployments.
  */
-export function generateReport(
+export async function generateReport(
   type: ReportType,
   format: ReportFormat,
   payload: GenerateReportRequest,
   opts?: RequestOptions,
 ): Promise<ApiResponse<GenerateReportResponse>> {
+  // ── Client-side report types ─────────────────────────────────────────────
+  // These fetch data from lightweight JSON endpoints, then generate PDF/Excel
+  // in the browser — no server-side WeasyPrint / GTK3 dependencies needed.
+
+  // All report types now use client-side generation via lightweight JSON endpoints
+  const CLIENT_SIDE_TYPES = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone"];
+  if (CLIENT_SIDE_TYPES.includes(type)) {
+    const reportGen = await import("../../utils/reportGenerator");
+    const isState = type === "PARKING" || type === "IDILING";
+
+    // Pick the right backend endpoint based on report type
+    const endpointMap: Record<string, string> = {
+      trips: ENDPOINTS.REPORTS.TRIPS_DATA,
+      fuel: ENDPOINTS.REPORTS.TRIPS_DATA,
+      night_driving: ENDPOINTS.REPORTS.NIGHT_DRIVING_DATA,
+      overspeeding: ENDPOINTS.REPORTS.OVERSPEEDING_DATA,
+      geozone: ENDPOINTS.REPORTS.GEOZONE_DATA,
+      PARKING: ENDPOINTS.REPORTS.STATE_DATA,
+      IDILING: ENDPOINTS.REPORTS.STATE_DATA,
+    };
+    const endpointUrl = endpointMap[type] ?? ENDPOINTS.REPORTS.TRIPS_DATA;
+
+    const labelMap: Record<string, string> = {
+      trips: "Trip", fuel: "Fuel", night_driving: "Night Driving",
+      overspeeding: "Overspeeding", geozone: "Geozone",
+      PARKING: "Parking", IDILING: "Idling",
+    };
+    const typeLabel = labelMap[type] ?? type;
+
+    // Friendly tips per report type for when no data is found
+    const noDataHints: Record<string, string> = {
+      trips: "This could mean no trips were recorded for these devices during the selected period. Try expanding your date range.",
+      fuel: "This could mean no fuel level changes were recorded for these devices. Try a wider date range or check that fuel sensors are active.",
+      night_driving: "No night driving events were detected. This is actually good news — your drivers may not have driven at night during this period!",
+      overspeeding: "No overspeeding events were detected — great news! Your drivers stayed within speed limits during this period.",
+      geozone: "No geozone breach events found. Make sure the selected devices have geozones assigned, or try a wider date range.",
+      PARKING: "No parking records found. Try expanding the date range or verify the devices were active during this period.",
+      IDILING: "No idling records found. Try expanding the date range or verify the devices were active during this period.",
+    };
+
+    console.log(`[Reports] Fetching ${typeLabel} data:`, { devices: payload.report_devices, start: payload.start_date, end: payload.end_date });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let resp: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body: any = {
+        data: {
+          report_devices: payload.report_devices,
+          start_date: payload.start_date,
+          end_date: payload.end_date,
+        },
+      };
+      // State reports need the report_state field
+      if (isState) {
+        body.data.report_state = type; // "PARKING" or "IDILING"
+      }
+
+      resp = await post<unknown>(endpointUrl, body, opts);
+    } catch (e) {
+      console.error(`[Reports] ${typeLabel} data fetch failed:`, e);
+      const msg = e instanceof Error ? e.message : `Failed to fetch ${typeLabel.toLowerCase()} data.`;
+      if (msg.includes("No ") && (msg.includes("Found") || msg.includes("Data"))) {
+        const hint = noDataHints[type] || "Try selecting a different date range or different devices.";
+        throw new Error(`NO_DATA::${typeLabel}::${hint}`);
+      }
+      if (msg.includes("datestyle") || msg.includes("date/time")) {
+        throw new Error("Date format error. Please check the selected date range and try again.");
+      }
+      throw new Error(msg);
+    }
+
+    console.log(`[Reports] ${typeLabel} data response:`, resp);
+
+    const reportData = resp?.data;
+    if (!Array.isArray(reportData) || reportData.length === 0) {
+      const hint = noDataHints[type] || "Try selecting a different date range or different devices.";
+      throw new Error(`NO_DATA::${typeLabel}::${hint}`);
+    }
+
+    try {
+      if (isState) {
+        if (format === "pdf") {
+          reportGen.generateStatePDF(reportData, payload.start_date, payload.end_date, typeLabel);
+        } else {
+          reportGen.generateStateExcel(reportData, payload.start_date, payload.end_date, typeLabel);
+        }
+      } else if (type === "night_driving") {
+        if (format === "pdf") {
+          reportGen.generateNightDrivingPDF(reportData, payload.start_date, payload.end_date);
+        } else {
+          reportGen.generateNightDrivingExcel(reportData, payload.start_date, payload.end_date);
+        }
+      } else if (type === "overspeeding") {
+        if (format === "pdf") {
+          reportGen.generateOverspeedingPDF(reportData, payload.start_date, payload.end_date);
+        } else {
+          reportGen.generateOverspeedingExcel(reportData, payload.start_date, payload.end_date);
+        }
+      } else if (type === "geozone") {
+        if (format === "pdf") {
+          reportGen.generateGeozonePDF(reportData, payload.start_date, payload.end_date);
+        } else {
+          reportGen.generateGeozoneExcel(reportData, payload.start_date, payload.end_date);
+        }
+      } else if (type === "fuel") {
+        if (format === "pdf") {
+          reportGen.generateFuelPDF(reportData, payload.start_date, payload.end_date);
+        } else {
+          reportGen.generateFuelExcel(reportData, payload.start_date, payload.end_date);
+        }
+      } else {
+        if (format === "pdf") {
+          reportGen.generateTripsPDF(reportData, payload.start_date, payload.end_date);
+        } else {
+          reportGen.generateTripsExcel(reportData, payload.start_date, payload.end_date);
+        }
+      }
+    } catch (genErr) {
+      console.error("[Reports] Client-side generation failed:", genErr);
+      throw new Error("Failed to generate the report file. Please try again.");
+    }
+
+    // Log the client-side report to the backend so it appears in Previous Reports
+    // Fire-and-forget — don't block the user if this fails
+    try {
+      await post(ENDPOINTS.REPORTS.LOG_DOWNLOAD, {
+        data: {
+          report_caller: payload.origin_user,
+          report_type: type,
+          format: format,
+        },
+      });
+      console.log(`[Reports] Logged ${typeLabel} ${format} download to backend`);
+    } catch (logErr) {
+      console.warn("[Reports] Failed to log report download (non-blocking):", logErr);
+    }
+
+    // Return a synthetic success response
+    return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
+  }
+
+  // For other report types, fall back to legacy server-side generation
   const segment = reportEndpointSegment(type);
   const url = `${ENDPOINTS.REPORTS.GENERATE}/${segment}/${format}`;
 
-  // Build the body — add report_state for state-based reports
   const body: { data: GenerateReportRequest } = { data: { ...payload } };
   if (isStateReport(type)) {
     body.data.report_state = type;

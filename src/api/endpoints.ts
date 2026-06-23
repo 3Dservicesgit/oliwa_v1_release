@@ -189,14 +189,26 @@ export const ENDPOINTS = {
   },
 
   REPORTS: {
-    /** Generate: POST /data-house/reports/{type}/{format} */
+    /** Generate (legacy, data_handler_bp): POST /data-house/reports/{type}/{format} */
     GENERATE:       "/data-house/reports",
+    /** Trip report data (lightweight): POST /data-stream/reports/trips/generate-data */
+    TRIPS_DATA:     "/data-stream/reports/trips/generate-data",
+    /** Night driving report data: POST /data-stream/reports/night-driving/generate-data */
+    NIGHT_DRIVING_DATA: "/data-stream/reports/night-driving/generate-data",
+    /** State duration report data (PARKING/IDILING): POST /data-stream/reports/state/generate-data */
+    STATE_DATA: "/data-stream/reports/state/generate-data",
+    /** Overspeeding report data: POST /data-stream/reports/overspeeding/generate-data */
+    OVERSPEEDING_DATA: "/data-stream/reports/overspeeding/generate-data",
+    /** Geozone breach report data: POST /data-stream/reports/geozone/generate-data */
+    GEOZONE_DATA: "/data-stream/reports/geozone/generate-data",
     /** List by type: GET /data-stream/reports/{owner}/{type}/list */
     LIST_BY_TYPE:   "/data-stream/reports",
     /** List state reports: GET /data-stream/reports/{owner}/state/list */
     LIST_STATE:     "/data-stream/reports",
     /** Status check: GET /data-stream/reports/{request_uid}/status */
     STATUS:         "/data-stream/reports",
+    /** Log client-side report: POST /data-stream/reports/log-download */
+    LOG_DOWNLOAD:   "/data-stream/reports/log-download",
     /** Delete: DELETE /data-stream/reports/{request_uid}/delete */
     DELETE:         "/data-stream/reports",
     /** Available types: GET /data-stream/reports/types/available */

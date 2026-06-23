@@ -25,6 +25,7 @@ import {
   getAllPreviousReports,
   getReportDownloadUrl,
   deleteReport,
+  getReportStatus,
   getAvailableReportTypes,
   formatDateForApi,
 } from "../../api/services/reports.service";
@@ -61,6 +62,79 @@ function toInputDate(date: Date): string {
 function fromInputDate(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
+}
+
+// ── Report date & status formatters ────────────────────────────────────────
+
+/**
+ * Parse the raw file_datestamp from the backend (DD-MM-YYYY_HH:MM:SSam/pm)
+ * into a human-readable format like "30 Jan 2026, 2:15 PM".
+ */
+function formatReportDate(raw: string | undefined): string {
+  if (!raw || raw === "—") return "—";
+
+  // Backend stores two formats:
+  //   1) "DD-MM-YYYY_HH:MM:SSam/pm"   e.g. "30-01-2026_02:15:30PM"
+  //   2) "DD-MM-YYYY HH:MM:SS AM/PM"  e.g. "23-06-2026 12:27:49 PM"
+  // Try underscore first, then space-based split
+
+  let datePart: string;
+  let timePart: string;
+
+  if (raw.includes("_")) {
+    const parts = raw.split("_");
+    if (parts.length < 2) return raw;
+    datePart = parts[0];
+    timePart = parts[1];
+  } else {
+    // Space-separated: "DD-MM-YYYY HH:MM:SS AM" or "DD-MM-YYYY HH:MM:SS PM"
+    const spaceMatch = raw.match(/^(\d{2}-\d{2}-\d{4})\s+(.+)$/);
+    if (!spaceMatch) return raw;
+    datePart = spaceMatch[1];
+    timePart = spaceMatch[2]; // "12:27:49 PM" or "12:27:49PM"
+  }
+
+  const [dd, mm, yyyy] = datePart.split("-");
+  if (!dd || !mm || !yyyy) return raw;
+
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthIdx = parseInt(mm, 10) - 1;
+  const monthName = months[monthIdx] ?? mm;
+
+  // Clean up time — remove seconds, keep am/pm
+  // Handles: "12:27:49PM", "12:27:49 PM", "12:27:49pm"
+  let timeDisplay = timePart;
+  const timeMatch = timePart.match(/^(\d{1,2}):(\d{2}):\d{2}\s*(AM|PM|am|pm)$/i);
+  if (timeMatch) {
+    let hr = parseInt(timeMatch[1], 10);
+    const min = timeMatch[2];
+    const ampm = timeMatch[3].toUpperCase();
+    if (hr === 0) hr = 12;
+    timeDisplay = `${hr}:${min} ${ampm}`;
+  }
+
+  return `${parseInt(dd, 10)} ${monthName} ${yyyy}, ${timeDisplay}`;
+}
+
+/**
+ * Prettify the raw status string from the backend into a friendly label.
+ */
+function formatReportStatus(status: string | undefined): { label: string; color: "green" | "red" | "amber" } {
+  if (!status) return { label: "Unknown", color: "amber" };
+  switch (status.toLowerCase()) {
+    case "completed":
+      return { label: "Completed", color: "green" };
+    case "failed":
+      return { label: "Failed", color: "red" };
+    case "no-data":
+      return { label: "No Data", color: "red" };
+    case "in_process":
+    case "in-process":
+    case "processing":
+      return { label: "Processing", color: "amber" };
+    default:
+      return { label: status, color: "amber" };
+  }
 }
 
 // ── Toast ───────────────────────────────────────────────────────────────────
@@ -133,15 +207,50 @@ function ConfirmDialog({
 function ReportDetailsDrawer({
   report,
   onClose,
+  onToast,
+  onRefresh,
 }: {
   report: PreviousReport;
   onClose: () => void;
+  onToast: (msg: string, type: "success" | "error") => void;
+  onRefresh: () => void;
 }) {
+  const [statusChecking, setStatusChecking] = useState(false);
   const isCompleted = report.file_progress === "completed";
   const isFailed = report.file_progress === "failed" || report.file_progress === "no-data";
+  const isProcessing = !isCompleted && !isFailed;
   const typeLower = report.report_type.toLowerCase() as ReportType;
-  const icon = REPORT_TYPE_ICONS[typeLower] ?? "📄";
-  const label = REPORT_TYPE_LABELS[typeLower] ?? report.report_type;
+  const typeKey = (REPORT_TYPE_LABELS[typeLower] ? typeLower : report.report_type) as ReportType;
+  const icon = REPORT_TYPE_ICONS[typeKey] ?? REPORT_TYPE_ICONS[typeLower] ?? "📄";
+  const label = REPORT_TYPE_LABELS[typeKey] || REPORT_TYPE_LABELS[typeLower] || report.report_type;
+  const statusInfo = formatReportStatus(report.file_progress);
+  const dateStr = formatReportDate(report.file_datestamp);
+  const isClientDownload = report.file_link?.startsWith("client-download");
+
+  const handleStatusCheck = async () => {
+    setStatusChecking(true);
+    try {
+      const res = await getReportStatus(report.file_request_uid);
+      console.log("[ReportDetails] Status:", JSON.stringify(res));
+      const status = (res?.data as Record<string, unknown>)?.status || "unknown";
+      onToast(`Report status: ${status}`, "success");
+      onRefresh();
+    } catch {
+      onToast("Could not check report status.", "error");
+    } finally {
+      setStatusChecking(false);
+    }
+  };
+
+  const handleDownload = () => {
+    const url = getReportDownloadUrl(report.file_link);
+    console.log("[ReportDetails] Download URL:", url);
+    if (!url || report.file_link === "NO_DIR_PATH") {
+      onToast("Report file is not available for download.", "error");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="fixed inset-0 z-[150] flex justify-end">
@@ -170,14 +279,14 @@ function ReportDetailsDrawer({
               <div className="font-black text-[14px] text-[#111B21]">{label}</div>
               <span
                 className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                  isCompleted
+                  statusInfo.color === "green"
                     ? "bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]"
-                    : isFailed
+                    : statusInfo.color === "red"
                     ? "bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]"
                     : "bg-[#F97316]/10 border-[#F97316]/30 text-[#F97316]"
                 }`}
               >
-                {report.file_progress}
+                {isClientDownload ? "Downloaded" : statusInfo.label}
               </span>
             </div>
           </div>
@@ -185,30 +294,63 @@ function ReportDetailsDrawer({
           {/* Detail rows */}
           <div className="flex flex-col gap-3">
             <DetailRow label="Report Type" value={label} />
-            <DetailRow label="Status" value={report.file_progress} />
-            <DetailRow label="Date Generated" value={report.file_datestamp || "—"} />
+            <DetailRow label="Status" value={isClientDownload ? "Downloaded to device" : statusInfo.label} />
+            <DetailRow label="Date Generated" value={dateStr} />
             <DetailRow label="Request ID" value={report.file_request_uid} mono />
             <DetailRow
               label="File"
               value={
-                isCompleted && report.file_link
+                isClientDownload
+                  ? `${label} (${report.file_link.replace("client-download-", "").toUpperCase()})`
+                  : isCompleted && report.file_link && report.file_link !== "NO_DIR_PATH"
                   ? report.file_link.split("/").pop() || report.file_link
                   : "—"
               }
             />
           </div>
 
-          {/* Download button */}
-          {isCompleted && report.file_link && (
-            <a
-              href={getReportDownloadUrl(report.file_link)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black flex items-center justify-center gap-2 no-underline hover:bg-[#0E7A6E] transition-all"
-            >
-              &#11015; Download Report
-            </a>
-          )}
+          {/* Action buttons */}
+          <div className="mt-6 flex flex-col gap-2">
+            {/* Download — only for completed reports with valid file */}
+            {isCompleted && report.file_link && report.file_link !== "NO_DIR_PATH" && (
+              <button
+                onClick={handleDownload}
+                className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[#0E7A6E] transition-all"
+              >
+                &#11015; Download Report
+              </button>
+            )}
+
+            {/* Check Status — for processing reports */}
+            {isProcessing && (
+              <button
+                onClick={handleStatusCheck}
+                disabled={statusChecking}
+                className="w-full h-10 rounded-lg bg-[#F97316] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[#EA580C] disabled:opacity-50 transition-all"
+              >
+                {statusChecking ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>&#8635; Check Status</>
+                )}
+              </button>
+            )}
+
+            {/* Failed message */}
+            {isFailed && (
+              <div className="p-3 rounded-lg bg-[#EF4444]/5 border border-[#EF4444]/20">
+                <p className="text-[12px] text-[#EF4444] font-black mb-1">Report Generation Failed</p>
+                <p className="text-[11px] text-[#667781]">
+                  {report.file_progress === "no-data"
+                    ? "No data was found for the selected devices and date range. Try different dates or devices."
+                    : "An error occurred while generating this report. Please try generating a new report."}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -256,6 +398,7 @@ function GenerateForm({
   const [endDate, setEndDate] = useState(() => toInputDate(new Date()));
   const [generating, setGenerating] = useState(false);
   const [searchDevice, setSearchDevice] = useState("");
+  const [noDataInfo, setNoDataInfo] = useState<{ label: string; hint: string } | null>(null);
 
   const toggleDevice = (imei: string) => {
     setSelectedDevices((prev) =>
@@ -297,23 +440,57 @@ function GenerateForm({
     }
 
     setGenerating(true);
+    setNoDataInfo(null); // Clear any previous "no data" banner
     try {
+      const sd = formatDateForApi(fromInputDate(startDate));
+      const ed = formatDateForApi(fromInputDate(endDate));
+      console.log("[GenerateForm] Generating:", { reportType, format, selectedDevices, sd, ed });
+
       await generateReport(reportType, format, {
         report_devices: selectedDevices,
-        start_date: formatDateForApi(fromInputDate(startDate)),
-        end_date: formatDateForApi(fromInputDate(endDate)),
+        start_date: sd,
+        end_date: ed,
         origin_user: ownerUid,
       });
-      onToast(
-        `${currentTypeLabel} report is processing. Check Previous Reports when ready.`,
-        "success",
-      );
+
+      const clientSideTypes = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone"];
+      if (clientSideTypes.includes(reportType)) {
+        onToast(`${currentTypeLabel} report downloaded successfully!`, "success");
+      } else {
+        onToast(
+          `${currentTypeLabel} report is processing. Check Previous Reports when ready.`,
+          "success",
+        );
+      }
       onGenerated();
     } catch (e) {
-      onToast(
-        e instanceof Error ? e.message : "Failed to generate report.",
-        "error",
-      );
+      console.error("[GenerateForm] Report generation failed:", e);
+      let errorMsg = "Failed to generate report.";
+      if (e instanceof Error) {
+        errorMsg = e.message;
+
+        // Handle friendly "no data" messages — show inline banner instead of error toast
+        if (errorMsg.startsWith("NO_DATA::")) {
+          const parts = errorMsg.split("::");
+          const label = parts[1] || currentTypeLabel;
+          const hint = parts[2] || "Try selecting a different date range or different devices.";
+          setNoDataInfo({ label, hint });
+          setGenerating(false);
+          return; // Don't show error toast — the inline banner is friendlier
+        }
+
+        // Clean up technical error messages for the user
+        if (errorMsg.includes("datestyle") || errorMsg.includes("date/time field")) {
+          errorMsg = "Date format error on the server. Please try a different date range.";
+        } else if (errorMsg.includes("failed to parse response")) {
+          errorMsg = "Server returned an unexpected response. The endpoint may not be deployed yet.";
+        } else if (errorMsg.includes("405") || errorMsg.includes("METHOD NOT ALLOWED")) {
+          errorMsg = "This report endpoint is not available on the server. Please contact support.";
+        } else if (errorMsg.includes("404") || errorMsg.includes("NOT FOUND")) {
+          errorMsg = "Report endpoint not found. The server may need to be updated.";
+        }
+      }
+      onToast(errorMsg, "error");
     } finally {
       setGenerating(false);
     }
@@ -482,6 +659,32 @@ function GenerateForm({
           `Generate ${currentTypeLabel} Report`
         )}
       </button>
+
+      {/* Friendly "no data" info banner */}
+      {noDataInfo && (
+        <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-4 flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-[#F59E0B] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex flex-col gap-1">
+              <span className="text-[13px] font-bold text-[#92400E]">
+                No {noDataInfo.label} Data Available
+              </span>
+              <span className="text-[12px] text-[#78350F] leading-relaxed">
+                {noDataInfo.hint}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setNoDataInfo(null)}
+            className="self-end text-[11px] text-[#92400E] underline cursor-pointer bg-transparent border-none hover:text-[#78350F]"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -504,25 +707,37 @@ function ReportHistory({
   onToast: (msg: string, type: "success" | "error") => void;
 }) {
   const [filterType, setFilterType] = useState<string>("all");
+  const [showFailed, setShowFailed] = useState(false);
   const [detailReport, setDetailReport] = useState<PreviousReport | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PreviousReport | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState<string | null>(null);
+
+  // Filter out failed/no-data reports by default unless toggled on
+  const visibleReports = showFailed
+    ? reports
+    : reports.filter((r) => r.file_progress !== "failed" && r.file_progress !== "no-data");
+
+  const failedCount = reports.length - visibleReports.length;
 
   const filtered = filterType === "all"
-    ? reports
-    : reports.filter((r) => r.report_type.toUpperCase() === filterType.toUpperCase());
+    ? visibleReports
+    : visibleReports.filter((r) => r.report_type.toUpperCase() === filterType.toUpperCase());
 
-  const uniqueTypes = Array.from(new Set(reports.map((r) => r.report_type.toUpperCase())));
+  const uniqueTypes = Array.from(new Set(visibleReports.map((r) => r.report_type.toUpperCase())));
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
+    console.log("[Reports] Deleting report:", deleteTarget.file_request_uid);
     try {
       await deleteReport(deleteTarget.file_request_uid, ownerUid);
+      console.log("[Reports] Delete successful");
       onToast("Report deleted successfully.", "success");
       setDeleteTarget(null);
       onDeleted();
     } catch (e) {
+      console.error("[Reports] Delete failed:", e);
       onToast(
         e instanceof Error ? e.message : "Failed to delete report.",
         "error",
@@ -532,11 +747,43 @@ function ReportHistory({
     }
   };
 
+  const handleCheckStatus = async (report: PreviousReport) => {
+    setCheckingStatus(report.file_request_uid);
+    console.log("[Reports] Checking status for:", report.file_request_uid);
+    try {
+      const res = await getReportStatus(report.file_request_uid);
+      const status = (res?.data as Record<string, unknown>)?.status || res?.data?.status || "unknown";
+      console.log("[Reports] Status response:", JSON.stringify(res));
+      onToast(`Report status: ${status}`, "success");
+      onRefresh(); // Refresh the list in case status changed
+    } catch (e) {
+      console.error("[Reports] Status check failed:", e);
+      onToast("Could not check report status.", "error");
+    } finally {
+      setCheckingStatus(null);
+    }
+  };
+
+  const handleDownload = (report: PreviousReport) => {
+    const url = getReportDownloadUrl(report.file_link);
+    console.log("[Reports] Download URL:", url, "file_link:", report.file_link);
+    if (!url || url === "" || report.file_link === "NO_DIR_PATH") {
+      onToast("Report file is not available for download.", "error");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Details drawer */}
       {detailReport && (
-        <ReportDetailsDrawer report={detailReport} onClose={() => setDetailReport(null)} />
+        <ReportDetailsDrawer
+          report={detailReport}
+          onClose={() => setDetailReport(null)}
+          onToast={onToast}
+          onRefresh={() => { setDetailReport(null); onRefresh(); }}
+        />
       )}
 
       {/* Delete confirmation */}
@@ -564,6 +811,22 @@ function ReportHistory({
         </button>
       </div>
 
+      {/* Failed reports toggle */}
+      {failedCount > 0 && (
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-[11px] text-[#667781]">
+            {failedCount} failed report{failedCount !== 1 ? "s" : ""} hidden
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowFailed(!showFailed)}
+            className="text-[11px] text-[#3B82F6] font-black cursor-pointer bg-transparent border-none hover:underline"
+          >
+            {showFailed ? "Hide failed" : "Show all"}
+          </button>
+        </div>
+      )}
+
       {/* Filter chips */}
       {uniqueTypes.length > 1 && (
         <div className="flex gap-1.5 mb-3 flex-wrap">
@@ -576,10 +839,12 @@ function ReportHistory({
                 : "bg-white border-[#E9EDEF] text-[#667781]"
             }`}
           >
-            All ({reports.length})
+            All ({visibleReports.length})
           </button>
           {uniqueTypes.map((t) => {
-            const count = reports.filter((r) => r.report_type.toUpperCase() === t).length;
+            const count = visibleReports.filter((r) => r.report_type.toUpperCase() === t).length;
+            const chipLower = t.toLowerCase() as ReportType;
+            const chipLabel = REPORT_TYPE_LABELS[t as ReportType] || REPORT_TYPE_LABELS[chipLower] || t;
             return (
               <button
                 key={t}
@@ -591,7 +856,7 @@ function ReportHistory({
                     : "bg-white border-[#E9EDEF] text-[#667781]"
                 }`}
               >
-                {t} ({count})
+                {chipLabel} ({count})
               </button>
             );
           })}
@@ -632,7 +897,12 @@ function ReportHistory({
                 const isCompleted = r.file_progress === "completed";
                 const isFailed = r.file_progress === "failed" || r.file_progress === "no-data";
                 const typeLower = r.report_type.toLowerCase() as ReportType;
-                const icon = REPORT_TYPE_ICONS[typeLower] ?? "📄";
+                const typeKey = (REPORT_TYPE_LABELS[typeLower] ? typeLower : r.report_type) as ReportType;
+                const icon = REPORT_TYPE_ICONS[typeKey] ?? REPORT_TYPE_ICONS[typeLower] ?? "📄";
+                const typeLabel = REPORT_TYPE_LABELS[typeKey] || REPORT_TYPE_LABELS[typeLower] || r.report_type;
+                const status = formatReportStatus(r.file_progress);
+                const dateStr = formatReportDate(r.file_datestamp);
+                const isClientDownload = r.file_link?.startsWith("client-download");
 
                 return (
                   <tr
@@ -642,38 +912,57 @@ function ReportHistory({
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className="text-[14px]">{icon}</span>
-                        <span className="font-black text-[#111B21]">{r.report_type}</span>
+                        <span className="font-black text-[#111B21]">{typeLabel}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-[#667781]">
-                      {r.file_datestamp || "—"}
+                      {dateStr}
                     </td>
                     <td className="px-3 py-2.5">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                          isCompleted
+                          status.color === "green"
                             ? "bg-[#25D366]/10 border-[#25D366]/30 text-[#25D366]"
-                            : isFailed
+                            : status.color === "red"
                             ? "bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]"
                             : "bg-[#F97316]/10 border-[#F97316]/30 text-[#F97316]"
                         }`}
                       >
-                        {r.file_progress || "processing"}
+                        {isClientDownload ? "Downloaded" : status.label}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1">
-                        {/* Download */}
-                        {isCompleted && r.file_link ? (
-                          <a
-                            href={getReportDownloadUrl(r.file_link)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        {/* Download / Already Downloaded */}
+                        {isClientDownload ? (
+                          <span
+                            title="Already downloaded to your device"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-[12px]"
+                          >
+                            &#10003;
+                          </span>
+                        ) : isCompleted && r.file_link && r.file_link !== "NO_DIR_PATH" ? (
+                          <button
+                            onClick={() => handleDownload(r)}
                             title="Download report"
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[12px] no-underline cursor-pointer hover:bg-[#128C7E]/20 transition-all"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[12px] cursor-pointer hover:bg-[#128C7E]/20 transition-all"
                           >
                             &#11015;
-                          </a>
+                          </button>
+                        ) : !isCompleted && !isFailed ? (
+                          /* Check Status for processing reports */
+                          <button
+                            onClick={() => handleCheckStatus(r)}
+                            disabled={checkingStatus === r.file_request_uid}
+                            title="Check status"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#F97316]/10 border border-[#F97316]/30 text-[#F97316] text-[12px] cursor-pointer hover:bg-[#F97316]/20 disabled:opacity-50 transition-all"
+                          >
+                            {checkingStatus === r.file_request_uid ? (
+                              <span className="w-3 h-3 border-2 border-[#F97316] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>&#8635;</>
+                            )}
+                          </button>
                         ) : (
                           <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#C4CCD5] text-[12px]">
                             &#11015;

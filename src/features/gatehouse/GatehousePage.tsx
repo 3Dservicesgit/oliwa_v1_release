@@ -248,15 +248,26 @@ export default function GatehousePage() {
   useEffect(() => {
     (async () => {
       const rawUid = getCookie("_nvxs_account_uid") ?? "";
-      if (!rawUid) { setDevLoading(false); return; }
-      const accountType = (getCookie("_nvxs_account_type") ?? "client").toLowerCase();
-      const accountUid  = accountType === "client"
+      if (!rawUid) { console.warn("[TrackPlayback] No account UID cookie — skipping device fetch"); setDevLoading(false); return; }
+      const cookieType = (getCookie("_nvxs_account_type") ?? "client").toLowerCase();
+      // Backend recognises "client", "inhouse", "service_provider" — map "customer" → "client"
+      const dataLevel   = (cookieType === "customer" || cookieType === "client") ? "client" : cookieType;
+      const accountUid  = (dataLevel === "client" || dataLevel === "inhouse")
         ? (getCookie("_nvxs_account_root") ?? rawUid) : rawUid;
+      console.log("[TrackPlayback] loadDevices — dataLevel:", dataLevel, "accountUid:", accountUid);
       try {
+        // 15-second timeout so a hanging backend doesn't freeze the UI
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Device fetch timed out after 15 seconds")), 15000),
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const resp = await fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
-          data: { data_level: accountType, account_uid: accountUid },
-        }) as any;
+        const resp = await Promise.race([
+          fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
+            data: { data_level: dataLevel, account_uid: accountUid },
+          }),
+          timeout,
+        ]) as any;
+        console.log("[TrackPlayback] fleetFetch response status:", resp?.status, "data count:", Array.isArray(resp?.data) ? resp.data.length : "not-array");
         if (resp?.status === "success" && Array.isArray(resp.data)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const devs: DeviceOption[] = resp.data.map((u: any) => ({
@@ -268,7 +279,7 @@ export default function GatehousePage() {
           setDevices(devs);
           if (devs.length === 1) setSelImei(devs[0].imei);
         }
-      } catch { /**/ }
+      } catch (err) { console.error("[TrackPlayback] device fetch failed:", err); }
       setDevLoading(false);
     })();
   }, []);
@@ -367,7 +378,7 @@ export default function GatehousePage() {
       const to   = parseInputDate(toDate);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const resp = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_HISTORY, {
+      const resp = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, {
         data: {
           device_imei:  selImei,
           from_date:    fmtDate(from),
@@ -376,14 +387,29 @@ export default function GatehousePage() {
           record_count: 10000,
         },
       }) as any;
+      console.log("[TrackPlayback] trips/history/replay full response:", JSON.stringify(resp));
 
-      if (resp?.status === "success" && resp.data) {
-        const rd: PositionRecord[] = resp.data.raw_data || [];
-        const td: TripSummary[]    = resp.data.trips_data || [];
+      if (resp?.status === "success" && Array.isArray(resp.data)) {
+        // Map replay response fields to PositionRecord shape
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rd: PositionRecord[] = resp.data.map((p: any) => ({
+          data_longitude:          p.data_longitude,
+          data_latitude:           p.data_latitude,
+          speed_log:               p.speed_log,
+          data_hdop:               p.data_hdop,
+          local_system_datestamp:   p.local_system_datestamp,
+          record_io_events_uid:    p.record_io_events_uid,
+          geocoded_location:       p.geocoded_location,
+          local_system_timestamp:  p.local_system_timestamp,
+          data_connected_satelites: p.data_connected_satelites,
+          batch_uid:               p.batch_uid,
+          data_idx:                p.data_idx,
+          data_index:              p.data_index,
+        }));
         setRawData(rd);
-        setTrips(td);
+        setTrips([]);  // replay endpoint doesn't return grouped trips
         drawRoute(rd);
-        if (td.length === 0 && rd.length === 0) {
+        if (rd.length === 0) {
           setTripError("No trips found for this date range.");
         }
       } else {
