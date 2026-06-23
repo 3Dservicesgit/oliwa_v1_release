@@ -133,6 +133,29 @@ function PaymentAuthorizingOverlay({ amountLabel, phone }: { amountLabel?: strin
   );
 }
 
+/** Full-screen confirmation shown once the polled payment status comes back successful. */
+function PaymentSuccessOverlay({ message, onDone }: { message: string; onDone: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[#E9EDEF] w-full max-w-[360px] p-6 flex flex-col items-center text-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-[#128C7E]/10 flex items-center justify-center">
+          <span className="text-[#128C7E] text-[34px] leading-none">&#10003;</span>
+        </div>
+        <div>
+          <h3 className="font-black text-[16px] text-[#111B21] mb-1.5">Payment Successful</h3>
+          <p className="text-[12px] text-[#667781] leading-relaxed">{message}</p>
+        </div>
+        <button
+          onClick={onDone}
+          className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Balance Card ───────────────────────────────────────────────────────────
 
 function BalanceCard({ b }: { b: ClientTokenBalance }) {
@@ -240,6 +263,94 @@ function getPkgBillingScope(pkg: TokenPackage): string {
   return pkg.billing_scope || "—";
 }
 
+// ── Explorer "View" menu config for token packages ──────────────────────────
+type PkgView = "xl" | "large" | "medium" | "small" | "list" | "details" | "tiles" | "content";
+
+const PKG_VIEW_OPTIONS: { key: PkgView; label: string; glyph: string }[] = [
+  { key: "xl",      label: "Extra large icons", glyph: "▦" },
+  { key: "large",   label: "Large icons",       glyph: "▦" },
+  { key: "medium",  label: "Medium icons",      glyph: "▧" },
+  { key: "small",   label: "Small icons",       glyph: "▤" },
+  { key: "list",    label: "List",              glyph: "≣" },
+  { key: "details", label: "Details",           glyph: "☰" },
+  { key: "tiles",   label: "Tiles",             glyph: "◨" },
+  { key: "content", label: "Content",           glyph: "▭" },
+];
+
+const PKG_VIEW_GRID: Record<PkgView, string> = {
+  xl:      "[grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]",
+  large:   "[grid-template-columns:repeat(auto-fill,minmax(165px,1fr))]",
+  medium:  "[grid-template-columns:repeat(auto-fill,minmax(130px,1fr))]",
+  small:   "[grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]",
+  list:    "[grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]",
+  tiles:   "[grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]",
+  content: "grid-cols-1",
+  details: "",
+};
+
+const PKG_ICON_SIZE: Record<PkgView, { box: string; text: string }> = {
+  xl:      { box: "w-16 h-16", text: "text-[34px]" },
+  large:   { box: "w-14 h-14", text: "text-[28px]" },
+  medium:  { box: "w-11 h-11", text: "text-[22px]" },
+  small:   { box: "w-8 h-8",   text: "text-[16px]" },
+  list:    { box: "w-7 h-7",   text: "text-[14px]" },
+  tiles:   { box: "w-12 h-12", text: "text-[24px]" },
+  content: { box: "w-12 h-12", text: "text-[24px]" },
+  details: { box: "w-9 h-9",   text: "text-[16px]" },
+};
+
+const PKG_TYPE_META: Record<string, { icon: string; tint: string; text: string }> = {
+  time:        { icon: "⏱",  tint: "bg-[#128C7E]/10", text: "text-[#0E7A6D]" },
+  parameter:   { icon: "⚙",  tint: "bg-[#34B7F1]/10", text: "text-[#1E88B5]" },
+  event:       { icon: "⚡", tint: "bg-[#F97316]/10", text: "text-[#C2570B]" },
+  volume:      { icon: "🛢", tint: "bg-[#3B82F6]/10", text: "text-[#2563EB]" },
+  distance:    { icon: "📏", tint: "bg-[#8B5CF6]/10", text: "text-[#7C3AED]" },
+  video:       { icon: "🎬", tint: "bg-[#EF4444]/10", text: "text-[#DC2626]" },
+  conditional: { icon: "🔀", tint: "bg-[#F59E0B]/10", text: "text-[#B45309]" },
+  action:      { icon: "⌘",  tint: "bg-[#0EA5E9]/10", text: "text-[#0284C7]" },
+  compliance:  { icon: "📋", tint: "bg-[#10B981]/10", text: "text-[#059669]" },
+};
+function pkgMeta(type?: string) {
+  return PKG_TYPE_META[(type || "").toLowerCase()] || { icon: "🎫", tint: "bg-[#E9EDEF]", text: "text-[#667781]" };
+}
+
+// ── Sorting (Explorer "Sort by" menu) ───────────────────────────────────────
+const PKG_SORT_OPTIONS: { key: string; label: string }[] = [
+  { key: "name",            label: "Name" },
+  { key: "cost",            label: "Cost" },
+  { key: "currency",        label: "Currency" },
+  { key: "type",            label: "Type" },
+  { key: "billing_unit",    label: "Billing Unit" },
+  { key: "billing_trigger", label: "Billing Trigger" },
+  { key: "billing_scope",   label: "Billing Scope" },
+  { key: "product",         label: "Product" },
+];
+
+function pkgSortValue(pkg: TokenPackage, key: string): string | number {
+  switch (key) {
+    case "cost":            return getPkgPrice(pkg);
+    case "currency":        return getPkgCurrency(pkg).toLowerCase();
+    case "type":            return (pkg.token_type || "").toLowerCase();
+    case "billing_unit":    return (pkg.billing_unit || "").toLowerCase();
+    case "billing_trigger": return (pkg.billing_trigger || "").toLowerCase();
+    case "billing_scope":   return (pkg.billing_scope || "").toLowerCase();
+    case "product":         return (pkg.product?.product_name || "").toLowerCase();
+    case "name":
+    default:                return (pkg.token_name || "").toLowerCase();
+  }
+}
+
+function sortPackages(list: TokenPackage[], key: string, dir: "asc" | "desc"): TokenPackage[] {
+  const f = dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const av = pkgSortValue(a, key);
+    const bv = pkgSortValue(b, key);
+    if (av < bv) return -1 * f;
+    if (av > bv) return 1 * f;
+    return 0;
+  });
+}
+
 // ── Token Package Card ─────────────────────────────────────────────────────
 
 function PackageCard({
@@ -323,6 +434,7 @@ function BuyDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [resultMsg, setResultMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const price = getPkgPrice(pkg);
@@ -351,7 +463,7 @@ function BuyDrawer({
         token_quantity: qty,
       });
 
-      const txnId = res?.data?.transaction_id;
+      const txnId = res?.data?.transaction_uid ?? res?.data?.transaction_id;
       if (txnId) {
         setPolling(true);
         setStatus("pending");
@@ -364,10 +476,10 @@ function BuyDrawer({
             if (txnStatus === "success" || txnStatus === "successful") {
               if (pollRef.current) clearInterval(pollRef.current);
               setPolling(false);
+              const msg = `${qty} × ${pkg.token_name} token${qty > 1 ? "s have" : " has"} been added to your account.`;
+              setResultMsg(msg);
               setStatus("success");
-              onSuccess(
-                `Payment successful! ${qty} × ${pkg.token_name} token${qty > 1 ? "s have" : " has"} been added to your account.`,
-              );
+              onSuccess(msg);
             } else if (txnStatus === "failed") {
               if (pollRef.current) clearInterval(pollRef.current);
               setPolling(false);
@@ -384,7 +496,10 @@ function BuyDrawer({
           }
         }, 5000);
       } else {
-        onSuccess("Purchase initiated! Your balance will update shortly.");
+        const msg = "Purchase initiated! Your balance will update shortly.";
+        setResultMsg(msg);
+        setStatus("success");
+        onSuccess(msg);
       }
     } catch {
       setStatus("failed");
@@ -514,15 +629,6 @@ function BuyDrawer({
           )}
 
           {/* ── Status indicators ───────────────────────────────────── */}
-          {status === "success" && (
-            <div className="bg-[#128C7E]/10 border border-[#128C7E]/20 rounded-xl p-4 mb-4 text-center">
-              <div className="text-[24px] mb-1">&#10003;</div>
-              <div className="text-[13px] font-black text-[#128C7E] mb-1">Payment Successful!</div>
-              <div className="text-[11px] text-[#667781]">
-                {qty} × {pkg.token_name} token{qty !== 1 ? "s have" : " has"} been added to your account.
-              </div>
-            </div>
-          )}
           {status === "failed" && (
             <div className="bg-[#EF4444]/10 border border-[#EF4444]/20 rounded-xl p-4 mb-4 text-center">
               <div className="text-[13px] font-black text-[#EF4444] mb-1">Payment Failed</div>
@@ -567,6 +673,11 @@ function BuyDrawer({
       {status === "pending" && (
         <PaymentAuthorizingOverlay amountLabel={`${currency} ${total.toLocaleString()}`} phone={phone} />
       )}
+
+      {/* Success confirmation — closes the drawer on "Done" */}
+      {status === "success" && (
+        <PaymentSuccessOverlay message={resultMsg} onDone={onClose} />
+      )}
     </>
   );
 }
@@ -607,6 +718,7 @@ function BudgetTab({
   const [submitting, setSubmitting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [resultMsg, setResultMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tokens that fit the budget — resolved by the backend /tokens/budget-offer endpoint
@@ -690,7 +802,7 @@ function BudgetTab({
         token_quantity: tokenCount,
       });
 
-      const txnId = res?.data?.transaction_id;
+      const txnId = res?.data?.transaction_uid ?? res?.data?.transaction_id;
       if (txnId) {
         setPolling(true);
         setStatus("pending");
@@ -703,10 +815,10 @@ function BudgetTab({
             if (txnStatus === "success" || txnStatus === "successful") {
               if (pollRef.current) clearInterval(pollRef.current);
               setPolling(false);
+              const msg = `${tokenCount} token(s) purchased for ${currency} ${totalCost.toLocaleString()}.`;
+              setResultMsg(msg);
               setStatus("success");
-              onSuccess(
-                `Payment successful! ${tokenCount} token(s) purchased for ${currency} ${totalCost.toLocaleString()}.`,
-              );
+              onSuccess(msg);
             } else if (txnStatus === "failed") {
               if (pollRef.current) clearInterval(pollRef.current);
               setPolling(false);
@@ -720,7 +832,10 @@ function BudgetTab({
           }
         }, 5000);
       } else {
-        onSuccess("Purchase initiated! Your balance will update shortly.");
+        const msg = "Purchase initiated! Your balance will update shortly.";
+        setResultMsg(msg);
+        setStatus("success");
+        onSuccess(msg);
       }
     } catch {
       setStatus("failed");
@@ -984,12 +1099,6 @@ function BudgetTab({
                   Payment is still processing. Check your Transactions tab for updates.
                 </div>
               )}
-              {status === "success" && (
-                <div className="mt-3 bg-[#25D366]/10 border border-[#25D366]/30 rounded-lg px-3 py-2 text-[11px] text-[#128C7E] font-black">
-                  Payment successful! Tokens added to your account.
-                </div>
-              )}
-
               {/* Pay button */}
               <button
                 onClick={handlePay}
@@ -1025,6 +1134,14 @@ function BudgetTab({
       {status === "pending" && (
         <PaymentAuthorizingOverlay amountLabel={`${currency} ${totalCost.toLocaleString()}`} phone={phone} />
       )}
+
+      {/* Success confirmation */}
+      {status === "success" && (
+        <PaymentSuccessOverlay
+          message={resultMsg}
+          onDone={() => { setStatus(null); setPhone(""); setBudgetStr(""); }}
+        />
+      )}
     </div>
   );
 }
@@ -1054,8 +1171,101 @@ export function SimPage() {
     type: "pause" | "restore"; imei: string; deviceName: string;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [pkgView, setPkgView] = useState<"grid" | "list">("grid");
+  const [pkgView, setPkgView] = useState<PkgView>("tiles");
+  const [pkgViewMenuOpen, setPkgViewMenuOpen] = useState(false);
   const [pkgSearch, setPkgSearch] = useState("");
+  const [pkgSort, setPkgSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
+  const [pkgSortMenuOpen, setPkgSortMenuOpen] = useState(false);
+  // Click a column header / sort field: same key flips direction, new key starts ascending
+  const togglePkgSort = (key: string) =>
+    setPkgSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  const pkgSortArrow = (key: string) => (pkgSort.key === key ? (pkgSort.dir === "asc" ? "▲" : "▼") : "");
+
+  // Renders a single token package for the icon / list / tiles / content views
+  const renderPackageItem = (pkg: TokenPackage) => {
+    const meta = pkgMeta(pkg.token_type);
+    const sz = PKG_ICON_SIZE[pkgView];
+    const price = getPkgPrice(pkg);
+    const currency = getPkgCurrency(pkg);
+    const product = pkg.product?.product_name;
+    const iconEl = <div className={`${sz.box} rounded-xl ${meta.tint} ${meta.text} grid place-items-center ${sz.text} shrink-0`}>{meta.icon}</div>;
+    const priceEl = <span className="font-black text-[#128C7E]">{currency} {price.toLocaleString()}</span>;
+    const buyBtn = (cls = "") => (
+      <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} className={`rounded-lg bg-[#128C7E] text-white font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all ${cls}`}>Buy Now</button>
+    );
+    const buyMini = (
+      <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} title="Buy" className="h-7 px-2.5 rounded-md bg-[#128C7E] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all shrink-0">Buy</button>
+    );
+    const common = { key: pkg.token_id, onDoubleClick: () => setBuyTarget(pkg) };
+
+    // Icon views — centered tile with a Buy button
+    if (pkgView === "xl" || pkgView === "large" || pkgView === "medium") {
+      return (
+        <div {...common} className="group rounded-xl border border-[#E9EDEF] bg-white p-3 flex flex-col items-center text-center gap-2 cursor-default hover:border-[#128C7E]/40 hover:shadow-sm transition-all">
+          {iconEl}
+          <div className="min-w-0 w-full">
+            <div className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
+            <div className="text-[11px] truncate">{priceEl}</div>
+            <div className="text-[9px] text-[#9AA5AD] truncate">{getPkgBillingUnitLabel(pkg)}</div>
+          </div>
+          {buyBtn("w-full h-8 text-[11px]")}
+        </div>
+      );
+    }
+
+    // Small / List — compact horizontal row
+    if (pkgView === "small" || pkgView === "list") {
+      return (
+        <div {...common} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-[#E9EDEF] bg-white cursor-default hover:border-[#128C7E]/40 transition-all">
+          {iconEl}
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-bold text-[#111B21] truncate">{pkg.token_name}</div>
+            <div className="text-[10px] truncate">{priceEl} <span className="text-[#9AA5AD]">{getPkgBillingUnitLabel(pkg)}</span></div>
+          </div>
+          {buyMini}
+        </div>
+      );
+    }
+
+    // Tiles — icon + meta + price + Buy
+    if (pkgView === "tiles") {
+      return (
+        <div {...common} className="group flex flex-col gap-2 rounded-xl border border-[#E9EDEF] bg-white p-3 cursor-default hover:border-[#128C7E]/40 hover:shadow-sm transition-all">
+          <div className="flex items-start gap-3">
+            {iconEl}
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
+              <div className="text-[10px] text-[#667781] truncate capitalize">{pkg.token_type || "—"}{product ? ` · ${product.toUpperCase()}` : ""}</div>
+              <div className="text-[13px] mt-0.5 truncate">{priceEl} <span className="text-[10px] text-[#9AA5AD] font-normal">{getPkgBillingUnitLabel(pkg)}</span></div>
+            </div>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 capitalize shrink-0">{pkg.token_type}</span>
+          </div>
+          {buyBtn("w-full h-8 text-[12px]")}
+        </div>
+      );
+    }
+
+    // Content — full-width detailed row
+    return (
+      <div {...common} className="group flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#E9EDEF] bg-white cursor-default hover:border-[#128C7E]/40 transition-all">
+        {iconEl}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</span>
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 capitalize shrink-0">{pkg.token_type}</span>
+          </div>
+          <div className="text-[10px] text-[#667781] truncate mt-0.5">
+            {product ? `Product ${product.toUpperCase()}` : "No product"} · {getPkgBillingUnitLabel(pkg)} · {getPkgBillingTrigger(pkg)}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[12px]">{priceEl}</div>
+          <div className="text-[10px] text-[#9AA5AD] capitalize">{getPkgBillingScope(pkg)}</div>
+        </div>
+        {buyMini}
+      </div>
+    );
+  };
 
   // SECURITY: ownerUid from logged-in user only
   const ownerUid = authState.accountUid || getCookie("_nvxs_account_uid") || "";
@@ -1211,7 +1421,7 @@ export function SimPage() {
           ownerUid={ownerUid}
           onClose={() => setBuyTarget(null)}
           onSuccess={(msg) => {
-            setBuyTarget(null);
+            // Keep the drawer open so the success overlay can show; it closes on "Done".
             showToast(msg, "success");
             balanceFetched.current = false;
             txnFetched.current = false;
@@ -1357,6 +1567,7 @@ export function SimPage() {
                   getPkgCurrency(p).toLowerCase().includes(q)
                 )
               : packages;
+            const sorted = sortPackages(filtered, pkgSort.key, pkgSort.dir);
 
             return (
             <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
@@ -1367,22 +1578,77 @@ export function SimPage() {
                   {!pkgLoading && <span className="text-[12px] text-[#667781] font-normal ml-2">({filtered.length})</span>}
                 </h3>
                 <div className="flex items-center gap-2">
-                  {/* View toggle */}
-                  <div className="flex bg-[#F0F2F5] rounded-lg border border-[#E9EDEF] overflow-hidden">
+                  {/* Sort menu (Explorer-style) */}
+                  <div className="relative">
                     <button
-                      onClick={() => setPkgView("grid")}
-                      title="Grid view"
-                      className={`w-8 h-8 flex items-center justify-center text-[13px] cursor-pointer border-none transition-all ${
-                        pkgView === "grid" ? "bg-[#128C7E] text-white" : "bg-transparent text-[#667781] hover:bg-[#E9EDEF]"
-                      }`}
-                    >&#9638;</button>
+                      onClick={() => setPkgSortMenuOpen((o) => !o)}
+                      title="Sort by"
+                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgSortMenuOpen ? "bg-[#128C7E] text-white border-[#128C7E]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                    >
+                      <span className="text-[12px] leading-none">↕</span>
+                      Sort
+                      <span className="text-[8px]">▾</span>
+                    </button>
+                    {pkgSortMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[40]" onClick={() => setPkgSortMenuOpen(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white rounded-xl shadow-xl border border-[#E9EDEF] py-1">
+                          {PKG_SORT_OPTIONS.map((o) => (
+                            <button
+                              key={o.key}
+                              onClick={() => setPkgSort((prev) => ({ key: o.key, dir: prev.key === o.key ? prev.dir : "asc" }))}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                            >
+                              <span className="w-3 text-[#128C7E] text-[10px]">{pkgSort.key === o.key ? "●" : ""}</span>
+                              <span className={pkgSort.key === o.key ? "font-black text-[#111B21]" : "text-[#111B21]"}>{o.label}</span>
+                            </button>
+                          ))}
+                          <div className="my-1 border-t border-[#E9EDEF]" />
+                          {(["asc", "desc"] as const).map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => setPkgSort((prev) => ({ ...prev, dir: d }))}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                            >
+                              <span className="w-3 text-[#128C7E] text-[10px]">{pkgSort.dir === d ? "●" : ""}</span>
+                              <span className="w-4 text-[11px] text-[#667781] text-center">{d === "asc" ? "▲" : "▼"}</span>
+                              <span className={pkgSort.dir === d ? "font-black text-[#111B21]" : "text-[#111B21]"}>{d === "asc" ? "Ascending" : "Descending"}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* View menu (Explorer-style) */}
+                  <div className="relative">
                     <button
-                      onClick={() => setPkgView("list")}
-                      title="List view"
-                      className={`w-8 h-8 flex items-center justify-center text-[13px] cursor-pointer border-none transition-all ${
-                        pkgView === "list" ? "bg-[#128C7E] text-white" : "bg-transparent text-[#667781] hover:bg-[#E9EDEF]"
-                      }`}
-                    >&#9776;</button>
+                      onClick={() => setPkgViewMenuOpen((o) => !o)}
+                      title="Change view"
+                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgViewMenuOpen ? "bg-[#128C7E] text-white border-[#128C7E]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                    >
+                      <span className="text-[13px] leading-none">{PKG_VIEW_OPTIONS.find((o) => o.key === pkgView)?.glyph}</span>
+                      View
+                      <span className="text-[8px]">▾</span>
+                    </button>
+                    {pkgViewMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[40]" onClick={() => setPkgViewMenuOpen(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white rounded-xl shadow-xl border border-[#E9EDEF] py-1">
+                          {PKG_VIEW_OPTIONS.map((o) => (
+                            <button
+                              key={o.key}
+                              onClick={() => { setPkgView(o.key); setPkgViewMenuOpen(false); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                            >
+                              <span className="w-3 text-[#128C7E] text-[10px]">{pkgView === o.key ? "●" : ""}</span>
+                              <span className="w-4 text-[14px] text-[#667781] text-center">{o.glyph}</span>
+                              <span className={pkgView === o.key ? "font-black text-[#111B21]" : "text-[#111B21]"}>{o.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                   <button
                     onClick={() => { pkgFetched.current = false; fetchPackages(); }}
@@ -1431,28 +1697,32 @@ export function SimPage() {
                     </button>
                   )}
                 </div>
-              ) : pkgView === "grid" ? (
-                /* ── Grid View ─────────────────────────────────────────── */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filtered.map((pkg) => (
-                    <PackageCard key={pkg.token_id} pkg={pkg} onBuy={setBuyTarget} />
-                  ))}
-                </div>
-              ) : (
-                /* ── List View ─────────────────────────────────────────── */
+              ) : pkgView === "details" ? (
+                /* ── Details View ──────────────────────────────────────── */
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
                       <tr className="border-b border-[#E9EDEF]">
-                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Token Name</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Type</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Cost</th>
-                        <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide">Billing Unit</th>
+                        {[
+                          { key: "name", label: "Token Name" },
+                          { key: "type", label: "Type" },
+                          { key: "cost", label: "Cost" },
+                          { key: "billing_unit", label: "Billing Unit" },
+                        ].map((c) => (
+                          <th key={c.key} className="px-3 py-2">
+                            <button
+                              onClick={() => togglePkgSort(c.key)}
+                              className="flex items-center gap-1 text-[10px] font-black text-[#667781] uppercase tracking-wide bg-transparent border-none cursor-pointer hover:text-[#128C7E] transition-colors"
+                            >
+                              {c.label}<span className="text-[8px] text-[#128C7E]">{pkgSortArrow(c.key)}</span>
+                            </button>
+                          </th>
+                        ))}
                         <th className="px-3 py-2 text-[10px] font-black text-[#667781] uppercase tracking-wide text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((pkg) => {
+                      {sorted.map((pkg) => {
                         const price = getPkgPrice(pkg);
                         const currency = getPkgCurrency(pkg);
                         const billingUnit = getPkgBillingUnit(pkg);
@@ -1486,6 +1756,11 @@ export function SimPage() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              ) : (
+                /* ── Icon / List / Tiles / Content views ─────────────────── */
+                <div className={`grid gap-2.5 ${PKG_VIEW_GRID[pkgView] || ""}`}>
+                  {sorted.map((pkg) => renderPackageItem(pkg))}
                 </div>
               )}
             </div>
