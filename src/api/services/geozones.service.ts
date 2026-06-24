@@ -117,6 +117,17 @@ export function detachDeviceFromGeozone(
   );
 }
 
+/** Get all device IMEIs attached to a specific geozone. */
+export function getGeozoneAttachedDevices(
+  geozoneId: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string[]>> {
+  return get<string[]>(
+    `${ENDPOINTS.GEOZONES.ATTACHED_DEVICES}/${geozoneId}/attached-devices`,
+    opts,
+  );
+}
+
 /** Get all geozones attached to a specific device. */
 export function getDeviceGeozones(
   deviceUid: string,

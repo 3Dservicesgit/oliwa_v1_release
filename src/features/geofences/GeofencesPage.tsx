@@ -9,14 +9,16 @@
  *   "my-geofences"  — CRUD geofences with map integration
  *   "device-zones"  — Per-device view of attached geofences
  */
-import React, { useState, useCallback, useEffect } from "react";
-import { getGeozones, deleteGeozone } from "../../api/services/geozones.service";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { getGeozones, deleteGeozone, getGeozoneAttachedDevices } from "../../api/services/geozones.service";
+import { getClientDevices } from "../../api/services/clients.service";
 import { useAuth } from "../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../auth/guards";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
 import type { ParsedGeozone, LatLng, Geozone } from "../../api/types";
 
 import { GeofenceMap } from "./components/GeofenceMap";
+import type { DeviceMarkerData } from "./components/GeofenceMap";
 import { GeofenceList } from "./components/GeofenceList";
 import { CreateGeofenceDrawer } from "./components/CreateGeofenceDrawer";
 import { EditGeofenceDrawer } from "./components/EditGeofenceDrawer";
@@ -31,6 +33,18 @@ const TABS: { key: GeofenceTab; label: string }[] = [
   { key: "device-zones", label: "Device Zones" },
   { key: "groups",       label: "Groups" },
 ];
+
+const FLEET_SSE = (import.meta.env.VITE_FLEET_SSE_URL as string) ?? "https://narvasocket.3dservices.co.ug";
+
+function normalizeStatus(ms: string, spd: number): "Moving" | "Parked" | "Idling" | "Offline" {
+  const s = ms.toLowerCase();
+  if (s.includes("park") || s.includes("stop")) return "Parked";
+  if (s.includes("idl")  || s === "idle")        return "Idling";
+  if (s.includes("mov")  || s.includes("driv"))  return "Moving";
+  if (Number.isFinite(spd) && spd >= 5)          return "Moving";
+  if (Number.isFinite(spd) && spd > 0)           return "Idling";
+  return "Offline";
+}
 
 export function GeofencesPage() {
   const { state: authState } = useAuth();
@@ -80,6 +94,86 @@ export function GeofencesPage() {
 
   // Attach devices
   const [attachGeozone, setAttachGeozone] = useState<ParsedGeozone | null>(null);
+
+  // ── Live device markers on geofence map ────────────────────────────────
+  const [deviceMarkers, setDeviceMarkers] = useState<DeviceMarkerData[]>([]);
+  const sseRefs = useRef<Map<string, EventSource>>(new Map());
+  const deviceDataRef = useRef<Map<string, DeviceMarkerData>>(new Map());
+
+  // Fetch attached devices when a geofence is selected
+  useEffect(() => {
+    // Close existing SSE connections
+    for (const es of sseRefs.current.values()) es.close();
+    sseRefs.current.clear();
+    deviceDataRef.current.clear();
+    setDeviceMarkers([]);
+
+    if (!selectedUid || !authState.accountRoot) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // 1. Get attached device IMEIs for the selected geofence
+        const attachRes = await getGeozoneAttachedDevices(selectedUid);
+        if (cancelled) return;
+        const attachedImeis: string[] =
+          attachRes.status === "success" && Array.isArray(attachRes.data)
+            ? attachRes.data
+            : [];
+        if (attachedImeis.length === 0) return;
+
+        // 2. Get device names from client devices
+        const devicesRes = await getClientDevices(authState.accountRoot!);
+        if (cancelled) return;
+        const allDevices = devicesRes.status === "success" && Array.isArray(devicesRes.data)
+          ? devicesRes.data
+          : [];
+
+        const nameMap = new Map<string, string>();
+        for (const d of allDevices) {
+          nameMap.set(d.device_imei, d.device_name || d.car_make ? `${d.device_name || ""}` : d.device_imei);
+        }
+
+        // 3. Connect SSE for each attached device
+        for (const imei of attachedImeis) {
+          const url = `${FLEET_SSE}/data-stream/${encodeURIComponent(imei)}/x-location`;
+          const es = new EventSource(url);
+          sseRefs.current.set(imei, es);
+
+          es.onmessage = (ev) => {
+            try {
+              const d = JSON.parse(ev.data);
+              const lat = parseFloat(d.latitude ?? d.lat ?? 0);
+              const lng = parseFloat(d.longitude ?? d.lng ?? 0);
+              if (lat === 0 && lng === 0) return;
+
+              const spd = parseFloat(d.speed ?? 0);
+              const marker: DeviceMarkerData = {
+                imei,
+                name: nameMap.get(imei) ?? imei,
+                lat,
+                lng,
+                speed: Math.round(spd),
+                status: normalizeStatus(d.motion_state ?? d.status ?? "", spd),
+                lastSync: d.device_time ?? d.timestamp ?? "—",
+              };
+              deviceDataRef.current.set(imei, marker);
+              setDeviceMarkers(Array.from(deviceDataRef.current.values()));
+            } catch { /* skip bad frames */ }
+          };
+        }
+      } catch (err) {
+        console.error("[GeofencesPage] Failed to load device markers:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      for (const es of sseRefs.current.values()) es.close();
+      sseRefs.current.clear();
+    };
+  }, [selectedUid, authState.accountRoot]);
 
   // ── Drawing handlers ────────────────────────────────────────────────────
   const handleStartDrawing = () => {
@@ -256,6 +350,7 @@ export function GeofencesPage() {
                 onPolygonComplete={handlePolygonComplete}
                 editingUid={editingUid}
                 onPolygonEdited={handlePolygonEdited}
+                deviceMarkers={deviceMarkers}
               />
             </div>
           </div>

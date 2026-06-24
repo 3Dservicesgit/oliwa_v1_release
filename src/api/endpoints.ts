@@ -123,6 +123,7 @@ export const ENDPOINTS = {
     ATTACH:        "/geozones",           // POST /{geozone_id}/attach
     DETACH:        "/geozones",           // PUT  /{geozone_id}/detach/{device_id}/action
     DEVICE_ZONES:  "/geozones/devices",   // GET  /{device_uid}/list
+    ATTACHED_DEVICES: "/geozones",         // GET  /{geozone_id}/attached-devices
     /** Geozone groups */
     GROUP_CREATE:  "/geozones/groups/create",       // POST
     GROUP_LIST:    "/geozones/groups",               // GET  /{owner_uid}/list

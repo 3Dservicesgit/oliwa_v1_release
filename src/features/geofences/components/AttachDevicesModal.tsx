@@ -170,7 +170,7 @@ export function AttachDevicesModal({
                       selected.has(d.device_imei) ? "bg-[#E9F7F4]" : "hover:bg-[#F8FAFC]",
                     ].join(" ")}
                   >
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.has(d.device_imei)}

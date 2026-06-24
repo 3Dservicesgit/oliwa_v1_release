@@ -20,6 +20,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { getCookie }          from "../../utils/cookies";
 import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
+import { getGeozones, getDeviceGeozones } from "../../api/services/geozones.service";
+import { getClientDevices }   from "../../api/services/clients.service";
+import { parseGeozonePoints } from "../../api/types/geozones.types";
+import type { Geozone }       from "../../api/types";
+import { checkGeozoneTransitions } from "../../utils/geofenceUtils";
+import type { Point }              from "../../utils/geofenceUtils";
 
 // ─── Fleet env config ─────────────────────────────────────────────────────────
 const FLEET_API = (import.meta.env.VITE_FLEET_API_URL as string) ?? "https://narvas.3dservices.co.ug";
@@ -280,6 +286,25 @@ export default function NocBridgePage() {
   const pendingFocus = useRef<string | null>(null);
   const activePopup  = useRef<string | null>(null);
 
+  // Geofence overlay state
+  const [showGeofences, setShowGeofences] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const geoPolygons = useRef<any[]>([]);
+
+  // Geofence alerts
+  interface GeoAlert { id: number; type: "enter" | "exit"; deviceName: string; zoneName: string; time: string; }
+  const [geoAlerts, setGeoAlerts] = useState<GeoAlert[]>([]);
+  const alertIdRef = useRef(0);
+  const geozonePathsRef = useRef<{ uid: string; name: string; path: Point[] }[]>([]);
+  // Per-device map of which geozones they're currently inside
+  const deviceInsideRef = useRef(new Map<string, Map<string, boolean>>());
+
+  // Geofence-attached device markers (shown on map when geofences are ON)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const geoDeviceMarkers = useRef(new Map<string, any>());
+  const geoDeviceSse = useRef(new Map<string, EventSource>());
+  const geoDeviceNames = useRef(new Map<string, string>());
+
   // RAF tick — batches SSE updates into one render frame
   const rafRef = useRef<number | null>(null);
   const tick = useCallback(() => {
@@ -414,6 +439,26 @@ export default function NocBridgePage() {
       u.ignition          = d.ignition_status || d.iginition || "";
       u.mileage           = d.mileage || "";
       u.fuel_level        = d.fuel_level || "";
+
+      // ── Geofence entry/exit detection ──
+      if (geozonePathsRef.current.length > 0 && showGeofences) {
+        if (!deviceInsideRef.current.has(imei)) {
+          deviceInsideRef.current.set(imei, new Map());
+        }
+        const prevMap = deviceInsideRef.current.get(imei)!;
+        const events = checkGeozoneTransitions({ lat, lng }, geozonePathsRef.current, prevMap);
+        if (events.length > 0) {
+          const now = new Date().toLocaleTimeString();
+          const newAlerts: GeoAlert[] = events.map((e) => ({
+            id: ++alertIdRef.current,
+            type: e.type,
+            deviceName: u.name || imei,
+            zoneName: e.name,
+            time: now,
+          }));
+          setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
+        }
+      }
 
       tick();
       const m = ensureMarker(u);
@@ -579,6 +624,229 @@ export default function NocBridgePage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Geofence overlays + attached device markers (merged) ─────────────────
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps;
+
+    // Helper: clear all geofence device markers & SSE connections
+    const clearGeoDevices = () => {
+      for (const es of geoDeviceSse.current.values()) { try { es.close(); } catch { /**/ } }
+      geoDeviceSse.current.clear();
+      for (const m of geoDeviceMarkers.current.values()) { try { m.setMap(null); } catch { /**/ } }
+      geoDeviceMarkers.current.clear();
+      geoDeviceNames.current.clear();
+    };
+
+    // Clear existing polygons
+    for (const p of geoPolygons.current) p.setMap(null);
+    geoPolygons.current = [];
+
+    if (!showGeofences || !G || !gMap.current) {
+      clearGeoDevices();
+      return;
+    }
+
+    const accountRoot = getCookie("_nvxs_account_root") ?? "";
+    if (!accountRoot) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // 1. Get all geozones for this account
+        const gzRes = await getGeozones(accountRoot, "client");
+        if (cancelled) return;
+        if (gzRes.status !== "success" || !Array.isArray(gzRes.data)) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const GM = gMap.current as any;
+        if (!GM) return;
+
+        // 2. Get all client devices for name lookup
+        const devRes = await getClientDevices(accountRoot);
+        if (cancelled) return;
+        const allDevices = devRes.status === "success" && Array.isArray(devRes.data) ? devRes.data : [];
+        const deviceNameMap = new Map<string, string>();
+        for (const d of allDevices) {
+          deviceNameMap.set(d.device_imei, d.device_name || d.device_imei);
+          geoDeviceNames.current.set(d.device_imei, d.device_name || d.device_imei);
+        }
+
+        // 3. For each client device, fetch its attached geozones and build reverse map
+        //    Uses getDeviceGeozones (per device) which works on the hosted server,
+        //    instead of getGeozoneAttachedDevices (per zone) which may not be deployed.
+        const zoneAttachments = new Map<string, string[]>(); // geozone_uid → [imei, ...]
+        const allAttachedImeis = new Set<string>();
+        const geozoneUids = new Set((gzRes.data as Geozone[]).map((gz) => gz.geozone_uid));
+
+        await Promise.allSettled(
+          allDevices.map(async (dev) => {
+            try {
+              const dzRes = await getDeviceGeozones(dev.device_imei);
+              if (cancelled) return;
+              if (dzRes.status === "success" && Array.isArray(dzRes.data)) {
+                for (const dz of dzRes.data) {
+                  // Only consider zones that belong to this account
+                  if (!geozoneUids.has(dz.zone_uid)) continue;
+                  allAttachedImeis.add(dev.device_imei);
+                  const existing = zoneAttachments.get(dz.zone_uid) ?? [];
+                  existing.push(dev.device_imei);
+                  zoneAttachments.set(dz.zone_uid, existing);
+                }
+              }
+            } catch { /* skip silently */ }
+          }),
+        );
+
+        if (cancelled) return;
+        console.log(`[LiveMonitoring] Geofence attachments loaded: ${zoneAttachments.size} zones with devices, ${allAttachedImeis.size} unique devices`);
+
+        // 4. Render polygons ONLY for geozones that have attached devices
+        const alertPaths: { uid: string; name: string; path: Point[] }[] = [];
+        for (const gz of gzRes.data as Geozone[]) {
+          const path = parseGeozonePoints(gz.geozone_points);
+          if (path.length < 3) continue;
+          alertPaths.push({ uid: gz.geozone_uid, name: gz.geozone_name, path });
+
+          const attachedImeis = zoneAttachments.get(gz.geozone_uid) ?? [];
+          // Only render geofence polygon if it has at least one attached device
+          if (attachedImeis.length === 0) continue;
+
+          const poly = new G.Polygon({
+            paths: path.map((p: { lat: number; lng: number }) => ({ lat: p.lat, lng: p.lng })),
+            fillColor: "#128C7E",
+            fillOpacity: 0.15,
+            strokeColor: "#128C7E",
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            clickable: true,
+            zIndex: 0,
+            map: GM,
+          });
+
+          // Build device list HTML for the info popup
+          const deviceListHtml = attachedImeis.map((imei) => {
+            const name = deviceNameMap.get(imei) ?? imei;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span style="width:6px;height:6px;border-radius:50%;background:#128C7E;flex-shrink:0"></span>
+              <span style="font-size:11px;color:#111B21;font-weight:600">${esc(name)}</span>
+            </div>`;
+          }).join("");
+
+          // Show zone name + attached devices on click
+          const iw = new G.InfoWindow({
+            content: `<div style="font-family:system-ui;padding:8px 12px;min-width:180px">
+              <div style="font-weight:800;font-size:13px;color:#111B21">${esc(gz.geozone_name)}</div>
+              <div style="font-size:11px;color:#667781;margin-top:2px">${esc(gz.geozone_description || "Geofence zone")}</div>
+              <div style="margin-top:8px;padding-top:6px;border-top:1px solid #E9EDEF">
+                <div style="font-size:10px;font-weight:700;color:#128C7E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">
+                  Attached Devices (${attachedImeis.length})
+                </div>
+                ${deviceListHtml}
+              </div>
+            </div>`,
+          });
+          poly.addListener("click", (ev: { latLng: unknown }) => {
+            iw.setPosition(ev.latLng);
+            iw.open(GM);
+          });
+
+          // Add a label marker at the centroid of the geofence showing device count
+          const centroid = path.reduce(
+            (acc, p) => ({ lat: acc.lat + p.lat / path.length, lng: acc.lng + p.lng / path.length }),
+            { lat: 0, lng: 0 },
+          );
+          const labelMarker = new G.Marker({
+            position: centroid,
+            map: GM,
+            icon: {
+              path: G.SymbolPath.CIRCLE,
+              scale: 0,  // invisible icon — we only want the label
+            },
+            label: {
+              text: `${esc(gz.geozone_name)} (${attachedImeis.length})`,
+              color: "#075E54",
+              fontSize: "11px",
+              fontWeight: "800",
+              className: "geofence-label",
+            },
+            clickable: false,
+            zIndex: 2,
+          });
+
+          geoPolygons.current.push(poly);
+          geoPolygons.current.push(labelMarker);
+        }
+        geozonePathsRef.current = alertPaths;
+
+        // 5. Open SSE for attached devices NOT already tracked by the fleet
+        for (const imei of allAttachedImeis) {
+          // Fleet devices already have SSE via startAll() — only open extra SSE for non-fleet devices
+          if (sseConns.current.has(imei)) continue;
+
+          const url = `${FLEET_SSE}/data-stream/${encodeURIComponent(imei)}/x-location`;
+          const es = new EventSource(url);
+          geoDeviceSse.current.set(imei, es);
+
+          es.onmessage = (ev) => {
+            if (cancelled) return;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let d: any;
+            try { d = JSON.parse(ev.data); } catch { return; }
+            if (d.status === "heartbeat" || d.status === "no_data") return;
+            if (d.status !== "success" || !d.data) return;
+
+            const lat = parseFloat(d.data?.data_latitude ?? d.data?.latitude ?? 0);
+            const lng = parseFloat(d.data?.data_longitude ?? d.data?.longitude ?? 0);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return;
+
+            const spd = Number(d.data?.speed_log ?? d.data?.speed ?? 0);
+            const status = normalizeStatus(d.data?.motion_state ?? "", spd);
+            const iconKey = status === "Moving" ? "moving" : status === "Parked" ? "parked"
+                          : status === "Idling" ? "idling" : "unknown";
+            const icon = { url: ICONS[iconKey], scaledSize: new G.Size(28, 28), anchor: new G.Point(14, 14) };
+            const devName = geoDeviceNames.current.get(imei) ?? imei;
+
+            let m = geoDeviceMarkers.current.get(imei);
+            if (!m) {
+              m = new G.Marker({
+                position: { lat, lng },
+                map: GM,
+                title: `${devName} (geofence device)`,
+                icon,
+                zIndex: 1,
+              });
+              m.addListener("click", () => {
+                const iwDev = new G.InfoWindow({
+                  content: `<div style="font-family:system-ui;padding:8px 12px;min-width:160px">
+                    <div style="font-weight:800;font-size:13px;color:#111B21">${esc(devName)}</div>
+                    <div style="font-size:11px;color:#667781;margin-top:2px">IMEI: ${esc(imei)}</div>
+                    <div style="font-size:11px;color:#667781;margin-top:2px">Status: ${status}</div>
+                    <div style="font-size:10px;color:#128C7E;margin-top:4px;font-weight:700">Geofence-attached device</div>
+                  </div>`,
+                });
+                iwDev.open({ map: GM, anchor: m });
+              });
+              geoDeviceMarkers.current.set(imei, m);
+            } else {
+              m.setPosition({ lat, lng });
+              m.setIcon(icon);
+            }
+          };
+        }
+      } catch (err) {
+        console.error("[LiveMonitoring] Failed to load geofences:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      for (const p of geoPolygons.current) p.setMap(null);
+      geoPolygons.current = [];
+      clearGeoDevices();
+    };
+  }, [showGeofences]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Handlers ─────────────────────────────────────────────────────────────
   function onUnitClick(imei: string) {
     const u = units.current.get(imei);
@@ -728,6 +996,19 @@ export default function NocBridgePage() {
               <span className="font-black text-[14px] text-[#111B21]">Fleet Map</span>
               <span className="text-[11px] text-[#667781]">Click a marker for details</span>
             </div>
+            {/* Geofence toggle */}
+            <button
+              type="button"
+              onClick={() => setShowGeofences((v) => !v)}
+              className={[
+                "h-7 px-2.5 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-colors",
+                showGeofences
+                  ? "bg-[#E9F7F4] border-[#C2E8E1] text-[#075E54]"
+                  : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781]",
+              ].join(" ")}
+            >
+              {showGeofences ? "Geofences ON" : "Geofences OFF"}
+            </button>
             {/* Status legend */}
             <div className="hidden sm:flex items-center gap-3">
               {(["Moving", "Parked", "Idling", "Offline"] as MotionStatus[]).map((s) => (
@@ -738,7 +1019,32 @@ export default function NocBridgePage() {
               ))}
             </div>
           </div>
-          <div ref={mapDivRef} className="flex-1 min-h-[300px] w-full" />
+          <div ref={mapDivRef} className="flex-1 min-h-[300px] w-full relative">
+            {/* Geofence alert toasts — bottom-left of map */}
+            {geoAlerts.length > 0 && (
+              <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5 max-h-[200px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {geoAlerts.slice(0, 5).map((a) => (
+                  <div
+                    key={a.id}
+                    className={[
+                      "flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg text-[11px] font-extrabold backdrop-blur-sm",
+                      a.type === "enter"
+                        ? "bg-[#E8F5E9]/95 text-[#2E7D32] border border-[#A5D6A7]"
+                        : "bg-[#FFF3E0]/95 text-[#E65100] border border-[#FFCC80]",
+                    ].join(" ")}
+                  >
+                    <span className="text-[14px]">{a.type === "enter" ? "📍" : "🚪"}</span>
+                    <span>
+                      <span className="font-black">{a.deviceName}</span>
+                      {a.type === "enter" ? " entered " : " exited "}
+                      <span className="font-black">{a.zoneName}</span>
+                    </span>
+                    <span className="text-[9px] opacity-60 ml-auto">{a.time}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ══ Right: Device Detail Panel ════════════════════════════════ */}

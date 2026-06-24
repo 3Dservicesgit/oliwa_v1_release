@@ -16,7 +16,19 @@ import {
   Polygon,
   Marker,
 } from "@react-google-maps/api";
+import { InfoWindow } from "@react-google-maps/api";
 import type { LatLng, ParsedGeozone } from "../../../api/types";
+
+/** A device with its live position to show on the geofence map. */
+export interface DeviceMarkerData {
+  imei: string;
+  name: string;
+  lat: number;
+  lng: number;
+  speed: number;
+  status: "Moving" | "Parked" | "Idling" | "Offline";
+  lastSync: string;
+}
 
 const MAP_CONTAINER: React.CSSProperties = { width: "100%", height: "100%" };
 
@@ -47,6 +59,14 @@ const POLYGON_DRAWING = {
   strokeWeight: 2,
 };
 
+// ── Device marker styles ───────────────────────────────────────────────────
+const DEVICE_COLORS: Record<string, string> = {
+  Moving:  "#2E7D32",
+  Parked:  "#C62828",
+  Idling:  "#1565C0",
+  Offline: "#607D8B",
+};
+
 // ── Props ───────────────────────────────────────────────────────────────────
 export interface GeofenceMapProps {
   /** All geozones to render as polygons. */
@@ -63,6 +83,8 @@ export interface GeofenceMapProps {
   onPolygonEdited?: (uid: string, newPath: LatLng[]) => void;
   /** UID of the geozone currently being edited (vertices draggable). */
   editingUid?: string | null;
+  /** Live device markers to render on the map. */
+  deviceMarkers?: DeviceMarkerData[];
 }
 
 export function GeofenceMap({
@@ -73,6 +95,7 @@ export function GeofenceMap({
   onPolygonComplete,
   onPolygonEdited,
   editingUid,
+  deviceMarkers = [],
 }: GeofenceMapProps) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -81,6 +104,7 @@ export function GeofenceMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const polygonRefs = useRef<Record<string, google.maps.Polygon>>({});
   const [mapReady, setMapReady] = useState(false);
+  const [activeDevice, setActiveDevice] = useState<DeviceMarkerData | null>(null);
 
   // ── Click-to-draw state ─────────────────────────────────────────────────
   const [drawPoints, setDrawPoints] = useState<LatLng[]>([]);
@@ -266,6 +290,60 @@ export function GeofenceMap({
               }}
             />
           ))}
+
+        {/* ── Attached device markers ─────────────────────────────── */}
+        {deviceMarkers.map((d) => {
+          const color = DEVICE_COLORS[d.status] ?? DEVICE_COLORS.Offline;
+          return (
+            <Marker
+              key={`dev-${d.imei}`}
+              position={{ lat: d.lat, lng: d.lng }}
+              title={d.name || d.imei}
+              onClick={() => setActiveDevice(d)}
+              icon={{
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 5,
+                fillColor: color,
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 2,
+                rotation: 0,
+              }}
+            />
+          );
+        })}
+
+        {/* ── Device info popup ────────────────────────────────────── */}
+        {activeDevice && (
+          <InfoWindow
+            position={{ lat: activeDevice.lat, lng: activeDevice.lng }}
+            onCloseClick={() => setActiveDevice(null)}
+          >
+            <div style={{ fontFamily: "system-ui, sans-serif", minWidth: 180, padding: 4 }}>
+              <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
+                {activeDevice.name || activeDevice.imei}
+              </div>
+              <div style={{ fontSize: 11, color: "#667781", fontFamily: "monospace", marginBottom: 8 }}>
+                {activeDevice.imei}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <span style={{
+                  display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                  background: DEVICE_COLORS[activeDevice.status] ?? DEVICE_COLORS.Offline,
+                }} />
+                <span style={{ fontSize: 12, fontWeight: 700 }}>{activeDevice.status}</span>
+                {activeDevice.speed > 0 && (
+                  <span style={{ fontSize: 11, color: "#667781" }}>
+                    {activeDevice.speed} km/h
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: "#667781" }}>
+                Last sync: {activeDevice.lastSync || "—"}
+              </div>
+            </div>
+          </InfoWindow>
+        )}
       </GoogleMap>
 
       {/* ── Drawing toolbar (overlaid on map) ───────────────────────── */}
