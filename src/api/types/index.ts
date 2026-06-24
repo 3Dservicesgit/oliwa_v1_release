@@ -190,6 +190,8 @@ export type {
   UpdateEventRequest,
   EventLoadLevel,
   GetEventsRequest,
+  EventNotification,
+  LogNotificationRequest,
 } from "./events.types";
 
 export {

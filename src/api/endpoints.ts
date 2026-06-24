@@ -224,6 +224,12 @@ export const ENDPOINTS = {
     DETAILS:  "/events",           // append /{event_id}/details
     DELETE:   "/events",           // append /{event_uid}/delete
   },
+  NOTIFICATIONS: {
+    LOG:      "/notifications/log",          // POST — log a triggered notification
+    LIST:     "/notifications",              // GET  append /{owner_uid}/list
+    MARK_READ:"/notifications",              // PUT  append /{notification_uid}/read
+    COUNT:    "/notifications",              // GET  append /{owner_uid}/unread-count
+  },
   TRACKING: {
     /** Trip history with IO events: POST /data-stream/trips/history */
     TRIPS_HISTORY:  "/data-stream/trips/history",

@@ -5,9 +5,10 @@
  * (speed, geofence breach, ignition, low battery, device offline) and fire
  * alerts via email, SMS, or push channels.
  *
- * Layout: Header + KPIs → Event Rules list → Create/Edit drawers.
+ * Layout: Header + KPIs → Tabs (Event Rules | Notification History) →
+ *         Create/Edit drawers with zone selectors for geofence breach.
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { useGuardedMutation } from "../../auth/guards";
 import { GuardedButton } from "../../auth/guards";
@@ -17,6 +18,8 @@ import {
   updateEvent,
   deleteEvent,
 } from "../../api/services/events.service";
+import { getGeozones } from "../../api/services/geozones.service";
+import { getNotifications } from "../../api/services/notifications.service";
 import {
   EVENT_CONDITION_LABELS,
   EVENT_CONDITION_DESCRIPTIONS,
@@ -26,8 +29,36 @@ import type {
   EventCondition,
   CreateEventRequest,
   UpdateEventRequest,
+  EventNotification,
+  Geozone,
 } from "../../api/types";
 import { getCookie } from "../../utils/cookies";
+
+// ── Breach type for geofence_breach condition ──────────────────────────────
+
+type BreachType = "enter" | "exit" | "both";
+
+interface GeofenceConditionValue {
+  zones: string[];       // geozone_uid[]
+  breach_type: BreachType;
+}
+
+function parseGeofenceConditionValue(raw: string): GeofenceConditionValue {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && Array.isArray(parsed.zones)) {
+      return {
+        zones: parsed.zones,
+        breach_type: parsed.breach_type || "both",
+      };
+    }
+  } catch { /* legacy free-text value */ }
+  return { zones: [], breach_type: "both" };
+}
+
+function serializeGeofenceConditionValue(val: GeofenceConditionValue): string {
+  return JSON.stringify({ zones: val.zones, breach_type: val.breach_type });
+}
 
 // ── Condition icon map ──────────────────────────────────────────────────────
 
@@ -46,6 +77,131 @@ const CONDITION_COLORS: Record<EventCondition, string> = {
   low_battery:      "bg-[#EF4444]/15 text-[#EF4444] border-[#EF4444]/30",
   device_offline:   "bg-[#667781]/15 text-[#667781] border-[#667781]/30",
 };
+
+// ── Geofence Zone Selector ──────────────────────────────────────────────────
+
+function GeofenceZoneSelector({
+  selectedZones,
+  onZonesChange,
+  breachType,
+  onBreachTypeChange,
+  ownerUid,
+}: {
+  selectedZones: string[];
+  onZonesChange: (zones: string[]) => void;
+  breachType: BreachType;
+  onBreachTypeChange: (bt: BreachType) => void;
+  ownerUid: string;
+}) {
+  const [zones, setZones] = useState<Geozone[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!ownerUid) return;
+    let cancelled = false;
+    setLoading(true);
+    getGeozones(ownerUid, "client")
+      .then((res) => {
+        if (!cancelled) setZones(res.data ?? []);
+      })
+      .catch(() => { if (!cancelled) setZones([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [ownerUid]);
+
+  const toggleZone = (uid: string) => {
+    onZonesChange(
+      selectedZones.includes(uid)
+        ? selectedZones.filter((z) => z !== uid)
+        : [...selectedZones, uid],
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Breach type */}
+      <div>
+        <label className="block text-[12px] font-black text-[#111B21] mb-1.5">Breach Type</label>
+        <div className="flex gap-2">
+          {(["enter", "exit", "both"] as BreachType[]).map((bt) => (
+            <button
+              key={bt}
+              type="button"
+              onClick={() => onBreachTypeChange(bt)}
+              className={`h-8 px-4 rounded-full text-[12px] font-black border cursor-pointer transition-all ${
+                breachType === bt
+                  ? "bg-[#8B5CF6]/10 border-[#8B5CF6]/30 text-[#8B5CF6]"
+                  : "bg-white border-[#E9EDEF] text-[#667781]"
+              }`}
+            >
+              {bt === "enter" ? "Zone Entry" : bt === "exit" ? "Zone Exit" : "Both"}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-[#667781] mt-1">
+          {breachType === "enter" && "Alert fires when a device enters a selected zone."}
+          {breachType === "exit" && "Alert fires when a device leaves a selected zone."}
+          {breachType === "both" && "Alert fires on both entry and exit."}
+        </p>
+      </div>
+
+      {/* Zone selection */}
+      <div>
+        <label className="block text-[12px] font-black text-[#111B21] mb-1.5">
+          Select Geofence Zones *
+        </label>
+        {loading ? (
+          <div className="flex items-center gap-2 py-3">
+            <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+            <span className="text-[12px] text-[#667781]">Loading zones...</span>
+          </div>
+        ) : zones.length === 0 ? (
+          <div className="bg-[#F0F2F5] rounded-lg px-3 py-3 text-[12px] text-[#667781]">
+            No geofence zones found. Create zones in the Geofences module first.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 max-h-[200px] overflow-y-auto rounded-lg border border-[#E9EDEF] p-2 [scrollbar-width:thin]">
+            {zones.map((z) => (
+              <label
+                key={z.geozone_uid}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer transition-all ${
+                  selectedZones.includes(z.geozone_uid)
+                    ? "bg-[#8B5CF6]/8 border border-[#8B5CF6]/30"
+                    : "border border-transparent hover:bg-[#F0F2F5]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedZones.includes(z.geozone_uid)}
+                  onChange={() => toggleZone(z.geozone_uid)}
+                  className="accent-[#8B5CF6] w-3.5 h-3.5"
+                />
+                <span className="w-6 h-6 rounded bg-[#8B5CF6]/15 text-[#8B5CF6] text-[12px] grid place-items-center shrink-0">
+                  📍
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-black text-[#111B21] truncate">
+                    {z.geozone_name}
+                  </div>
+                  {z.geozone_description && (
+                    <div className="text-[10px] text-[#667781] truncate">
+                      {z.geozone_description}
+                    </div>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+        {selectedZones.length > 0 && (
+          <p className="text-[11px] text-[#8B5CF6] mt-1 font-black">
+            {selectedZones.length} zone{selectedZones.length !== 1 ? "s" : ""} selected
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Drawer: Create Event ────────────────────────────────────────────────────
 
@@ -68,8 +224,14 @@ function CreateEventDrawer({
   const [alertChannels, setAlertChannels] = useState<string[]>(["email"]);
   const [error, setError] = useState("");
 
+  // Geofence breach-specific state
+  const [selectedZones, setSelectedZones] = useState<string[]>([]);
+  const [breachType, setBreachType] = useState<BreachType>("both");
+
   const ownerUid =
     authState.accountUid || getCookie("_nvxs_account_uid") || "";
+  const accountRoot =
+    authState.accountRoot || getCookie("_nvxs_account_root") || ownerUid;
 
   const create = useGuardedMutation("events.create", createEvent);
 
@@ -78,13 +240,24 @@ function CreateEventDrawer({
       setError("Please fill in all required fields.");
       return;
     }
+    // Validate geofence_breach has zones selected
+    if (condition === "geofence_breach" && selectedZones.length === 0) {
+      setError("Please select at least one geofence zone.");
+      return;
+    }
     setError("");
     try {
+      // Build condition_value based on condition type
+      const finalConditionValue =
+        condition === "geofence_breach"
+          ? serializeGeofenceConditionValue({ zones: selectedZones, breach_type: breachType })
+          : conditionValue.trim();
+
       const payload: CreateEventRequest = {
         event_name: name.trim(),
         event_description: description.trim(),
         event_condition: condition,
-        event_condition_value: conditionValue.trim(),
+        event_condition_value: finalConditionValue,
         alert_email: alertEmail.trim(),
         alert_phone_numbers: alertPhone.trim(),
         alert_channels: alertChannels,
@@ -96,6 +269,8 @@ function CreateEventDrawer({
       setDescription("");
       setCondition("speed_threshold");
       setConditionValue("");
+      setSelectedZones([]);
+      setBreachType("both");
       setAlertEmail("");
       setAlertPhone("");
       setAlertChannels(["email"]);
@@ -197,33 +372,42 @@ function CreateEventDrawer({
             </div>
           </div>
 
-          {/* Condition Value */}
-          <div>
-            <label className="block text-[12px] font-black text-[#111B21] mb-1">
-              Threshold Value
-            </label>
-            <input
-              value={conditionValue}
-              onChange={(e) => setConditionValue(e.target.value)}
-              placeholder={
-                condition === "speed_threshold"
-                  ? "e.g. 120 (km/h)"
-                  : condition === "low_battery"
-                    ? "e.g. 20 (%)"
-                    : condition === "device_offline"
-                      ? "e.g. 30 (minutes)"
-                      : "Value"
-              }
-              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+          {/* Condition Value — dynamic per condition type */}
+          {condition === "geofence_breach" ? (
+            <GeofenceZoneSelector
+              selectedZones={selectedZones}
+              onZonesChange={setSelectedZones}
+              breachType={breachType}
+              onBreachTypeChange={setBreachType}
+              ownerUid={accountRoot}
             />
-            <p className="text-[11px] text-[#667781] mt-1">
-              {condition === "speed_threshold" && "Speed in km/h. Alert fires when exceeded."}
-              {condition === "geofence_breach" && "Enter geofence zone name or ID."}
-              {condition === "ignition_change" && "Enter 'on' or 'off' to trigger on that state."}
-              {condition === "low_battery" && "Battery percentage threshold (e.g. 20)."}
-              {condition === "device_offline" && "Minutes before triggering offline alert."}
-            </p>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-[12px] font-black text-[#111B21] mb-1">
+                Threshold Value
+              </label>
+              <input
+                value={conditionValue}
+                onChange={(e) => setConditionValue(e.target.value)}
+                placeholder={
+                  condition === "speed_threshold"
+                    ? "e.g. 120 (km/h)"
+                    : condition === "low_battery"
+                      ? "e.g. 20 (%)"
+                      : condition === "device_offline"
+                        ? "e.g. 30 (minutes)"
+                        : "Value"
+                }
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+              />
+              <p className="text-[11px] text-[#667781] mt-1">
+                {condition === "speed_threshold" && "Speed in km/h. Alert fires when exceeded."}
+                {condition === "ignition_change" && "Enter 'on' or 'off' to trigger on that state."}
+                {condition === "low_battery" && "Battery percentage threshold (e.g. 20)."}
+                {condition === "device_offline" && "Minutes before triggering offline alert."}
+              </p>
+            </div>
+          )}
 
           {/* Alert Channels */}
           <div>
@@ -318,6 +502,14 @@ function EditEventDrawer({
   const [alertChannels, setAlertChannels] = useState<string[]>(["email"]);
   const [error, setError] = useState("");
 
+  // Geofence breach-specific state
+  const [selectedZones, setSelectedZones] = useState<string[]>([]);
+  const [breachType, setBreachType] = useState<BreachType>("both");
+
+  const { state: authState } = useAuth();
+  const accountRoot =
+    authState.accountRoot || getCookie("_nvxs_account_root") || getCookie("_nvxs_account_uid") || "";
+
   const update = useGuardedMutation(
     "events.update",
     (uid: string, payload: UpdateEventRequest) => updateEvent(uid, payload),
@@ -329,7 +521,6 @@ function EditEventDrawer({
       setName(event.event_name);
       setDescription(event.description);
       setCondition(event.condition);
-      setConditionValue(event.condition_value);
       setAlertEmail(event.alert_email || "");
       setAlertPhone(event.alert_phone_numbers || "");
       try {
@@ -337,6 +528,17 @@ function EditEventDrawer({
         setAlertChannels(Array.isArray(methods) ? methods : ["email"]);
       } catch {
         setAlertChannels(["email"]);
+      }
+      // Parse condition value for geofence_breach
+      if (event.condition === "geofence_breach") {
+        const gfVal = parseGeofenceConditionValue(event.condition_value);
+        setSelectedZones(gfVal.zones);
+        setBreachType(gfVal.breach_type);
+        setConditionValue("");
+      } else {
+        setConditionValue(event.condition_value);
+        setSelectedZones([]);
+        setBreachType("both");
       }
       setError("");
     }
@@ -348,13 +550,22 @@ function EditEventDrawer({
       setError("Please fill in all required fields.");
       return;
     }
+    if (condition === "geofence_breach" && selectedZones.length === 0) {
+      setError("Please select at least one geofence zone.");
+      return;
+    }
     setError("");
     try {
+      const finalConditionValue =
+        condition === "geofence_breach"
+          ? serializeGeofenceConditionValue({ zones: selectedZones, breach_type: breachType })
+          : conditionValue.trim();
+
       const payload: UpdateEventRequest = {
         event_name: name.trim(),
         event_description: description.trim(),
         event_condition: condition,
-        event_condition_value: conditionValue.trim(),
+        event_condition_value: finalConditionValue,
         alert_email: alertEmail.trim(),
         alert_phone_numbers: alertPhone.trim(),
         alert_channels: alertChannels,
@@ -456,17 +667,27 @@ function EditEventDrawer({
             </div>
           </div>
 
-          {/* Condition Value */}
-          <div>
-            <label className="block text-[12px] font-black text-[#111B21] mb-1">
-              Threshold Value
-            </label>
-            <input
-              value={conditionValue}
-              onChange={(e) => setConditionValue(e.target.value)}
-              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+          {/* Condition Value — dynamic per condition type */}
+          {condition === "geofence_breach" ? (
+            <GeofenceZoneSelector
+              selectedZones={selectedZones}
+              onZonesChange={setSelectedZones}
+              breachType={breachType}
+              onBreachTypeChange={setBreachType}
+              ownerUid={accountRoot}
             />
-          </div>
+          ) : (
+            <div>
+              <label className="block text-[12px] font-black text-[#111B21] mb-1">
+                Threshold Value
+              </label>
+              <input
+                value={conditionValue}
+                onChange={(e) => setConditionValue(e.target.value)}
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+              />
+            </div>
+          )}
 
           {/* Alert Channels */}
           <div>
@@ -663,9 +884,25 @@ function EventCard({
         <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${colorClass}`}>
           {label}
         </span>
-        <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#111B21] border border-[#E9EDEF]">
-          Threshold: {event.condition_value}
-        </span>
+        {condKey === "geofence_breach" ? (
+          (() => {
+            const gfVal = parseGeofenceConditionValue(event.condition_value);
+            return (
+              <>
+                <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#8B5CF6]/10 text-[#8B5CF6] border border-[#8B5CF6]/30">
+                  {gfVal.breach_type === "enter" ? "Entry" : gfVal.breach_type === "exit" ? "Exit" : "Entry & Exit"}
+                </span>
+                <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#111B21] border border-[#E9EDEF]">
+                  {gfVal.zones.length} zone{gfVal.zones.length !== 1 ? "s" : ""}
+                </span>
+              </>
+            );
+          })()
+        ) : (
+          <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#111B21] border border-[#E9EDEF]">
+            Threshold: {event.condition_value}
+          </span>
+        )}
       </div>
 
       {/* Alert info row */}
@@ -695,7 +932,131 @@ function EventCard({
   );
 }
 
+// ── Notification History Tab ────────────────────────────────────────────────
+
+function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
+  const [notifications, setNotifications] = useState<EventNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterCondition, setFilterCondition] = useState<string>("all");
+
+  const fetchNotifications = useCallback(async () => {
+    if (!ownerUid) return;
+    setLoading(true);
+    try {
+      const res = await getNotifications(ownerUid);
+      setNotifications(res.data ?? []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [ownerUid]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const filtered = useMemo(() => {
+    if (filterCondition === "all") return notifications;
+    return notifications.filter((n) => n.condition === filterCondition);
+  }, [notifications, filterCondition]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[13px] text-[#667781]">Loading notifications...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {["all", "speed_threshold", "geofence_breach", "ignition_change", "low_battery", "device_offline"].map(
+          (f) => (
+            <button
+              key={f}
+              onClick={() => setFilterCondition(f)}
+              className={`h-7 px-3 rounded-full text-[11px] font-black border cursor-pointer transition-all ${
+                filterCondition === f
+                  ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                  : "bg-white border-[#E9EDEF] text-[#667781]"
+              }`}
+            >
+              {f === "all" ? "All" : EVENT_CONDITION_LABELS[f as EventCondition]}
+            </button>
+          ),
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
+          <div className="text-[36px] mb-3">&#128276;</div>
+          <h3 className="font-black text-[16px] text-[#111B21] mb-2">No Notifications Yet</h3>
+          <p className="text-[13px] text-[#667781]">
+            Notifications will appear here when your event rules are triggered by device activity.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {filtered.map((n) => {
+            const condKey = n.condition as EventCondition;
+            const icon = CONDITION_ICONS[condKey] ?? "?";
+            const colorClass = CONDITION_COLORS[condKey] ?? "bg-[#667781]/15 text-[#667781] border-[#667781]/30";
+
+            return (
+              <div
+                key={n.notification_uid}
+                className={`bg-white border rounded-xl px-4 py-3 flex items-start gap-3 transition-all ${
+                  n.is_read ? "border-[#E9EDEF]" : "border-[#128C7E]/40 bg-[#128C7E]/3"
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-lg border flex items-center justify-center text-[14px] shrink-0 mt-0.5 ${colorClass}`}>
+                  {icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-black text-[13px] text-[#111B21] truncate">{n.event_name}</span>
+                    {!n.is_read && (
+                      <span className="w-2 h-2 rounded-full bg-[#128C7E] shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[12px] text-[#667781] mb-1">
+                    <span className="font-black">{n.device_name || n.device_imei}</span>
+                    {n.geozone_name && (
+                      <span>
+                        {" — "}
+                        {n.breach_type === "enter" ? "entered" : "exited"}{" "}
+                        <span className="font-black text-[#8B5CF6]">{n.geozone_name}</span>
+                      </span>
+                    )}
+                    {!n.geozone_name && n.trigger_value && (
+                      <span> — value: {n.trigger_value}</span>
+                    )}
+                  </p>
+                  <div className="flex items-center gap-3 text-[10px] text-[#667781]">
+                    <span>{n.date_triggered}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${colorClass}`}>
+                      {EVENT_CONDITION_LABELS[condKey]}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ───────────────────────────────────────────────────────────────
+
+type EventsTab = "rules" | "history";
 
 export function EventsPage() {
   const { state: authState } = useAuth();
@@ -706,9 +1067,12 @@ export function EventsPage() {
   const [editEvent, setEditEvent] = useState<DeviceEvent | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeviceEvent | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<EventsTab>("rules");
 
   const ownerUid =
     authState.accountUid || getCookie("_nvxs_account_uid") || "";
+  const accountRoot =
+    authState.accountRoot || getCookie("_nvxs_account_root") || ownerUid;
   const accountType =
     authState.accountType || getCookie("_nvxs_account_type") || "";
 
@@ -771,13 +1135,15 @@ export function EventsPage() {
                   — Device monitoring rules & alert configuration
                 </span>
               </div>
-              <GuardedButton
-                permission="events.create"
-                onClick={() => setCreateOpen(true)}
-                className="h-8 px-4 rounded-full bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105 whitespace-nowrap"
-              >
-                + New Event Rule
-              </GuardedButton>
+              {activeTab === "rules" && (
+                <GuardedButton
+                  permission="events.create"
+                  onClick={() => setCreateOpen(true)}
+                  className="h-8 px-4 rounded-full bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105 whitespace-nowrap"
+                >
+                  + New Event Rule
+                </GuardedButton>
+              )}
             </div>
           </div>
 
@@ -809,75 +1175,106 @@ export function EventsPage() {
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-2.5 flex items-center gap-3">
-            <span className="text-[14px] text-[#667781]">&#128269;</span>
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search event rules by name, description, or condition..."
-              className="flex-1 h-8 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none border-none bg-transparent"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="text-[12px] text-[#667781] cursor-pointer border-none bg-transparent"
-              >
-                Clear
-              </button>
-            )}
+          {/* Tabs */}
+          <div className="bg-white border border-[#E9EDEF] rounded-xl px-1 py-1 flex gap-1">
+            <button
+              onClick={() => setActiveTab("rules")}
+              className={`flex-1 h-9 rounded-lg text-[13px] font-black border-none cursor-pointer transition-all ${
+                activeTab === "rules"
+                  ? "bg-[#128C7E] text-white"
+                  : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]"
+              }`}
+            >
+              Event Rules
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex-1 h-9 rounded-lg text-[13px] font-black border-none cursor-pointer transition-all ${
+                activeTab === "history"
+                  ? "bg-[#128C7E] text-white"
+                  : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]"
+              }`}
+            >
+              Notification History
+            </button>
           </div>
 
-          {/* Event List */}
-          {loading ? (
-            <div className="flex-1 flex items-center justify-center py-12">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[13px] text-[#667781]">Loading events...</span>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-xl px-4 py-3 text-[13px] text-[#EF4444]">
-              {error}
-              <button
-                onClick={fetchEvents}
-                className="ml-3 text-[12px] font-black underline cursor-pointer border-none bg-transparent text-[#EF4444]"
-              >
-                Retry
-              </button>
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
-              <div className="text-[36px] mb-3">&#9889;</div>
-              <h3 className="font-black text-[16px] text-[#111B21] mb-2">
-                {searchQuery ? "No matching events" : "No Event Rules Yet"}
-              </h3>
-              <p className="text-[13px] text-[#667781] mb-4">
-                {searchQuery
-                  ? "Try adjusting your search query."
-                  : "Create your first event rule to start monitoring your devices for important conditions like speed, geofence breaches, and more."}
-              </p>
-              {!searchQuery && (
-                <GuardedButton
-                  permission="events.create"
-                  onClick={() => setCreateOpen(true)}
-                  className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105"
-                >
-                  Create First Event Rule
-                </GuardedButton>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {filteredEvents.map((ev) => (
-                <EventCard
-                  key={ev.event_uid}
-                  event={ev}
-                  onEdit={setEditEvent}
-                  onDelete={setDeleteTarget}
+          {/* Tab Content */}
+          {activeTab === "rules" ? (
+            <>
+              {/* Search bar */}
+              <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-2.5 flex items-center gap-3">
+                <span className="text-[14px] text-[#667781]">&#128269;</span>
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search event rules by name, description, or condition..."
+                  className="flex-1 h-8 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none border-none bg-transparent"
                 />
-              ))}
-            </div>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="text-[12px] text-[#667781] cursor-pointer border-none bg-transparent"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Event List */}
+              {loading ? (
+                <div className="flex-1 flex items-center justify-center py-12">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[13px] text-[#667781]">Loading events...</span>
+                  </div>
+                </div>
+              ) : error ? (
+                <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-xl px-4 py-3 text-[13px] text-[#EF4444]">
+                  {error}
+                  <button
+                    onClick={fetchEvents}
+                    className="ml-3 text-[12px] font-black underline cursor-pointer border-none bg-transparent text-[#EF4444]"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : filteredEvents.length === 0 ? (
+                <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
+                  <div className="text-[36px] mb-3">&#9889;</div>
+                  <h3 className="font-black text-[16px] text-[#111B21] mb-2">
+                    {searchQuery ? "No matching events" : "No Event Rules Yet"}
+                  </h3>
+                  <p className="text-[13px] text-[#667781] mb-4">
+                    {searchQuery
+                      ? "Try adjusting your search query."
+                      : "Create your first event rule to start monitoring your devices for important conditions like speed, geofence breaches, and more."}
+                  </p>
+                  {!searchQuery && (
+                    <GuardedButton
+                      permission="events.create"
+                      onClick={() => setCreateOpen(true)}
+                      className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105"
+                    >
+                      Create First Event Rule
+                    </GuardedButton>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {filteredEvents.map((ev) => (
+                    <EventCard
+                      key={ev.event_uid}
+                      event={ev}
+                      onEdit={setEditEvent}
+                      onDelete={setDeleteTarget}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <NotificationHistoryTab ownerUid={accountRoot} />
           )}
         </div>
       </main>

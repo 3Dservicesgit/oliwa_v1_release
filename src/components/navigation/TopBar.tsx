@@ -2,16 +2,21 @@
  * TopBar — Primary Navigation Bar
  *
  * Renders the application header containing the brand identity, global
- * search input, and the current user's RBAC role badges and avatar.
+ * search input, notification bell, and the current user's RBAC role
+ * badges and avatar.
  *
  * User identity is derived from AuthContext (the logged-in user), NOT
  * from hardcoded defaults. Falls back to fetching /users/{uid}/details
  * for display_name if the auth state only has UIDs.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getRaw } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
+import { getUnreadCount, getNotifications, markNotificationRead } from "../../api/services/notifications.service";
+import { getCookie } from "../../utils/cookies";
+import { EVENT_CONDITION_LABELS } from "../../api/types/events.types";
+import type { EventCondition, EventNotification } from "../../api/types";
 
 // ── Pill variant map ────────────────────────────────────────────────────────
 const pillVariant: Record<string, string> = {
@@ -19,6 +24,170 @@ const pillVariant: Record<string, string> = {
   azure: "bg-[#34B7F1] text-white",
   green: "bg-[#25D366] text-white",
 };
+
+// ── Notification Bell ──────────────────────────────────────────────────────
+
+function NotificationBell() {
+  const { state: authState } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<EventNotification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const ownerUid =
+    authState.accountRoot || getCookie("_nvxs_account_root") ||
+    authState.accountUid || getCookie("_nvxs_account_uid") || "";
+
+  // Fetch unread count periodically
+  const fetchCount = useCallback(async () => {
+    if (!ownerUid) {
+      console.warn("[NotificationBell] No ownerUid resolved — skipping fetch");
+      return;
+    }
+    console.log("[NotificationBell] ownerUid =", ownerUid);
+    try {
+      const res = await getUnreadCount(ownerUid);
+      console.log("[NotificationBell] unread response:", res);
+      setUnreadCount(
+        typeof res.data === "object" && res.data !== null
+          ? (res.data as { count: number }).count
+          : 0,
+      );
+    } catch (err) {
+      console.error("[NotificationBell] fetchCount error:", err);
+    }
+  }, [ownerUid]);
+
+  useEffect(() => {
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000); // every 30s
+    return () => clearInterval(interval);
+  }, [fetchCount]);
+
+  // Load notifications when dropdown opens
+  useEffect(() => {
+    if (!open || !ownerUid) return;
+    let cancelled = false;
+    setLoading(true);
+    getNotifications(ownerUid)
+      .then((res) => { if (!cancelled) setNotifications(res.data ?? []); })
+      .catch(() => { if (!cancelled) setNotifications([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, ownerUid]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleMarkRead = async (uid: string) => {
+    try {
+      await markNotificationRead(uid);
+      setNotifications((prev) =>
+        prev.map((n) => (n.notification_uid === uid ? { ...n, is_read: true } : n)),
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+    } catch { /* ignore */ }
+  };
+
+  const recentNotifs = notifications.slice(0, 10);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-[30px] h-[30px] rounded-full bg-white/10 hover:bg-white/20 grid place-items-center text-white border-none cursor-pointer transition-colors relative"
+        title="Notifications"
+      >
+        <span className="text-[14px]">&#128276;</span>
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#EF4444] rounded-full text-[9px] font-black text-white grid place-items-center">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[36px] w-[360px] max-h-[420px] bg-white rounded-xl shadow-xl border border-[#E9EDEF] overflow-hidden z-[200] flex flex-col">
+          {/* Header */}
+          <div className="px-4 py-2.5 border-b border-[#E9EDEF] flex items-center justify-between shrink-0">
+            <span className="font-black text-[13px] text-[#111B21]">Notifications</span>
+            {unreadCount > 0 && (
+              <span className="text-[11px] font-black text-[#128C7E] bg-[#128C7E]/10 px-2 py-0.5 rounded-full">
+                {unreadCount} new
+              </span>
+            )}
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : recentNotifs.length === 0 ? (
+              <div className="py-8 text-center">
+                <div className="text-[24px] mb-2">&#128276;</div>
+                <p className="text-[12px] text-[#667781]">No notifications yet</p>
+              </div>
+            ) : (
+              recentNotifs.map((n) => (
+                <div
+                  key={n.notification_uid}
+                  onClick={() => !n.is_read && handleMarkRead(n.notification_uid)}
+                  className={`px-4 py-2.5 border-b border-[#E9EDEF] cursor-pointer hover:bg-[#F0F2F5] transition-colors ${
+                    !n.is_read ? "bg-[#128C7E]/5" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-0.5">
+                    {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[#128C7E] shrink-0" />}
+                    <span className="font-black text-[12px] text-[#111B21] truncate">{n.event_name}</span>
+                  </div>
+                  <p className="text-[11px] text-[#667781] truncate">
+                    {n.device_name || n.device_imei}
+                    {n.geozone_name && (
+                      <span>
+                        {" — "}
+                        {n.breach_type === "enter" ? "entered" : "exited"} {n.geozone_name}
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-[#667781]">{n.date_triggered}</span>
+                    <span className="text-[10px] font-black text-[#128C7E]">
+                      {EVENT_CONDITION_LABELS[n.condition as EventCondition] ?? n.condition}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer */}
+          {recentNotifs.length > 0 && (
+            <div className="px-4 py-2 border-t border-[#E9EDEF] shrink-0">
+              <button
+                onClick={() => setOpen(false)}
+                className="w-full text-center text-[12px] font-black text-[#128C7E] border-none bg-transparent cursor-pointer hover:underline"
+              >
+                View all in Events &amp; Notifications
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface TopBarProps {
   brandName?:        string;
@@ -108,6 +277,9 @@ export function TopBar({
             {r.label}
           </span>
         ))}
+
+        {/* Notification Bell */}
+        <NotificationBell />
 
         {/* Avatar */}
         <div className="

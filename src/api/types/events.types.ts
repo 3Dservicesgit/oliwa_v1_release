@@ -76,3 +76,33 @@ export interface GetEventsRequest {
   load_level: EventLoadLevel;
   owner_uid: string;
 }
+
+// ── Notification types ─────────────────────────────────────────────────────
+
+export interface EventNotification {
+  notification_uid: string;
+  event_uid: string;
+  event_name: string;
+  device_imei: string;
+  device_name: string;
+  condition: EventCondition;
+  trigger_value: string;
+  geozone_name?: string;
+  breach_type?: "enter" | "exit";
+  alert_channels: string;
+  date_triggered: string;
+  is_read: boolean;
+}
+
+export interface LogNotificationRequest {
+  event_uid: string;
+  event_name: string;
+  device_imei: string;
+  device_name: string;
+  condition: EventCondition;
+  trigger_value: string;
+  geozone_name?: string;
+  breach_type?: string;
+  alert_channels: string[];
+  owner_uid: string;
+}

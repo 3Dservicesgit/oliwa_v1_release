@@ -22,8 +22,10 @@ import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
 import { getGeozones, getDeviceGeozones } from "../../api/services/geozones.service";
 import { getClientDevices }   from "../../api/services/clients.service";
+import { getEvents }          from "../../api/services/events.service";
+import { logNotification }    from "../../api/services/notifications.service";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
-import type { Geozone }       from "../../api/types";
+import type { Geozone, DeviceEvent } from "../../api/types";
 import { checkGeozoneTransitions } from "../../utils/geofenceUtils";
 import type { Point }              from "../../utils/geofenceUtils";
 
@@ -298,6 +300,10 @@ export default function NocBridgePage() {
   const geozonePathsRef = useRef<{ uid: string; name: string; path: Point[] }[]>([]);
   // Per-device map of which geozones they're currently inside
   const deviceInsideRef = useRef(new Map<string, Map<string, boolean>>());
+  // Event rules loaded from the backend (for notification matching)
+  const eventRulesRef = useRef<DeviceEvent[]>([]);
+  // Track which notifications we already logged to avoid duplicates per session
+  const loggedNotifsRef = useRef(new Set<string>());
 
   // Geofence-attached device markers (shown on map when geofences are ON)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -457,6 +463,50 @@ export default function NocBridgePage() {
             time: now,
           }));
           setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
+
+          // ── Match against event rules and log notifications ──
+          const deviceName = u.name || imei;
+          const ownerUid = getCookie("_nvxs_account_root") ?? getCookie("_nvxs_account_uid") ?? "";
+          for (const geoEvt of events) {
+            for (const rule of eventRulesRef.current) {
+              // Parse the rule's condition_value to check zone and breach_type match
+              let ruleZones: string[] = [];
+              let ruleBreachType = "both";
+              try {
+                const cv = JSON.parse(rule.condition_value);
+                if (cv && Array.isArray(cv.zones)) {
+                  ruleZones = cv.zones;
+                  ruleBreachType = cv.breach_type || "both";
+                }
+              } catch { continue; }
+
+              // Check if this zone matches the rule
+              if (ruleZones.length > 0 && !ruleZones.includes(geoEvt.uid)) continue;
+              // Check if the breach type matches
+              if (ruleBreachType !== "both" && ruleBreachType !== geoEvt.type) continue;
+
+              // Deduplicate: one notification per rule+device+zone+type per session
+              const dedupeKey = `${rule.event_uid}:${imei}:${geoEvt.uid}:${geoEvt.type}`;
+              if (loggedNotifsRef.current.has(dedupeKey)) continue;
+              loggedNotifsRef.current.add(dedupeKey);
+
+              // Fire-and-forget log to the backend
+              logNotification({
+                event_uid: rule.event_uid,
+                event_name: rule.event_name,
+                device_imei: imei,
+                device_name: deviceName,
+                condition: "geofence_breach",
+                trigger_value: `${geoEvt.type}:${geoEvt.name}`,
+                geozone_name: geoEvt.name,
+                breach_type: geoEvt.type,
+                alert_channels: (() => {
+                  try { return JSON.parse(rule.alert_methods || "[]"); } catch { return []; }
+                })(),
+                owner_uid: ownerUid,
+              }).catch(() => { /* ignore logging errors */ });
+            }
+          }
         }
       }
 
@@ -778,6 +828,20 @@ export default function NocBridgePage() {
           geoPolygons.current.push(labelMarker);
         }
         geozonePathsRef.current = alertPaths;
+
+        // 4b. Load event rules to match geofence_breach events for notifications
+        try {
+          const ownerUid = getCookie("_nvxs_account_uid") ?? accountRoot;
+          const evRes = await getEvents(ownerUid, "usri");
+          if (!cancelled && evRes.status === "success" && Array.isArray(evRes.data)) {
+            eventRulesRef.current = evRes.data.filter(
+              (ev: DeviceEvent) => ev.condition === "geofence_breach",
+            );
+            console.log(`[LiveMonitoring] Loaded ${eventRulesRef.current.length} geofence_breach event rules`);
+          }
+        } catch {
+          // Silently ignore — events may not exist yet
+        }
 
         // 5. Open SSE for attached devices NOT already tracked by the fleet
         for (const imei of allAttachedImeis) {
