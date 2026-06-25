@@ -4,9 +4,8 @@
  * All routes are defined here. Each feature exports its page
  * component via a barrel export in features/<name>/index.ts.
  *
- * AUTH GATE: If the user is not authenticated, only the login screen
- * is shown — the app shell (TopBar, NavRail, Sidebar, routes) is
- * never rendered.
+ * The login overlay (AirlockModal) lives inside AegisDashboardPage
+ * and is shown as a modal when the user is not yet authenticated.
  */
 import { Routes, Route } from "react-router-dom";
 import { useSessionMonitor } from "../hooks/useSessionMonitor";
@@ -17,10 +16,9 @@ import { NavRail }     from "../components/navigation";
 import { Sidebar }     from "../components/navigation";
 
 // ── Auth context ─────────────────────────────────────────────────────────────
-import { AuthProvider, useAuth } from "../auth/AuthContext";
+import { AuthProvider } from "../auth/AuthContext";
 import { PermissionsProvider } from "../auth/PermissionsContext";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
-import { LoginPage } from "../auth/LoginPage";
 
 // ── Feature pages ────────────────────────────────────────────────────────────
 import { AegisDashboardPage }  from "../features/aegis";
@@ -52,28 +50,10 @@ import { NotFoundPage } from "./NotFoundPage";
 
 
 export default function App() {
+  useSessionMonitor();
+
   return (
     <AuthProvider>
-      <AppShell />
-    </AuthProvider>
-  );
-}
-
-/**
- * AppShell — renders either the login screen or the full app,
- * depending on the auth status. Must be inside AuthProvider.
- */
-function AppShell() {
-  useSessionMonitor();
-  const { state } = useAuth();
-
-  // ── AUTH GATE: show login page if not authenticated ──────────────
-  if (state.status !== "authenticated") {
-    return <LoginPage />;
-  }
-
-  // ── Authenticated — render the full app ─────────────────────────
-  return (
     <PermissionsProvider>
     <div className="h-dvh flex flex-col bg-[#F0F2F5] overflow-hidden w-full">
       <TopBar />
@@ -124,5 +104,6 @@ function AppShell() {
       </footer>
     </div>
     </PermissionsProvider>
+    </AuthProvider>
   );
 }
