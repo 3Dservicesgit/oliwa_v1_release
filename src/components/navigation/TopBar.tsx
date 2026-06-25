@@ -13,7 +13,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getRaw } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
-import { getUnreadCount, getNotifications, markNotificationRead } from "../../api/services/notifications.service";
+import { getUnreadCount, getNotifications, markNotificationRead, markAllNotificationsRead } from "../../api/services/notifications.service";
 import { getCookie } from "../../utils/cookies";
 import { EVENT_CONDITION_LABELS } from "../../api/types/events.types";
 import type { EventCondition, EventNotification } from "../../api/types";
@@ -41,21 +41,16 @@ function NotificationBell() {
 
   // Fetch unread count periodically
   const fetchCount = useCallback(async () => {
-    if (!ownerUid) {
-      console.warn("[NotificationBell] No ownerUid resolved — skipping fetch");
-      return;
-    }
-    console.log("[NotificationBell] ownerUid =", ownerUid);
+    if (!ownerUid) return;
     try {
       const res = await getUnreadCount(ownerUid);
-      console.log("[NotificationBell] unread response:", res);
       setUnreadCount(
         typeof res.data === "object" && res.data !== null
           ? (res.data as { count: number }).count
           : 0,
       );
-    } catch (err) {
-      console.error("[NotificationBell] fetchCount error:", err);
+    } catch {
+      /* silently ignore polling errors */
     }
   }, [ownerUid]);
 
@@ -65,7 +60,7 @@ function NotificationBell() {
     return () => clearInterval(interval);
   }, [fetchCount]);
 
-  // Load notifications when dropdown opens
+  // Load notifications when dropdown opens & mark all as read
   useEffect(() => {
     if (!open || !ownerUid) return;
     let cancelled = false;
@@ -74,6 +69,20 @@ function NotificationBell() {
       .then((res) => { if (!cancelled) setNotifications(res.data ?? []); })
       .catch(() => { if (!cancelled) setNotifications([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
+
+    // Mark all as read when the bell is opened — clears the badge
+    if (unreadCount > 0) {
+      markAllNotificationsRead(ownerUid)
+        .then(() => {
+          if (!cancelled) {
+            setUnreadCount(0);
+            // Mark all local notifications as read too
+            setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+          }
+        })
+        .catch(() => { /* silently ignore */ });
+    }
+
     return () => { cancelled = true; };
   }, [open, ownerUid]);
 

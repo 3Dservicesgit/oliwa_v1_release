@@ -15,7 +15,7 @@
  *   POST  /audit/export         → requestAuditExport  (HIC-gated)
  */
 
-import { get, post, patch } from "../client";
+import { get, post, patch, del } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
 import type {
@@ -98,6 +98,27 @@ export function getComplianceSnapshot(
   opts?: RequestOptions,
 ): Promise<ApiResponse<ComplianceSnapshot>> {
   return get<ComplianceSnapshot>(ENDPOINTS.AUDIT.COMPLIANCE, opts);
+}
+
+/** Flag or unflag an audit event as suspicious. */
+export function flagAuditEvent(
+  eventId: string,
+  flagged: boolean,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ id: string; flagged: boolean }>> {
+  return patch<{ id: string; flagged: boolean }>(
+    `${ENDPOINTS.AUDIT.FLAG_EVENT}/${eventId}/flag`, { flagged }, opts,
+  );
+}
+
+/** Delete an audit event. */
+export function deleteAuditEvent(
+  eventId: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ id: string }>> {
+  return del<{ id: string }>(
+    `${ENDPOINTS.AUDIT.DELETE_EVENT}/${eventId}`, undefined, opts,
+  );
 }
 
 /** Request an audit pack export (HIC-gated, requires approvers). */

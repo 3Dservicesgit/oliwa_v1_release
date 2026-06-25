@@ -519,11 +519,11 @@ export function RbacPage() {
   // ── Derived stats ────────────────────────────────────────────────────────
   const totalUsers = users.length;
   const activeCount = users.filter((u) => u.access_status === "active").length;
-  const blockedCount = users.filter((u) => u.access_status === "locked").length;
+  const blockedCount = users.filter((u) => u.access_status !== "active").length;
 
   // ── Tab-scoped + search-filtered users ───────────────────────────────────
   const tabUsers = activeTab === "blocked"
-    ? users.filter((u) => u.access_status === "locked")
+    ? users.filter((u) => u.access_status !== "active")
     : users;
 
   const filteredUsers = tabUsers.filter((u) => {

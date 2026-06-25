@@ -228,6 +228,7 @@ export const ENDPOINTS = {
     LOG:      "/notifications/log",          // POST — log a triggered notification
     LIST:     "/notifications",              // GET  append /{owner_uid}/list
     MARK_READ:"/notifications",              // PUT  append /{notification_uid}/read
+    MARK_ALL_READ: "/notifications",        // PUT  append /{owner_uid}/mark-all-read
     COUNT:    "/notifications",              // GET  append /{owner_uid}/unread-count
   },
   TRACKING: {
@@ -253,6 +254,10 @@ export const ENDPOINTS = {
     REJECT:         "/audit/approvals",      // append /{id}/reject
     /** Compliance snapshot (retention, crypto, gaps) */
     COMPLIANCE:     "/audit/compliance",
+    /** Flag/unflag a specific audit event */
+    FLAG_EVENT:     "/audit/events",      // append /{id}/flag
+    /** Delete a specific audit event */
+    DELETE_EVENT:   "/audit/events",      // append /{id}
     /** Request an audit pack export (HIC-gated) */
     EXPORT:         "/audit/export",
   },

@@ -44,6 +44,7 @@ export interface AuditEvent {
   hash_prev:   string;       // previous block hash (tamper-evidence chain)
   hash_this:   string;       // current block hash
   meta?:       Record<string, unknown>; // arbitrary payload (redacted by RBAC)
+  flagged?:    boolean;      // flagged as suspicious by user
 }
 
 // ── Audit KPIs (dashboard cards) ────────────────────────────────────────────

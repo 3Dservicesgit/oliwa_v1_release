@@ -47,6 +47,18 @@ export function markNotificationRead(
   );
 }
 
+/** Mark all notifications as read for an owner. */
+export function markAllNotificationsRead(
+  ownerUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<{ updated: number }>> {
+  return put<{ updated: number }>(
+    `${ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ}/${ownerUid}/mark-all-read`,
+    {},
+    opts,
+  );
+}
+
 /** Get unread notification count. */
 export function getUnreadCount(
   ownerUid: string,
