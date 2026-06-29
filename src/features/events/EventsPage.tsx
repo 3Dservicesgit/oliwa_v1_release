@@ -17,7 +17,9 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
+  attachDevicesToEvent,
 } from "../../api/services/events.service";
+import { getClientDevices } from "../../api/services/clients.service";
 import { getGeozones } from "../../api/services/geozones.service";
 import { getNotifications } from "../../api/services/notifications.service";
 import {
@@ -31,6 +33,7 @@ import type {
   UpdateEventRequest,
   EventNotification,
   Geozone,
+  ClientDevice,
 } from "../../api/types";
 import { getCookie } from "../../utils/cookies";
 
@@ -203,6 +206,162 @@ function GeofenceZoneSelector({
   );
 }
 
+// ── Device Selector ────────────────────────────────────────────────────────
+
+function DeviceSelector({
+  selectedDevices,
+  onDevicesChange,
+  ownerUid,
+}: {
+  selectedDevices: string[];
+  onDevicesChange: (imeis: string[]) => void;
+  ownerUid: string;
+}) {
+  const [devices, setDevices] = useState<ClientDevice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectAll, setSelectAll] = useState(false);
+
+  useEffect(() => {
+    if (!ownerUid) return;
+    let cancelled = false;
+    setLoading(true);
+    getClientDevices(ownerUid)
+      .then((res) => {
+        if (!cancelled) setDevices(res.data ?? []);
+      })
+      .catch(() => { if (!cancelled) setDevices([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [ownerUid]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return devices;
+    const q = search.toLowerCase();
+    return devices.filter(
+      (d) =>
+        d.device_name?.toLowerCase().includes(q) ||
+        d.device_imei?.toLowerCase().includes(q) ||
+        d.car_make?.toLowerCase().includes(q) ||
+        d.car_model?.toLowerCase().includes(q),
+    );
+  }, [devices, search]);
+
+  const toggleDevice = (imei: string) => {
+    onDevicesChange(
+      selectedDevices.includes(imei)
+        ? selectedDevices.filter((d) => d !== imei)
+        : [...selectedDevices, imei],
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      onDevicesChange([]);
+    } else {
+      onDevicesChange(filtered.map((d) => d.device_imei));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Sync selectAll state
+  useEffect(() => {
+    if (filtered.length > 0 && filtered.every((d) => selectedDevices.includes(d.device_imei))) {
+      setSelectAll(true);
+    } else {
+      setSelectAll(false);
+    }
+  }, [selectedDevices, filtered]);
+
+  return (
+    <div>
+      <label className="block text-[12px] font-black text-[#111B21] mb-1.5">
+        Attach Devices
+        <span className="text-[10px] text-[#667781] font-normal ml-1">(optional)</span>
+      </label>
+      <p className="text-[11px] text-[#667781] mb-2">
+        Select which devices this rule applies to. Leave empty to apply to all devices.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-3">
+          <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[12px] text-[#667781]">Loading devices...</span>
+        </div>
+      ) : devices.length === 0 ? (
+        <div className="bg-[#F0F2F5] rounded-lg px-3 py-3 text-[12px] text-[#667781]">
+          No devices found for your account.
+        </div>
+      ) : (
+        <>
+          {/* Search + select all */}
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search devices..."
+              className="flex-1 h-8 rounded-lg border border-[#E9EDEF] px-2.5 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
+            />
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="h-8 px-3 rounded-lg text-[11px] font-black border border-[#E9EDEF] bg-white text-[#128C7E] cursor-pointer hover:bg-[#128C7E]/5 transition-colors whitespace-nowrap"
+            >
+              {selectAll ? "Deselect All" : "Select All"}
+            </button>
+          </div>
+
+          {/* Device list */}
+          <div className="flex flex-col gap-1 max-h-[180px] overflow-y-auto rounded-lg border border-[#E9EDEF] p-2 [scrollbar-width:thin]">
+            {filtered.map((d) => (
+              <label
+                key={d.device_imei}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 cursor-pointer transition-all ${
+                  selectedDevices.includes(d.device_imei)
+                    ? "bg-[#128C7E]/8 border border-[#128C7E]/30"
+                    : "border border-transparent hover:bg-[#F0F2F5]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedDevices.includes(d.device_imei)}
+                  onChange={() => toggleDevice(d.device_imei)}
+                  className="accent-[#128C7E] w-3.5 h-3.5"
+                />
+                <div className="w-7 h-7 rounded-full bg-[#128C7E]/10 text-[#128C7E] text-[11px] grid place-items-center shrink-0 font-bold">
+                  {d.car_type === "truck" ? "🚛" : d.car_type === "motorcycle" ? "🏍️" : "🚗"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-black text-[#111B21] truncate">
+                    {d.device_name || d.device_imei}
+                  </div>
+                  <div className="text-[10px] text-[#667781] truncate">
+                    {d.car_make && d.car_model
+                      ? `${d.car_make} ${d.car_model}`
+                      : d.device_imei}
+                    {d.car_make && d.car_model && ` · ${d.device_imei}`}
+                  </div>
+                </div>
+              </label>
+            ))}
+            {filtered.length === 0 && (
+              <div className="text-[12px] text-[#667781] text-center py-2">
+                No devices match "{search}"
+              </div>
+            )}
+          </div>
+
+          {selectedDevices.length > 0 && (
+            <p className="text-[11px] text-[#128C7E] mt-1.5 font-black">
+              {selectedDevices.length} device{selectedDevices.length !== 1 ? "s" : ""} selected
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Drawer: Create Event ────────────────────────────────────────────────────
 
 function CreateEventDrawer({
@@ -228,6 +387,9 @@ function CreateEventDrawer({
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [breachType, setBreachType] = useState<BreachType>("both");
 
+  // Device attachment state
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+
   const ownerUid =
     authState.accountUid || getCookie("_nvxs_account_uid") || "";
   const accountRoot =
@@ -248,10 +410,12 @@ function CreateEventDrawer({
     setError("");
     try {
       // Build condition_value based on condition type
+      // Send "0" as default when no threshold is entered so older backends
+      // that validate length > 2 still accept the request.
       const finalConditionValue =
         condition === "geofence_breach"
           ? serializeGeofenceConditionValue({ zones: selectedZones, breach_type: breachType })
-          : conditionValue.trim();
+          : conditionValue.trim() || "n/a";
 
       const payload: CreateEventRequest = {
         event_name: name.trim(),
@@ -263,7 +427,17 @@ function CreateEventDrawer({
         alert_channels: alertChannels,
         event_owner_uid: ownerUid,
       };
-      await create.mutate(payload);
+      const result = await create.mutate(payload);
+
+      // Attach selected devices to the newly created event
+      if (selectedDevices.length > 0 && result?.data) {
+        try {
+          await attachDevicesToEvent(result.data, selectedDevices);
+        } catch {
+          console.warn("[Events] Device attach failed — event was created but devices not attached.");
+        }
+      }
+
       // Reset form
       setName("");
       setDescription("");
@@ -271,6 +445,7 @@ function CreateEventDrawer({
       setConditionValue("");
       setSelectedZones([]);
       setBreachType("both");
+      setSelectedDevices([]);
       setAlertEmail("");
       setAlertPhone("");
       setAlertChannels(["email"]);
@@ -292,24 +467,28 @@ function CreateEventDrawer({
   return (
     <div className="fixed inset-0 bg-black/35 z-50 flex justify-end" onClick={onClose}>
       <div
-        className="w-[480px] max-w-full h-full bg-white flex flex-col shadow-xl"
+        className="w-[520px] max-w-full h-full bg-white flex flex-col shadow-2xl animate-[slideInRight_0.25s_ease-out]"
         onClick={(e) => e.stopPropagation()}
+        style={{ animation: "slideInRight 0.25s ease-out" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF] shrink-0">
-          <h2 className="font-black text-[16px] text-[#111B21]">Create Event Rule</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF] shrink-0 bg-[#075E54]">
+          <div>
+            <h2 className="font-black text-[16px] text-white">Create Event Rule</h2>
+            <p className="text-[11px] text-white/70 mt-0.5">Configure alerts for your devices</p>
+          </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] font-black text-[14px] cursor-pointer grid place-items-center"
+            className="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 border-none text-white font-black text-[14px] cursor-pointer grid place-items-center transition-colors"
           >
             ✕
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Body — visible scrollbar */}
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 [scrollbar-width:thin]">
           {error && (
-            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2 text-[12px] text-[#EF4444]">
+            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2.5 text-[12px] text-[#EF4444] font-bold">
               {error}
             </div>
           )}
@@ -320,8 +499,8 @@ function CreateEventDrawer({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Over Speed Alert"
-              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+              placeholder="e.g. Night Driving Alert, Over Speed Alert"
+              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
             />
           </div>
 
@@ -332,21 +511,21 @@ function CreateEventDrawer({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what this event rule monitors..."
-              rows={3}
-              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] resize-none"
+              rows={2}
+              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30 resize-none"
             />
           </div>
 
           {/* Condition Type */}
           <div>
             <label className="block text-[12px] font-black text-[#111B21] mb-2">Condition Type *</label>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {(Object.keys(EVENT_CONDITION_LABELS) as EventCondition[]).map((c) => (
                 <label
                   key={c}
-                  className={`flex items-center gap-3 border rounded-lg px-3 py-2.5 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-all ${
                     condition === c
-                      ? "border-[#128C7E] bg-[#128C7E]/5"
+                      ? "border-[#128C7E] bg-[#128C7E]/5 shadow-sm"
                       : "border-[#E9EDEF] hover:border-[#128C7E]/50"
                   }`}
                 >
@@ -358,12 +537,12 @@ function CreateEventDrawer({
                     onChange={() => setCondition(c)}
                     className="accent-[#128C7E]"
                   />
-                  <span className="text-[16px]">{CONDITION_ICONS[c]}</span>
+                  <span className="text-[15px]">{CONDITION_ICONS[c]}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-black text-[#111B21]">
                       {EVENT_CONDITION_LABELS[c]}
                     </div>
-                    <div className="text-[11px] text-[#667781]">
+                    <div className="text-[10px] text-[#667781] leading-tight">
                       {EVENT_CONDITION_DESCRIPTIONS[c]}
                     </div>
                   </div>
@@ -381,10 +560,17 @@ function CreateEventDrawer({
               onBreachTypeChange={setBreachType}
               ownerUid={accountRoot}
             />
+          ) : condition === "ignition_change" ? (
+            <div className="bg-[#34B7F1]/8 border border-[#34B7F1]/20 rounded-lg px-3 py-2.5">
+              <p className="text-[11px] text-[#34B7F1] font-bold">
+                No threshold needed — this rule triggers whenever the ignition state changes (on/off).
+              </p>
+            </div>
           ) : (
             <div>
               <label className="block text-[12px] font-black text-[#111B21] mb-1">
                 Threshold Value
+                <span className="text-[10px] text-[#667781] font-normal ml-1">(optional)</span>
               </label>
               <input
                 value={conditionValue}
@@ -398,16 +584,22 @@ function CreateEventDrawer({
                         ? "e.g. 30 (minutes)"
                         : "Value"
                 }
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
               />
               <p className="text-[11px] text-[#667781] mt-1">
                 {condition === "speed_threshold" && "Speed in km/h. Alert fires when exceeded."}
-                {condition === "ignition_change" && "Enter 'on' or 'off' to trigger on that state."}
                 {condition === "low_battery" && "Battery percentage threshold (e.g. 20)."}
                 {condition === "device_offline" && "Minutes before triggering offline alert."}
               </p>
             </div>
           )}
+
+          {/* Device Selector */}
+          <DeviceSelector
+            selectedDevices={selectedDevices}
+            onDevicesChange={setSelectedDevices}
+            ownerUid={accountRoot}
+          />
 
           {/* Alert Channels */}
           <div>
@@ -439,7 +631,7 @@ function CreateEventDrawer({
                 onChange={(e) => setAlertEmail(e.target.value)}
                 placeholder="alert@company.com"
                 type="email"
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
               />
             </div>
           )}
@@ -452,7 +644,7 @@ function CreateEventDrawer({
                 value={alertPhone}
                 onChange={(e) => setAlertPhone(e.target.value)}
                 placeholder="+256700123456, +254712345678"
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
               />
               <p className="text-[11px] text-[#667781] mt-1">Comma-separated phone numbers with country code.</p>
             </div>
@@ -460,17 +652,17 @@ function CreateEventDrawer({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#E9EDEF] shrink-0">
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#E9EDEF] shrink-0 bg-[#FAFAFA]">
           <button
             onClick={onClose}
-            className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer"
+            className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer hover:bg-[#F0F2F5] transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={create.isRunning}
-            className="h-10 px-5 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
+            className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 transition-all"
           >
             {create.isRunning ? "Creating..." : "Create Event"}
           </button>
@@ -506,6 +698,9 @@ function EditEventDrawer({
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [breachType, setBreachType] = useState<BreachType>("both");
 
+  // Device attachment state
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+
   const { state: authState } = useAuth();
   const accountRoot =
     authState.accountRoot || getCookie("_nvxs_account_root") || getCookie("_nvxs_account_uid") || "";
@@ -540,6 +735,10 @@ function EditEventDrawer({
         setSelectedZones([]);
         setBreachType("both");
       }
+      // Note: we don't pre-populate selectedDevices here because
+      // the current DeviceEvent model only has device_count, not the list.
+      // The DeviceSelector shows all devices and lets the user pick new ones to attach.
+      setSelectedDevices([]);
       setError("");
     }
   }, [event]);
@@ -559,7 +758,7 @@ function EditEventDrawer({
       const finalConditionValue =
         condition === "geofence_breach"
           ? serializeGeofenceConditionValue({ zones: selectedZones, breach_type: breachType })
-          : conditionValue.trim();
+          : conditionValue.trim() || "n/a";
 
       const payload: UpdateEventRequest = {
         event_name: name.trim(),
@@ -571,6 +770,16 @@ function EditEventDrawer({
         alert_channels: alertChannels,
       };
       await update.mutate(event.event_uid, payload);
+
+      // Attach newly selected devices
+      if (selectedDevices.length > 0) {
+        try {
+          await attachDevicesToEvent(event.event_uid, selectedDevices);
+        } catch {
+          console.warn("[Events] Device attach failed during edit.");
+        }
+      }
+
       onUpdated();
       onClose();
     } catch (e) {
@@ -589,24 +798,27 @@ function EditEventDrawer({
   return (
     <div className="fixed inset-0 bg-black/35 z-50 flex justify-end" onClick={onClose}>
       <div
-        className="w-[480px] max-w-full h-full bg-white flex flex-col shadow-xl"
+        className="w-[520px] max-w-full h-full bg-white flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF] shrink-0">
-          <h2 className="font-black text-[16px] text-[#111B21]">Edit Event Rule</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF] shrink-0 bg-[#075E54]">
+          <div>
+            <h2 className="font-black text-[16px] text-white">Edit Event Rule</h2>
+            <p className="text-[11px] text-white/70 mt-0.5">Update alert configuration</p>
+          </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] font-black text-[14px] cursor-pointer grid place-items-center"
+            className="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 border-none text-white font-black text-[14px] cursor-pointer grid place-items-center transition-colors"
           >
             ✕
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Body — visible scrollbar */}
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 [scrollbar-width:thin]">
           {error && (
-            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2 text-[12px] text-[#EF4444]">
+            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2.5 text-[12px] text-[#EF4444] font-bold">
               {error}
             </div>
           )}
@@ -617,7 +829,7 @@ function EditEventDrawer({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
             />
           </div>
 
@@ -627,21 +839,21 @@ function EditEventDrawer({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] resize-none"
+              rows={2}
+              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30 resize-none"
             />
           </div>
 
           {/* Condition Type */}
           <div>
             <label className="block text-[12px] font-black text-[#111B21] mb-2">Condition Type *</label>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {(Object.keys(EVENT_CONDITION_LABELS) as EventCondition[]).map((c) => (
                 <label
                   key={c}
-                  className={`flex items-center gap-3 border rounded-lg px-3 py-2.5 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-all ${
                     condition === c
-                      ? "border-[#128C7E] bg-[#128C7E]/5"
+                      ? "border-[#128C7E] bg-[#128C7E]/5 shadow-sm"
                       : "border-[#E9EDEF] hover:border-[#128C7E]/50"
                   }`}
                 >
@@ -653,12 +865,12 @@ function EditEventDrawer({
                     onChange={() => setCondition(c)}
                     className="accent-[#128C7E]"
                   />
-                  <span className="text-[16px]">{CONDITION_ICONS[c]}</span>
+                  <span className="text-[15px]">{CONDITION_ICONS[c]}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-black text-[#111B21]">
                       {EVENT_CONDITION_LABELS[c]}
                     </div>
-                    <div className="text-[11px] text-[#667781]">
+                    <div className="text-[10px] text-[#667781] leading-tight">
                       {EVENT_CONDITION_DESCRIPTIONS[c]}
                     </div>
                   </div>
@@ -676,18 +888,46 @@ function EditEventDrawer({
               onBreachTypeChange={setBreachType}
               ownerUid={accountRoot}
             />
+          ) : condition === "ignition_change" ? (
+            <div className="bg-[#34B7F1]/8 border border-[#34B7F1]/20 rounded-lg px-3 py-2.5">
+              <p className="text-[11px] text-[#34B7F1] font-bold">
+                No threshold needed — this rule triggers whenever the ignition state changes (on/off).
+              </p>
+            </div>
           ) : (
             <div>
               <label className="block text-[12px] font-black text-[#111B21] mb-1">
                 Threshold Value
+                <span className="text-[10px] text-[#667781] font-normal ml-1">(optional)</span>
               </label>
               <input
                 value={conditionValue}
                 onChange={(e) => setConditionValue(e.target.value)}
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                placeholder={
+                  condition === "speed_threshold"
+                    ? "e.g. 120 (km/h)"
+                    : condition === "low_battery"
+                      ? "e.g. 20 (%)"
+                      : condition === "device_offline"
+                        ? "e.g. 30 (minutes)"
+                        : "Value"
+                }
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
               />
+              <p className="text-[11px] text-[#667781] mt-1">
+                {condition === "speed_threshold" && "Speed in km/h. Alert fires when exceeded."}
+                {condition === "low_battery" && "Battery percentage threshold (e.g. 20)."}
+                {condition === "device_offline" && "Minutes before triggering offline alert."}
+              </p>
             </div>
           )}
+
+          {/* Device Selector */}
+          <DeviceSelector
+            selectedDevices={selectedDevices}
+            onDevicesChange={setSelectedDevices}
+            ownerUid={accountRoot}
+          />
 
           {/* Alert Channels */}
           <div>
@@ -718,7 +958,7 @@ function EditEventDrawer({
                 value={alertEmail}
                 onChange={(e) => setAlertEmail(e.target.value)}
                 type="email"
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
               />
             </div>
           )}
@@ -730,24 +970,26 @@ function EditEventDrawer({
               <input
                 value={alertPhone}
                 onChange={(e) => setAlertPhone(e.target.value)}
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                placeholder="+256700123456, +254712345678"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E]/30"
               />
+              <p className="text-[11px] text-[#667781] mt-1">Comma-separated phone numbers with country code.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#E9EDEF] shrink-0">
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#E9EDEF] shrink-0 bg-[#FAFAFA]">
           <button
             onClick={onClose}
-            className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer"
+            className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer hover:bg-[#F0F2F5] transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={update.isRunning}
-            className="h-10 px-5 rounded-lg bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
+            className="h-10 px-6 rounded-lg bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 transition-all"
           >
             {update.isRunning ? "Saving..." : "Save Changes"}
           </button>
@@ -898,9 +1140,15 @@ function EventCard({
               </>
             );
           })()
-        ) : (
+        ) : event.condition_value && event.condition_value !== "n/a" ? (
           <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#111B21] border border-[#E9EDEF]">
             Threshold: {event.condition_value}
+          </span>
+        ) : null}
+        {/* Device count badge */}
+        {Number(event.device_count) > 0 && (
+          <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 flex items-center gap-1">
+            <span>&#128225;</span> {event.device_count} device{Number(event.device_count) !== 1 ? "s" : ""}
           </span>
         )}
       </div>

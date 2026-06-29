@@ -660,11 +660,12 @@ export default function NocBridgePage() {
         setLoading(false);
         return;
       }
-      const accountType = "inhouse";
-      const dataLevel   = accountType;
-      const accountUid  = dataLevel === "inhouse"
-        ? (getCookie("_nvxs_account_root") ?? rawUid)
-        : rawUid;
+      // Use "client" data level for customers — queries devices by client UID.
+      // "inhouse" fetches ALL devices in the system (admin only).
+      const accountType = getCookie("_nvxs_account_type") || "Customer";
+      const isAdmin = ["Admin", "SuperAdmin", "super_admin", "system"].includes(accountType);
+      const dataLevel   = isAdmin ? "inhouse" : "client";
+      const accountUid  = getCookie("_nvxs_account_root") ?? rawUid;
       await loadUnits(dataLevel, accountUid);
     })();
 
