@@ -223,6 +223,8 @@ export const ENDPOINTS = {
     GET_ALL:  "/events/getall",
     DETAILS:  "/events",           // append /{event_id}/details
     DELETE:   "/events",           // append /{event_uid}/delete
+    ATTACH:   "/devices/events",   // append /{event_uid}/attach
+    DETACH:   "/devices",          // append /{device_imei}/events/{event_uid}/remove
   },
   NOTIFICATIONS: {
     LOG:      "/notifications/log",          // POST — log a triggered notification

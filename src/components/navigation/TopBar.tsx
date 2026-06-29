@@ -11,8 +11,6 @@
  */
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "../../auth/AuthContext";
-import { getRaw } from "../../api/client";
-import { ENDPOINTS } from "../../api/endpoints";
 import { getUnreadCount, getNotifications, markNotificationRead, markAllNotificationsRead } from "../../api/services/notifications.service";
 import { getCookie } from "../../utils/cookies";
 import { EVENT_CONDITION_LABELS } from "../../api/types/events.types";
@@ -210,28 +208,10 @@ export function TopBar({
   searchPlaceholder = "Search tenants, units, tokens, incidents…",
 }: TopBarProps) {
   const { state: authState, logout } = useAuth();
-  const [userDetails, setUserDetails] = useState<any>(null);
 
-  useEffect(() => {
-    if (!authState.accountUid) return;
-    const fetchDetails = async () => {
-      try {
-        const json = await getRaw<{ status: string; data: any }>(
-          `${ENDPOINTS.AUTH.USER_DETAILS}/${authState.accountUid}/details`
-        );
-        if (json?.status === "success" && json?.data) {
-          setUserDetails(json.data);
-        }
-      } catch {
-        // Silently fall back to auth state
-      }
-    };
-    fetchDetails();
-  }, [authState.accountUid]);
-
-  // Derive display values from fetched details → auth state → safe fallbacks
-  const displayName = userDetails?.account_name || authState.accountUid || "User";
-  const displayRole = userDetails?.account_role || authState.role || "";
+  // Derive display values from auth state (populated during login) → safe fallbacks
+  const displayName = authState.accountName || getCookie("_nvxs_account_name") || "User";
+  const displayRole = authState.role || getCookie("_nvxs_account_role") || "";
   const avatarInitial = displayName.charAt(0).toUpperCase();
   const whoLabel = displayRole
     ? `${displayName} • ${displayRole.toUpperCase().replace(/_/g, " ")}`

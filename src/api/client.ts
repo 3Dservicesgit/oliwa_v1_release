@@ -20,6 +20,35 @@ import { getCookie, clearAllCookies } from "../utils/cookies";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+/**
+ * Build a full URL string from `path` and optional query params.
+ * Works with both absolute base URLs (https://example.com) and
+ * relative proxy prefixes (/api) used during local development.
+ */
+function buildUrl(path: string, params?: Record<string, string>): string {
+  let url: string;
+
+  if (BASE_URL.startsWith("http")) {
+    // Full URL — use the URL constructor for proper resolution
+    const u = new URL(path, BASE_URL);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    }
+    url = u.toString();
+  } else {
+    // Relative proxy prefix (e.g. "/api") — simple string concat
+    const base = BASE_URL.replace(/\/+$/, "");
+    const p = path.startsWith("/") ? path : `/${path}`;
+    url = `${base}${p}`;
+    if (params) {
+      const sp = new URLSearchParams(params);
+      url += `?${sp.toString()}`;
+    }
+  }
+
+  return url;
+}
+
 // ── Auth token management ────────────────────────────────────────────────────
 
 /**
@@ -80,8 +109,8 @@ async function tryRefresh(): Promise<boolean> {
 
   refreshPromise = (async () => {
     try {
-      const url = new URL("/auth/refresh", BASE_URL);
-      const resp = await fetch(url.toString(), {
+      const url = buildUrl("/auth/refresh");
+      const resp = await fetch(url, {
         method: "POST",
         credentials: "include", // send HttpOnly refresh-token cookie
         headers: { "Content-Type": "application/json" },
@@ -125,12 +154,7 @@ async function baseFetch(
 ): Promise<Response> {
   const { params, headers: extraHeaders, ...fetchOpts } = opts;
 
-  const url = new URL(path, BASE_URL);
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, value);
-    }
-  }
+  const url = buildUrl(path, params as Record<string, string>);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -142,7 +166,7 @@ async function baseFetch(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method,
     headers,
     body: body != null ? JSON.stringify(body) : undefined,
@@ -160,7 +184,7 @@ async function baseFetch(
       if (newToken) {
         retryHeaders["Authorization"] = `Bearer ${newToken}`;
       }
-      return fetch(url.toString(), {
+      return fetch(url, {
         method,
         headers: retryHeaders,
         body: body != null ? JSON.stringify(body) : undefined,
@@ -277,12 +301,7 @@ export async function postMultipart<T>(
 ): Promise<ApiResponse<T>> {
   const { params, headers: extraHeaders, ...fetchOpts } = opts;
 
-  const url = new URL(path, BASE_URL);
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, value);
-    }
-  }
+  const url = buildUrl(path, params as Record<string, string>);
 
   // No Content-Type — browser auto-sets the multipart boundary.
   const headers: Record<string, string> = {
@@ -293,7 +312,7 @@ export async function postMultipart<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  let response = await fetch(url.toString(), {
+  let response = await fetch(url, {
     method: "POST",
     headers,
     body: formData,
@@ -310,7 +329,7 @@ export async function postMultipart<T>(
       if (newToken) {
         retryHeaders["Authorization"] = `Bearer ${newToken}`;
       }
-      response = await fetch(url.toString(), {
+      response = await fetch(url, {
         method: "POST",
         headers: retryHeaders,
         body: formData,
