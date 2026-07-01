@@ -100,10 +100,12 @@ export function AegisDashboard() {
     (d) => d.subscription_status?.toLowerCase() === "paused",
   ).length;
 
-  const totalHoursLeft = balances.reduce((s, b) => s + (b.token_hours_left ?? 0), 0);
-  const totalHoursUsed = balances.reduce((s, b) => s + (b.token_hours_used ?? 0), 0);
-  const activeTokens = balances.filter((b) => b.token_hours_left > 0).length;
-  const expiredTokens = balances.filter((b) => b.token_hours_left <= 0 && b.token_hours_used > 0).length;
+  // Coerce to number — backend may store deprecated string placeholders in these columns
+  const safeNum = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const totalHoursLeft = balances.reduce((s, b) => s + safeNum(b.token_hours_left), 0);
+  const totalHoursUsed = balances.reduce((s, b) => s + safeNum(b.token_hours_used), 0);
+  const activeTokens = balances.filter((b) => safeNum(b.token_hours_left) > 0).length;
+  const expiredTokens = balances.filter((b) => safeNum(b.token_hours_left) <= 0 && safeNum(b.token_hours_used) > 0).length;
 
   const totalTransactions = transactions.length;
   const successfulTxns = transactions.filter((t) => t.payment_status?.toLowerCase() === "success").length;

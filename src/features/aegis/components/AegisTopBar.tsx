@@ -12,6 +12,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../auth/AuthContext";
 import { getRaw } from "../../../api/client";
 import { ENDPOINTS } from "../../../api/endpoints";
+import { getCookie } from "../../../utils/cookies";
 
 interface AegisTopBarProps {
   tenant?:       string;
@@ -80,8 +81,8 @@ export function AegisTopBar({
     fetchUserDetails();
   }, [authState.accountUid]);
 
-  // Derive display values: fetched details → auth state → prop defaults (last resort)
-  const displayName = userDetails?.account_name || authState.accountUid || "";
+  // Derive display values: fetched details → auth state → cookie → prop defaults (last resort)
+  const displayName = userDetails?.account_name || authState.accountName || getCookie("_nvxs_account_name") || "";
   const displayRole = userDetails?.account_role || authState.role || "";
   const displayTenant = userDetails?.primary_account || authState.tenant || tenant;
   const displayAvatarInitial = displayName

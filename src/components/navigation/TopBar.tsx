@@ -230,7 +230,7 @@ export function TopBar({
   }, [authState.accountUid]);
 
   // Derive display values from fetched details → auth state → safe fallbacks
-  const displayName = userDetails?.account_name || authState.accountUid || "User";
+  const displayName = userDetails?.account_name || authState.accountName || getCookie("_nvxs_account_name") || "User";
   const displayRole = userDetails?.account_role || authState.role || "";
   const avatarInitial = displayName.charAt(0).toUpperCase();
   const whoLabel = displayRole

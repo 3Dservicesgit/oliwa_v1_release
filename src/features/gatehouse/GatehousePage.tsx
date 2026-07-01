@@ -27,7 +27,7 @@ import type { TripSummary, PositionRecord } from "../../api";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const FLEET_API = (import.meta.env.VITE_FLEET_API_URL as string) ?? "https://narvas.3dservices.co.ug";
-const GMAPS_KEY = "AIzaSyCxsn8cnwrKUpbgO6Pn_Gdk2-T5HkJRmLY";
+const GMAPS_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || "AIzaSyCxsn8cnwrKUpbgO6Pn_Gdk2-T5HkJRmLY";
 
 const DEFAULT_CENTER = { lat: 1.3733, lng: 32.2903 };
 

@@ -32,7 +32,7 @@ import type { Point }              from "../../utils/geofenceUtils";
 // ─── Fleet env config ─────────────────────────────────────────────────────────
 const FLEET_API = (import.meta.env.VITE_FLEET_API_URL as string) ?? "https://narvas.3dservices.co.ug";
 const FLEET_SSE = (import.meta.env.VITE_FLEET_SSE_URL as string) ?? "https://narvasocket.3dservices.co.ug";
-const GMAPS_KEY = "AIzaSyCxsn8cnwrKUpbgO6Pn_Gdk2-T5HkJRmLY";
+const GMAPS_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || "AIzaSyCxsn8cnwrKUpbgO6Pn_Gdk2-T5HkJRmLY";
 const PAGE_SIZE = 30;
 
 const ICONS: Record<string, string> = {
@@ -438,7 +438,8 @@ export default function NocBridgePage() {
       u.motion_state      = d.motion_state || "";
       u.status            = normalizeStatus(u.motion_state, u.speed);
       u.coords            = { lat, lng };
-      u.geocoded_location = d.geocoded_location || u.geocoded_location || "";
+      const rawGeo = d.geocoded_location || u.geocoded_location || "";
+      u.geocoded_location = rawGeo.toLowerCase().includes("failure") ? "" : rawGeo;
       u.last_sync         = `${d.local_system_datestamp || ""} ${d.local_system_timestamp || ""}`.trim();
       u.satellites        = Number(d.data_connected_satelites) || 0;
       u.hdop              = d.data_hdop ? String(d.data_hdop) : "";
@@ -660,11 +661,12 @@ export default function NocBridgePage() {
         setLoading(false);
         return;
       }
-      const accountType = "inhouse";
-      const dataLevel   = accountType;
-      const accountUid  = dataLevel === "inhouse"
-        ? (getCookie("_nvxs_account_root") ?? rawUid)
-        : rawUid;
+      // Determine data_level from the user's account type cookie
+      const rawType = (getCookie("_nvxs_account_type") ?? "").toLowerCase();
+      const dataLevel = rawType === "customer" ? "client"
+        : rawType === "serviceprovider" || rawType === "service_provider" ? "service_provider"
+        : "client"; // safe default — customers should only see their own devices
+      const accountUid = getCookie("_nvxs_account_root") ?? rawUid;
       await loadUnits(dataLevel, accountUid);
     })();
 

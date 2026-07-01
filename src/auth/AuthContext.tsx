@@ -37,6 +37,7 @@ export interface AuthState {
   accountType: string;
   accountUid:  string | null;
   accountRoot: string | null;
+  accountName: string;
   loginHint:   { email: string } | null;
   error:       string | null;
 }
@@ -62,6 +63,7 @@ function buildInitialState(): AuthState {
   const root = getCookie("_nvxs_account_root");
   const type = getCookie("_nvxs_account_type");
   const role = getCookie("_nvxs_account_role");
+  const name = getCookie("_nvxs_account_name");
 
   if (uid) {
     return {
@@ -71,6 +73,7 @@ function buildInitialState(): AuthState {
       accountType: type || "",
       accountUid:  uid,
       accountRoot: root || null,
+      accountName: name || "",
       loginHint:   null,
       error:       null,
     };
@@ -83,6 +86,7 @@ function buildInitialState(): AuthState {
     accountType: "",
     accountUid:  null,
     accountRoot: null,
+    accountName: "",
     loginHint:   null,
     error:       null,
   };
@@ -100,6 +104,7 @@ type AuthAction =
         accountUid: string;
         accountRoot: string;
         accountType: string;
+        accountName: string;
         tenant: string;
         role: string;
       };
@@ -123,6 +128,7 @@ function reducer(state: AuthState, action: AuthAction): AuthState {
         accountUid: action.payload.accountUid,
         accountRoot: action.payload.accountRoot,
         accountType: action.payload.accountType,
+        accountName: action.payload.accountName,
         tenant: action.payload.tenant,
         role: action.payload.role,
         error: null,
@@ -135,6 +141,7 @@ function reducer(state: AuthState, action: AuthAction): AuthState {
         accountType: "",
         accountUid:  null,
         accountRoot: null,
+        accountName: "",
         loginHint:   null,
         error:       null,
       };
@@ -287,6 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCookie("_nvxs_account_type", d.account_type || "");
     setCookie("_nvxs_account_root", d.account_root || "");
     setCookie("_nvxs_account_role", d.account_role || "");
+    setCookie("_nvxs_account_name", d.account_name || "");
 
     dispatch({
       type: "AUTHENTICATED",
@@ -294,6 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accountUid: d.account_uid,
         accountRoot: d.account_root || "",
         accountType: d.account_type || "",
+        accountName: d.account_name || "",
         tenant: d.primary_account || d.account_root || "",
         role: d.account_role || "",
       },
@@ -317,11 +326,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accountUid: state.accountUid || "",
         accountRoot: state.accountRoot || "",
         accountType: state.accountType,
+        accountName: state.accountName,
         tenant: state.tenant,
         role: state.role,
       },
     });
-  }, [state.accountUid, state.accountRoot, state.tenant, state.role]);
+  }, [state.accountUid, state.accountRoot, state.accountName, state.tenant, state.role]);
 
   /**
    * resendMfa — Request a new MFA code.
