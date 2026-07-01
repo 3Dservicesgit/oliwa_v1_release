@@ -556,9 +556,9 @@ export default function NocBridgePage() {
     setLoading(true); setListError(null);
     console.log("[LiveMonitoring] loadUnits — dataLevel:", dataLevel, "accountUid:", accountUid);
     try {
-      // 15-second timeout so a hanging backend doesn't freeze the UI forever
+      // 30-second timeout — the Cassandra ALLOW FILTERING query can be slow on cold start
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Device fetch timed out after 15 seconds")), 15000),
+        setTimeout(() => reject(new Error("Device fetch timed out after 30 seconds")), 30000),
       );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const resp = await Promise.race([
@@ -656,17 +656,12 @@ export default function NocBridgePage() {
 
     (async () => {
       const rawUid = getCookie("_nvxs_account_uid") ?? "";
-      if (!rawUid) {
-        setListError("Missing session — please log in.");
-        setLoading(false);
-        return;
-      }
-      // Determine data_level from the user's account type cookie
-      const rawType = (getCookie("_nvxs_account_type") ?? "").toLowerCase();
-      const dataLevel = rawType === "customer" ? "client"
-        : rawType === "serviceprovider" || rawType === "service_provider" ? "service_provider"
-        : "client"; // safe default — customers should only see their own devices
-      const accountUid = getCookie("_nvxs_account_root") ?? rawUid;
+      if (!rawUid) { console.warn("[LiveMonitoring] No account UID cookie — skipping device fetch"); setLoading(false); return; }
+      // Match Track Playback: derive data_level from account_type cookie
+      const cookieType = (getCookie("_nvxs_account_type") ?? "client").toLowerCase();
+      const dataLevel   = (cookieType === "customer" || cookieType === "client") ? "client" : cookieType;
+      const accountUid  = (dataLevel === "client" || dataLevel === "inhouse")
+        ? (getCookie("_nvxs_account_root") ?? rawUid) : rawUid;
       await loadUnits(dataLevel, accountUid);
     })();
 
