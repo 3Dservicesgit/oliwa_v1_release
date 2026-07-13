@@ -21,7 +21,7 @@ import type { ApiResponse, RequestOptions } from "../types";
 import type {
   Client, ClientDevice, CreateClientRequest, UpdateClientRequest,
   TrashClientRequest, TrashedClient,
-  TokenPackage,
+  TokenPackage, TokenProduct,
   ClientTokenBalance, BuyTokensRequest, BuyTokensResponse,
   TransferTokensRequest, TransferTokensResponse,
   BudgetOfferRequest, BudgetOfferResponse,
@@ -109,6 +109,14 @@ export function getBudgetOffer(
   return post<BudgetOfferResponse>(ENDPOINTS.TOKENS.BUDGET_OFFER, { data: payload }, opts);
 }
 
+/** Fetch tokens that belong to a specific product. */
+export function getTokensByProduct(
+  productUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<TokenPackage[]>> {
+  return get<TokenPackage[]>(`${ENDPOINTS.TOKENS.BY_PRODUCT}/${productUid}/list`, opts);
+}
+
 /** Fetch token balance for a client. */
 export function getClientBalance(
   clientUid: string,
@@ -171,4 +179,11 @@ export function getPaymentStatus(
     `${ENDPOINTS.TOKENS.PAYMENT_STATUS}/${transactionUid}/status`,
     opts,
   );
+}
+
+/** Fetch all billing products (from abi_products_manager). */
+export function getAllProducts(
+  opts?: RequestOptions,
+): Promise<ApiResponse<TokenProduct[]>> {
+  return get<TokenProduct[]>(ENDPOINTS.PRODUCTS.LIST, opts);
 }

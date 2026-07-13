@@ -22,6 +22,10 @@ export interface Geozone {
   /** Present only when access_level = "inhouse". */
   geozone_owner?: string;
   geozone_owner_name?: string;
+  /** Hex color for the geofence polygon (e.g. "#128C7E"). */
+  geozone_color?: string;
+  /** Hex color for the geofence name label on the map. */
+  geozone_label_color?: string;
 }
 
 // ── Create / Update payloads ────────────────────────────────────────────────
@@ -31,6 +35,8 @@ export interface CreateGeozoneRequest {
   geozone_decription: string;   // backend uses this spelling
   geozone_points: string;       // JSON-stringified coordinate array
   geozone_owner: string;
+  geozone_color?: string;       // hex color for the geofence polygon (e.g. "#128C7E")
+  geozone_label_color?: string; // hex color for the geofence name label on the map
 }
 
 export interface UpdateGeozoneRequest {

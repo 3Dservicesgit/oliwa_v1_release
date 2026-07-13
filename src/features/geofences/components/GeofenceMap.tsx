@@ -242,12 +242,18 @@ export function GeofenceMap({
         {geozones.map((gz) => {
           const isSelected = gz.geozone_uid === selectedUid;
           const isEditing = gz.geozone_uid === editingUid;
+          const customColor = gz.geozone_color;
+          const baseStyle = isSelected
+            ? { ...POLYGON_SELECTED }
+            : customColor
+              ? { fillColor: customColor, fillOpacity: 0.15, strokeColor: customColor, strokeOpacity: 0.8, strokeWeight: 2 }
+              : { ...POLYGON_DEFAULT };
           return (
             <Polygon
               key={`${gz.geozone_uid}-${isEditing ? "edit" : "view"}`}
               paths={gz.path}
               options={{
-                ...(isSelected ? POLYGON_SELECTED : POLYGON_DEFAULT),
+                ...baseStyle,
                 editable: isEditing,
                 draggable: isEditing,
                 clickable: true,
@@ -266,11 +272,46 @@ export function GeofenceMap({
           );
         })}
 
+        {/* ── Geofence name labels ────────────────────────────────── */}
+        {geozones.map((gz) => {
+          if (gz.path.length === 0) return null;
+          // Compute centroid for label placement
+          const cx = gz.path.reduce((s, p) => s + p.lat, 0) / gz.path.length;
+          const cy = gz.path.reduce((s, p) => s + p.lng, 0) / gz.path.length;
+          const lblColor = gz.geozone_label_color || gz.geozone_color || "#075E54";
+          return (
+            <Marker
+              key={`label-${gz.geozone_uid}`}
+              position={{ lat: cx, lng: cy }}
+              label={{
+                text: gz.geozone_name,
+                color: lblColor,
+                fontSize: "11px",
+                fontWeight: "800",
+              }}
+              icon={{
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 0,
+                fillOpacity: 0,
+                strokeOpacity: 0,
+              }}
+              clickable={false}
+            />
+          );
+        })}
+
         {/* ── Drawing preview polygon ──────────────────────────────── */}
         {drawingMode && drawPoints.length >= 2 && (
           <Polygon
             paths={drawPoints}
-            options={{ ...POLYGON_DRAWING, editable: false, clickable: false, zIndex: 5 }}
+            options={{
+              ...POLYGON_DRAWING,
+              editable: false,
+              clickable: false,
+              zIndex: 5,
+              // Transparent enough that map clicks pass through visually
+              fillOpacity: 0.12,
+            }}
           />
         )}
 
@@ -362,7 +403,9 @@ export function GeofenceMap({
             <span className="text-[12px] text-[#667781]">
               {drawPoints.length === 0
                 ? "Click on the map to start placing vertices"
-                : `${drawPoints.length} point${drawPoints.length !== 1 ? "s" : ""} placed`}
+                : drawPoints.length < 3
+                  ? `${drawPoints.length} point${drawPoints.length !== 1 ? "s" : ""} placed — need at least 3`
+                  : `${drawPoints.length} points placed — click to add more or finish`}
             </span>
             {drawPoints.length > 0 && (
               <button
@@ -373,13 +416,22 @@ export function GeofenceMap({
                 Undo
               </button>
             )}
+            {drawPoints.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setDrawPoints([])}
+                className="h-7 px-3 rounded-lg border border-[#EF4444]/30 bg-white text-[11px] font-extrabold text-[#EF4444] cursor-pointer hover:bg-[#FEF2F2]"
+              >
+                Clear All
+              </button>
+            )}
             {drawPoints.length >= 3 && (
               <button
                 type="button"
                 onClick={handleFinishDraw}
                 className="h-7 px-3 rounded-lg border-0 bg-[#128C7E] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[#0D7466]"
               >
-                Finish Drawing
+                Finish ({drawPoints.length} pts)
               </button>
             )}
           </div>

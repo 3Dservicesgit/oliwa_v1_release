@@ -16,6 +16,16 @@ export interface VebaListingAssetSummary {
   owner_org?:    string;
   country?:      string;
   photo_url?:    string;
+  /** Device IMEI associated with this asset. */
+  imei?:         string;
+  /** Vehicle Identification Number (17-char). */
+  vin_number?:   string;
+  /** Car make (e.g. "Toyota"). */
+  car_make?:     string;
+  /** Car model (e.g. "Hilux"). */
+  car_model?:    string;
+  /** Car model year (e.g. "2022"). */
+  car_year?:     string;
 }
 
 export interface VebaListing {

@@ -11,6 +11,12 @@ import { useGuardedMutation } from "../../../auth/guards";
 import type { LatLng } from "../../../api/types";
 import { serializeGeozonePoints } from "../../../api/types/geozones.types";
 
+/** Preset colors for quick selection. */
+const COLOR_PRESETS = [
+  "#128C7E", "#075E54", "#25D366", "#3B82F6", "#8B5CF6",
+  "#EF4444", "#F97316", "#F59E0B", "#10B981", "#EC4899",
+];
+
 interface CreateGeofenceDrawerProps {
   open: boolean;
   /** The polygon path the user just drew. */
@@ -28,6 +34,8 @@ export function CreateGeofenceDrawer({
   const { state: authState } = useAuth();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [geofenceColor, setGeofenceColor] = useState("#128C7E");
+  const [labelColor, setLabelColor] = useState("#075E54");
   const [error, setError] = useState<string | null>(null);
 
   // Reset form when drawer opens/closes
@@ -35,6 +43,8 @@ export function CreateGeofenceDrawer({
     if (open) {
       setName("");
       setDescription("");
+      setGeofenceColor("#128C7E");
+      setLabelColor("#075E54");
       setError(null);
     }
   }, [open]);
@@ -65,6 +75,8 @@ export function CreateGeofenceDrawer({
           geozone_decription: description.trim(),
           geozone_points: serializeGeozonePoints(drawnPath),
           geozone_owner: authState.accountRoot,
+          geozone_color: geofenceColor,
+          geozone_label_color: labelColor,
         });
         if (res.status === "success") {
           onCreated?.();
@@ -75,7 +87,7 @@ export function CreateGeofenceDrawer({
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to create geofence.");
       }
-    }, [name, description, drawnPath, authState.accountRoot, onCreated, onClose]),
+    }, [name, description, drawnPath, authState.accountRoot, geofenceColor, labelColor, onCreated, onClose]),
   );
 
   if (!open) return null;
@@ -131,6 +143,70 @@ export function CreateGeofenceDrawer({
               rows={3}
               className="w-full px-3 py-2 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] resize-none"
             />
+          </div>
+
+          {/* Geofence Color */}
+          <div>
+            <label className="block text-[11px] font-extrabold text-[#667781] mb-1">
+              Geofence Color
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setGeofenceColor(c)}
+                  className="w-7 h-7 rounded-full border-2 cursor-pointer transition-all shrink-0"
+                  style={{
+                    backgroundColor: c,
+                    borderColor: geofenceColor === c ? "#111B21" : "transparent",
+                  }}
+                />
+              ))}
+              <input
+                type="color"
+                value={geofenceColor}
+                onChange={(e) => setGeofenceColor(e.target.value)}
+                className="w-7 h-7 rounded cursor-pointer border border-[#E9EDEF] p-0"
+                title="Custom color"
+              />
+            </div>
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: geofenceColor }} />
+              <span className="text-[10px] text-[#667781] font-mono">{geofenceColor}</span>
+            </div>
+          </div>
+
+          {/* Label Color */}
+          <div>
+            <label className="block text-[11px] font-extrabold text-[#667781] mb-1">
+              Label Color (name on map)
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setLabelColor(c)}
+                  className="w-7 h-7 rounded-full border-2 cursor-pointer transition-all shrink-0"
+                  style={{
+                    backgroundColor: c,
+                    borderColor: labelColor === c ? "#111B21" : "transparent",
+                  }}
+                />
+              ))}
+              <input
+                type="color"
+                value={labelColor}
+                onChange={(e) => setLabelColor(e.target.value)}
+                className="w-7 h-7 rounded cursor-pointer border border-[#E9EDEF] p-0"
+                title="Custom color"
+              />
+            </div>
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: labelColor }} />
+              <span className="text-[10px] text-[#667781] font-mono">{labelColor}</span>
+            </div>
           </div>
 
           {/* Polygon info */}

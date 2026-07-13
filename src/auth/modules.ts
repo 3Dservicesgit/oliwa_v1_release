@@ -149,8 +149,8 @@ const BUILT_MODULES: ModuleDef[] = [
   },
   {
     id: "events",
-    name: "Events & Notifications",
-    navLabel: "Events & Notifications",
+    name: "Events & Alerts",
+    navLabel: "Events & Alerts",
     navGlyph: "⚡",
     route: "/events",
     viewPermission: "events.view",

@@ -1,11 +1,11 @@
 /**
- * EventsPage — Events & Notifications management for clients.
+ * EventsPage — Events & Alerts management for clients.
  *
  * Lets users create event rules that monitor their devices for conditions
  * (speed, geofence breach, ignition, low battery, device offline) and fire
  * alerts via email, SMS, or push channels.
  *
- * Layout: Header + KPIs → Tabs (Event Rules | Notification History) →
+ * Layout: Header + KPIs → Tabs (Event Rules | Alert History) →
  *         Create/Edit drawers with zone selectors for geofence breach.
  */
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -966,7 +966,7 @@ function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
       <div className="flex items-center justify-center py-12">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[13px] text-[#667781]">Loading notifications...</span>
+          <span className="text-[13px] text-[#667781]">Loading alerts...</span>
         </div>
       </div>
     );
@@ -996,9 +996,9 @@ function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
       {filtered.length === 0 ? (
         <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
           <div className="text-[36px] mb-3">&#128276;</div>
-          <h3 className="font-black text-[16px] text-[#111B21] mb-2">No Notifications Yet</h3>
+          <h3 className="font-black text-[16px] text-[#111B21] mb-2">No Alerts Yet</h3>
           <p className="text-[13px] text-[#667781]">
-            Notifications will appear here when your event rules are triggered by device activity.
+            Alerts will appear here when your event rules are triggered by device activity.
           </p>
         </div>
       ) : (
@@ -1129,7 +1129,7 @@ export function EventsPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-baseline gap-3">
                 <span className="font-black text-[18px] text-[#111B21] tracking-wide">
-                  EVENTS & NOTIFICATIONS
+                  EVENTS & ALERTS
                 </span>
                 <span className="text-[13px] text-[#667781]">
                   — Device monitoring rules & alert configuration
@@ -1195,7 +1195,7 @@ export function EventsPage() {
                   : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]"
               }`}
             >
-              Notification History
+              Alert History
             </button>
           </div>
 

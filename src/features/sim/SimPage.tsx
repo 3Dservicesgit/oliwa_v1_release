@@ -22,10 +22,11 @@ import { useAuth } from "../../auth/AuthContext";
 import { getCookie } from "../../utils/cookies";
 import {
   getAllTokens,
+  getAllProducts,
+  getTokensByProduct,
   getClientBalance,
   getClientDevices,
   buyTokens,
-  getBudgetOffer,
   pauseSubscription,
   restoreSubscription,
   getPaymentStatus,
@@ -33,6 +34,7 @@ import {
 import { getClientTransactions } from "../../api/services/billing.service";
 import type {
   TokenPackage,
+  TokenProduct,
   ClientTokenBalance,
   ClientDevice,
   ClientTransaction,
@@ -423,6 +425,23 @@ function PackageCard({
 
 // ── Buy Drawer ─────────────────────────────────────────────────────────────
 
+// ── Country code config ───────────────────────────────────────────────────
+const COUNTRY_CODES: { code: string; label: string; flag: string; currency: string }[] = [
+  { code: "+256", label: "Uganda",       flag: "🇺🇬", currency: "UGX" },
+  { code: "+254", label: "Kenya",        flag: "🇰🇪", currency: "KES" },
+  { code: "+255", label: "Tanzania",     flag: "🇹🇿", currency: "TZS" },
+  { code: "+250", label: "Rwanda",       flag: "🇷🇼", currency: "RWF" },
+  { code: "+211", label: "South Sudan",  flag: "🇸🇸", currency: "SSP" },
+  { code: "+243", label: "DR Congo",     flag: "🇨🇩", currency: "CDF" },
+  { code: "+1",   label: "US / Canada",  flag: "🇺🇸", currency: "USD" },
+  { code: "+44",  label: "UK",           flag: "🇬🇧", currency: "GBP" },
+];
+
+function getDefaultCountryCode(currency: string): string {
+  const match = COUNTRY_CODES.find((c) => c.currency === currency);
+  return match?.code ?? "+256";
+}
+
 function BuyDrawer({
   pkg, ownerUid, onClose, onSuccess,
 }: {
@@ -436,6 +455,8 @@ function BuyDrawer({
   const [status, setStatus] = useState<string | null>(null);
   const [resultMsg, setResultMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [countryCode, setCountryCode] = useState(() => getDefaultCountryCode(getPkgCurrency(pkg)));
 
   const price = getPkgPrice(pkg);
   const currency = getPkgCurrency(pkg);
@@ -455,11 +476,14 @@ function BuyDrawer({
     if (!phone || phone.length < 9) return;
     setSubmitting(true);
     setStatus(null);
+    // Prepend country code — strip leading 0 from local number
+    const localNum = phone.startsWith("0") ? phone.slice(1) : phone;
+    const fullPhone = `${countryCode}${localNum}`;
     try {
       const res = await buyTokens({
         token_buyer: ownerUid,
         token_uid: pkg.token_id,
-        mobile_money_number: phone,
+        mobile_money_number: fullPhone,
         token_quantity: qty,
       });
 
@@ -589,20 +613,31 @@ function BuyDrawer({
           {/* ── Payment Method ──────────────────────────────────────── */}
           {isMobileMoney ? (
             <>
-              {/* Mobile Money input */}
+              {/* Mobile Money input with country code */}
               <div className="mb-4">
                 <label className="block text-[11px] font-black text-[#667781] uppercase tracking-wide mb-1.5">
                   Mobile Money Number
                 </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                  placeholder={currency === "KES" ? "e.g. 0712345678" : "e.g. 0771234567"}
-                  className="w-full h-10 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
-                />
+                <div className="flex gap-1.5">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="h-10 pl-2 pr-1 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all shrink-0 w-[120px]"
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    placeholder={currency === "KES" ? "e.g. 0712345678" : "e.g. 0771234567"}
+                    className="flex-1 h-10 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+                  />
+                </div>
                 <p className="text-[10px] text-[#667781] mt-1">
-                  {currency === "KES" ? "M-Pesa" : "MTN/Airtel"} payment prompt will be sent to this number.
+                  {currency === "KES" ? "M-Pesa" : "MTN/Airtel"} payment prompt will be sent to {countryCode} {phone || "..."}.
                 </p>
               </div>
             </>
@@ -712,6 +747,8 @@ function BudgetTab({
   ownerUid: string; onSuccess: (msg: string) => void;
 }) {
   const [currency, setCurrency] = useState<BudgetCurrency>("UGX");
+  const [countryCode, setCountryCode] = useState(() => getDefaultCountryCode("UGX"));
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
   const [budgetStr, setBudgetStr] = useState("");
   const [phone, setPhone] = useState("");
@@ -721,68 +758,97 @@ function BudgetTab({
   const [resultMsg, setResultMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Tokens that fit the budget — resolved by the backend /tokens/budget-offer endpoint
-  const [offers, setOffers] = useState<TokenPackage[]>([]);
-  const [offersLoading, setOffersLoading] = useState(false);
-  const [offersError, setOffersError] = useState<string | null>(null);
+  // ── Fetch products from dedicated endpoint ──────────────────────────────
+  const [fetchedProducts, setFetchedProducts] = useState<TokenProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const productsFetched = useRef(false);
+
+  useEffect(() => {
+    if (productsFetched.current) return;
+    productsFetched.current = true;
+    setProductsLoading(true);
+    getAllProducts()
+      .then((res) => {
+        setFetchedProducts(Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(() => {
+        // Permission denied or network error — fall back to packages-derived list
+        setFetchedProducts([]);
+      })
+      .finally(() => setProductsLoading(false));
+  }, []);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
-  const budget = parseFloat(budgetStr) || 0;
+  // Build product list: prefer dedicated endpoint, merge with package-derived products
+  const availableProducts = React.useMemo(() => {
+    const seen = new Map<string, string>(); // product_uid → product_name
 
-  // ── Fetch budget offers from the backend (debounced) ──────────────────────
+    // 1. Add products from dedicated /billing/products/list endpoint
+    for (const prod of fetchedProducts) {
+      if (prod.product_uid && prod.product_name) {
+        seen.set(prod.product_uid, prod.product_name);
+      }
+    }
+
+    // 2. Merge any additional products found in the token packages
+    for (const p of packages) {
+      const uid = p.token_product_uid ?? p.product?.product_uid;
+      const name = p.product?.product_name;
+      if (uid && name && !seen.has(uid)) seen.set(uid, name);
+    }
+
+    return Array.from(seen.entries()).map(([uid, name]) => ({ uid, name }));
+  }, [fetchedProducts, packages]);
+
+  // Reset product + token selection when currency changes
   useEffect(() => {
-    if (budget <= 0) {
-      setOffers([]);
-      setOffersError(null);
-      setOffersLoading(false);
+    setSelectedProduct(null);
+    setSelectedPkgId(null);
+    setBudgetStr("");
+  }, [currency]);
+
+  // ── Product tokens: fetched from backend when a product is selected ─────
+  const [productTokens, setProductTokens] = useState<TokenPackage[]>([]);
+  const [productTokensLoading, setProductTokensLoading] = useState(false);
+  const [tokensError, setTokensError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedProduct) {
+      setProductTokens([]);
+      setTokensError(null);
+      setProductTokensLoading(false);
       return;
     }
     let cancelled = false;
-    setOffersLoading(true);
-    setOffersError(null);
-    const handle = setTimeout(async () => {
-      try {
-        const res = await getBudgetOffer({ currency, amount: budget });
+    setProductTokensLoading(true);
+    setTokensError(null);
+    setSelectedPkgId(null);
+    setBudgetStr("");
+    getTokensByProduct(selectedProduct)
+      .then((res) => {
         if (cancelled) return;
-        const tokens = res?.data?.tokens ?? [];
-        // Map budget-offer rows into TokenPackage shape so the existing helpers/UI work
-        const mapped: TokenPackage[] = tokens.map((t) => ({
-          token_id: t.token_id,
-          token_name: t.token_name,
-          token_type: t.token_type,
-          token_parameters: [],
-          date_created: "",
-          token_product_uid: t.token_product_uid ?? undefined,
-          product: t.product_name ? { product_uid: t.token_product_uid ?? "", product_name: t.product_name } : undefined,
-          token_amount: t.token_amount,
-          token_currency: t.token_currency,
-          billing_unit: t.billing_unit,
-          billing_trigger: t.billing_trigger,
-          billing_scope: t.billing_scope,
-        }));
-        setOffers(mapped);
-      } catch {
-        if (!cancelled) { setOffers([]); setOffersError("Could not load token offers. Please try again."); }
-      } finally {
-        if (!cancelled) setOffersLoading(false);
-      }
-    }, 400);
-    return () => { cancelled = true; clearTimeout(handle); };
-  }, [currency, budget]);
+        const all: TokenPackage[] = Array.isArray(res?.data) ? res.data : [];
+        // Filter by selected currency
+        const filtered = all.filter((p) => getPkgCurrency(p) === currency);
+        setProductTokens(filtered);
+        // Auto-select the first token
+        if (filtered.length > 0) setSelectedPkgId(filtered[0].token_id);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProductTokens([]);
+          setTokensError("Could not load tokens for this product. Please try again.");
+        }
+      })
+      .finally(() => { if (!cancelled) setProductTokensLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedProduct, currency]);
 
-  // Auto-select the cheapest offer (backend returns ascending by price) when selection is invalid
-  useEffect(() => {
-    if (offers.length > 0) {
-      const stillValid = selectedPkgId && offers.some((p) => p.token_id === selectedPkgId);
-      if (!stillValid) setSelectedPkgId(offers[0].token_id);
-    } else {
-      setSelectedPkgId(null);
-    }
-  }, [offers]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Selected token (from the product's tokens)
+  const selectedPkg = productTokens.find((p) => p.token_id === selectedPkgId) ?? null;
 
-  // Selected token (from the affordable offers)
-  const selectedPkg = offers.find((p) => p.token_id === selectedPkgId) ?? null;
+  const budget = parseFloat(budgetStr) || 0;
 
   const unitPrice = selectedPkg ? getPkgPrice(selectedPkg) : 0;
   const tokenCount = unitPrice > 0 ? Math.floor(budget / unitPrice) : 0;
@@ -794,11 +860,14 @@ function BudgetTab({
     if (!selectedPkg || tokenCount <= 0 || !phone || phone.length < 9) return;
     setSubmitting(true);
     setStatus(null);
+    // Prepend country code — strip leading 0 from local number
+    const localNum = phone.startsWith("0") ? phone.slice(1) : phone;
+    const fullPhone = `${countryCode}${localNum}`;
     try {
       const res = await buyTokens({
         token_buyer: ownerUid,
         token_uid: selectedPkg.token_id,
-        mobile_money_number: phone,
+        mobile_money_number: fullPhone,
         token_quantity: tokenCount,
       });
 
@@ -886,7 +955,7 @@ function BudgetTab({
                   return (
                     <button
                       key={c}
-                      onClick={() => { setCurrency(c); setBudgetStr(""); }}
+                      onClick={() => { setCurrency(c); setBudgetStr(""); setCountryCode(getDefaultCountryCode(c)); }}
                       disabled={!hasPkgs}
                       className={[
                         "h-10 px-5 rounded-lg text-[13px] font-black border cursor-pointer transition-all",
@@ -905,63 +974,68 @@ function BudgetTab({
               </div>
             </div>
 
-            {/* Step 2: Budget Input */}
+            {/* Step 2: Select Product */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
-                <label className="text-[12px] font-black text-[#111B21]">Enter Your Budget</label>
+                <label className="text-[12px] font-black text-[#111B21]">Select Product</label>
               </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-black text-[#667781]">{currency}</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={budgetStr}
-                  onChange={(e) => setBudgetStr(e.target.value)}
-                  placeholder={currency === "UGX" ? "e.g. 50000" : "e.g. 5000"}
-                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[18px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all placeholder:text-[#CCC] placeholder:font-normal"
-                />
-              </div>
-              {offersLoading && (
-                <p className="text-[10px] text-[#667781] mt-1.5 flex items-center gap-1.5">
+              {productsLoading ? (
+                <p className="text-[11px] text-[#667781] flex items-center gap-1.5">
                   <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
-                  Finding tokens within your budget…
+                  Loading products…
                 </p>
-              )}
-              {offersError && (
-                <p className="text-[10px] text-[#EF4444] mt-1.5 font-black">{offersError}</p>
-              )}
-              {!offersLoading && !offersError && budget > 0 && offers.length === 0 && (
-                <p className="text-[10px] text-[#F97316] mt-1.5 font-black">
-                  No tokens fit within {currency} {budget.toLocaleString()}. Try increasing your budget or another currency.
+              ) : availableProducts.length === 0 ? (
+                <p className="text-[11px] text-[#F97316] font-black">
+                  No products available. Contact support.
                 </p>
-              )}
-              {unitPrice > 0 && (
-                <p className="text-[10px] text-[#667781] mt-1.5">
-                  Token rate: <b className="text-[#128C7E]">{currency} {unitPrice.toLocaleString()}</b> {getPkgBillingUnitLabel(selectedPkg!)}
-                  {selectedPkg && <span> ({selectedPkg.token_name})</span>}
-                </p>
+              ) : (
+                <select
+                  value={selectedProduct ?? ""}
+                  onChange={(e) => { setSelectedProduct(e.target.value || null); setBudgetStr(""); }}
+                  className="w-full h-11 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all cursor-pointer capitalize"
+                >
+                  <option value="">-- Choose a product --</option>
+                  {availableProducts.map((prod) => (
+                    <option key={prod.uid} value={prod.uid}>{prod.name}</option>
+                  ))}
+                </select>
               )}
             </div>
 
-            {/* Step 3: Select Token (within budget — from backend) */}
-            {offers.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
-                  <label className="text-[12px] font-black text-[#111B21]">Select Token</label>
-                  <span className="text-[10px] text-[#667781] ml-auto">{offers.length} fit your budget</span>
-                </div>
+            {/* Steps 3–5 require a product to be selected */}
+            {selectedProduct && (<>
+            {/* Step 3: Select Token (immediately loaded for the product) */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                <label className="text-[12px] font-black text-[#111B21]">Select Token</label>
+                {productTokens.length > 0 && (
+                  <span className="text-[10px] text-[#667781] ml-auto">{productTokens.length} token{productTokens.length !== 1 ? "s" : ""} available</span>
+                )}
+              </div>
+              {productTokensLoading && (
+                <p className="text-[11px] text-[#667781] flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                  Loading tokens…
+                </p>
+              )}
+              {tokensError && (
+                <p className="text-[10px] text-[#EF4444] mt-1.5 font-black">{tokensError}</p>
+              )}
+              {!productTokensLoading && !tokensError && productTokens.length === 0 ? (
+                <p className="text-[10px] text-[#F97316] font-black">
+                  No {currency} tokens found for this product. Try a different currency or product.
+                </p>
+              ) : !productTokensLoading && productTokens.length > 0 ? (
                 <div className="grid gap-2">
-                  {offers.map((pkg) => {
+                  {productTokens.map((pkg) => {
                     const price = getPkgPrice(pkg);
                     const isSelected = pkg.token_id === selectedPkgId;
-                    const maxQty = price > 0 ? Math.floor(budget / price) : 0;
                     return (
                       <button
                         key={pkg.token_id}
-                        onClick={() => setSelectedPkgId(pkg.token_id)}
+                        onClick={() => { setSelectedPkgId(pkg.token_id); setBudgetStr(""); }}
                         className={[
                           "w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer",
                           isSelected
@@ -988,14 +1062,42 @@ function BudgetTab({
                             <div className="text-[13px] font-black text-[#128C7E]">
                               {currency} {price.toLocaleString()}
                             </div>
-                            <div className="text-[10px] text-[#667781]">up to {maxQty} token{maxQty !== 1 ? "s" : ""}</div>
+                            <div className="text-[10px] text-[#667781]">{getPkgBillingUnitLabel(pkg)}</div>
                           </div>
                         </div>
                       </button>
                     );
                   })}
                 </div>
+              ) : null}
+            </div>
+
+            {/* Step 4: Budget Input (only after token is selected) */}
+            {selectedPkg && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">4</span>
+                <label className="text-[12px] font-black text-[#111B21]">Enter Your Budget</label>
               </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-black text-[#667781]">{currency}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={budgetStr}
+                  onChange={(e) => setBudgetStr(e.target.value)}
+                  placeholder={currency === "UGX" ? "e.g. 50000" : "e.g. 5000"}
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[18px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all placeholder:text-[#CCC] placeholder:font-normal"
+                />
+              </div>
+              {unitPrice > 0 && (
+                <p className="text-[10px] text-[#667781] mt-1.5">
+                  Token rate: <b className="text-[#128C7E]">{currency} {unitPrice.toLocaleString()}</b> {getPkgBillingUnitLabel(selectedPkg)}
+                  <span> ({selectedPkg.token_name})</span>
+                </p>
+              )}
+            </div>
             )}
 
             {/* Calculation Result */}
@@ -1027,26 +1129,38 @@ function BudgetTab({
               </div>
             )}
 
-            {/* Step 4: Phone Number */}
+            {/* Step 5: Phone Number with Country Code */}
             {tokenCount > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">4</span>
+                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">5</span>
                   <label className="text-[12px] font-black text-[#111B21]">Mobile Money Number</label>
                 </div>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ""))}
-                  placeholder={currency === "UGX" ? "e.g. 0771234567" : "e.g. 0712345678"}
-                  maxLength={15}
-                  className="w-full h-10 px-3 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
-                />
+                <div className="flex gap-1.5">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="h-10 pl-2 pr-1 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all shrink-0 w-[120px]"
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder={currency === "UGX" ? "e.g. 0771234567" : "e.g. 0712345678"}
+                    maxLength={15}
+                    className="flex-1 h-10 px-3 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+                  />
+                </div>
                 <p className="text-[10px] text-[#667781] mt-1">
-                  A payment prompt will be sent to this number via Mobile Money.
+                  A payment prompt will be sent to {countryCode} {phone || "..."} via Mobile Money.
                 </p>
               </div>
             )}
+            </>)}
           </div>
 
           {/* ══ Right: Order Summary ═══════════════════════════════════ */}
@@ -1058,6 +1172,12 @@ function BudgetTab({
                   <span className="text-[#667781]">Currency</span>
                   <span className="font-black text-[#111B21]">{currency}</span>
                 </div>
+                {selectedProduct && (
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-[#667781]">Product</span>
+                    <span className="font-black text-[#111B21]">{availableProducts.find((p) => p.uid === selectedProduct)?.name ?? "—"}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[12px]">
                   <span className="text-[#667781]">Budget</span>
                   <span className="font-black text-[#111B21]">{currency} {budget.toLocaleString()}</span>
@@ -1180,6 +1300,42 @@ export function SimPage() {
   const togglePkgSort = (key: string) =>
     setPkgSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   const pkgSortArrow = (key: string) => (pkgSort.key === key ? (pkgSort.dir === "asc" ? "▲" : "▼") : "");
+
+  // ── Buy tab: product filter ───────────────────────────────────────────
+  const [buyProductFilter, setBuyProductFilter] = useState<string | null>(null);
+  const [buyProducts, setBuyProducts] = useState<TokenProduct[]>([]);
+  const [buyProductsLoading, setBuyProductsLoading] = useState(false);
+  const buyProductsFetched = useRef(false);
+  const [buyProductTokens, setBuyProductTokens] = useState<TokenPackage[]>([]);
+  const [buyProductTokensLoading, setBuyProductTokensLoading] = useState(false);
+
+  // Fetch products once for the Buy tab product dropdown
+  useEffect(() => {
+    if (tab !== "buy" || buyProductsFetched.current) return;
+    buyProductsFetched.current = true;
+    setBuyProductsLoading(true);
+    getAllProducts()
+      .then((res) => setBuyProducts(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setBuyProducts([]))
+      .finally(() => setBuyProductsLoading(false));
+  }, [tab]);
+
+  // Fetch tokens when product filter changes
+  useEffect(() => {
+    if (!buyProductFilter) {
+      setBuyProductTokens([]);
+      return;
+    }
+    let cancelled = false;
+    setBuyProductTokensLoading(true);
+    getTokensByProduct(buyProductFilter)
+      .then((res) => {
+        if (!cancelled) setBuyProductTokens(Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(() => { if (!cancelled) setBuyProductTokens([]); })
+      .finally(() => { if (!cancelled) setBuyProductTokensLoading(false); });
+    return () => { cancelled = true; };
+  }, [buyProductFilter]);
 
   // Renders a single token package for the icon / list / tiles / content views
   const renderPackageItem = (pkg: TokenPackage) => {
@@ -1557,25 +1713,50 @@ export function SimPage() {
 
           {/* ── TAB: Buy Tokens ────────────────────────────────────────── */}
           {tab === "buy" && (() => {
+            // Use product-filtered tokens when a product is selected, else all packages
+            const source = buyProductFilter ? buyProductTokens : packages;
             const q = pkgSearch.toLowerCase();
             const filtered = q
-              ? packages.filter((p) =>
+              ? source.filter((p) =>
                   p.token_name?.toLowerCase().includes(q) ||
                   p.token_type?.toLowerCase().includes(q) ||
                   (p.product?.product_name || "").toLowerCase().includes(q) ||
                   (p.billing_unit || "").toLowerCase().includes(q) ||
                   getPkgCurrency(p).toLowerCase().includes(q)
                 )
-              : packages;
+              : source;
             const sorted = sortPackages(filtered, pkgSort.key, pkgSort.dir);
+            const isLoadingTokens = buyProductFilter ? buyProductTokensLoading : pkgLoading;
 
             return (
             <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
+              {/* Product filter */}
+              <div className="mb-4">
+                <label className="text-[12px] font-black text-[#111B21] mb-1.5 block">Filter by Product</label>
+                {buyProductsLoading ? (
+                  <p className="text-[11px] text-[#667781] flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                    Loading products…
+                  </p>
+                ) : (
+                  <select
+                    value={buyProductFilter ?? ""}
+                    onChange={(e) => { setBuyProductFilter(e.target.value || null); setPkgSearch(""); }}
+                    className="w-full max-w-xs h-10 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all cursor-pointer capitalize"
+                  >
+                    <option value="">All Products</option>
+                    {buyProducts.map((p) => (
+                      <option key={p.product_uid} value={p.product_uid}>{p.product_name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               {/* Header row */}
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-black text-[14px] text-[#111B21]">
                   Available Token Packages
-                  {!pkgLoading && <span className="text-[12px] text-[#667781] font-normal ml-2">({filtered.length})</span>}
+                  {!isLoadingTokens && <span className="text-[12px] text-[#667781] font-normal ml-2">({filtered.length})</span>}
                 </h3>
                 <div className="flex items-center gap-2">
                   {/* Sort menu (Explorer-style) */}
@@ -1670,7 +1851,7 @@ export function SimPage() {
                 />
               </div>
 
-              {pkgLoading ? (
+              {isLoadingTokens ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
@@ -1681,12 +1862,14 @@ export function SimPage() {
                 <div className="text-center py-12">
                   <div className="text-[28px] mb-2">{pkgSearch ? "🔍" : "🛒"}</div>
                   <p className="text-[13px] font-black text-[#111B21] mb-1">
-                    {pkgSearch ? "No Matching Packages" : "No Packages Available"}
+                    {pkgSearch ? "No Matching Packages" : buyProductFilter ? "No Tokens for This Product" : "No Packages Available"}
                   </p>
                   <p className="text-[12px] text-[#667781]">
                     {pkgSearch
                       ? `No packages match "${pkgSearch}". Try a different search.`
-                      : "Token packages are not configured yet. Contact support."}
+                      : buyProductFilter
+                        ? "No tokens found for the selected product. Try a different product."
+                        : "Token packages are not configured yet. Contact support."}
                   </p>
                   {pkgSearch && (
                     <button

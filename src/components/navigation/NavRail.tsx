@@ -9,6 +9,7 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { getModulesForNavRail } from "../../auth/modules";
 import { usePermissions } from "../../auth/PermissionsContext";
+import { getModuleIcon } from "./moduleIcons";
 
 export interface NavRailItem { key: string; glyph: string; label: string; path?: string; }
 interface NavRailProps { items?: NavRailItem[]; }
@@ -55,6 +56,7 @@ export function NavRail({ items }: NavRailProps) {
 
 function RailLink({ item, mobile = false }: { item: NavRailItem; mobile?: boolean }) {
   const to = item.path ?? `/${item.key}`;
+  const IconComponent = getModuleIcon(item.key);
   return (
     <NavLink
       to={to}
@@ -72,7 +74,7 @@ function RailLink({ item, mobile = false }: { item: NavRailItem; mobile?: boolea
         ].join(" ")
       }
     >
-      {item.glyph}
+      {IconComponent ? <IconComponent className="w-[18px] h-[18px]" /> : item.glyph}
     </NavLink>
   );
 }

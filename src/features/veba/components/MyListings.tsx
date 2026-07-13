@@ -358,6 +358,7 @@ export function MyListings() {
   const [pendingUid, setPendingUid] = useState<string | null>(null);
   const [editingListing, setEditingListing] = useState<VebaListing | null>(null);
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [search, setSearch]     = useState("");
   const { confirm, dialogProps } = useConfirmDialog();
 
   const fetchListings = useCallback(async () => {
@@ -456,68 +457,122 @@ export function MyListings() {
     );
   }
 
+  // ── Search filtering ──────────────────────────────────────────────
+  const q = search.toLowerCase();
+  const filtered = q
+    ? listings.filter((l) => {
+        const s = l.asset_summary;
+        return (
+          (s?.display_name || "").toLowerCase().includes(q) ||
+          (s?.imei || l.asset_uid || "").toLowerCase().includes(q) ||
+          (s?.vin_number || "").toLowerCase().includes(q) ||
+          (s?.car_make || "").toLowerCase().includes(q) ||
+          (s?.car_model || "").toLowerCase().includes(q) ||
+          (s?.car_year || "").toLowerCase().includes(q) ||
+          (s?.asset_class || "").toLowerCase().includes(q) ||
+          (s?.owner_org || "").toLowerCase().includes(q)
+        );
+      })
+    : listings;
+
   // ── Card grid ─────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-3">
       {/* Header */}
-      <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3 flex items-center justify-between">
-        <div>
+      <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+        <div className="shrink-0">
           <h2 className="font-extrabold text-[13px] text-[#111B21]">My listings</h2>
           <p className="text-[11px] text-[#667781]">
-            {listings.length} listing{listings.length === 1 ? "" : "s"} — tap a card for details
+            {filtered.length} of {listings.length} listing{listings.length === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-1 justify-end">
+          {/* Search */}
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, IMEI, VIN, car make/model..."
+            className="h-[30px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all w-full max-w-[320px]"
+          />
           <button
             type="button"
             onClick={fetchListings}
-            className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#E9EDEF] bg-white text-[#111B21] hover:bg-[#F0F2F5] cursor-pointer"
+            className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#E9EDEF] bg-white text-[#111B21] hover:bg-[#F0F2F5] cursor-pointer shrink-0"
           >
             Refresh
           </button>
           <GuardedButton
             permission="can_list_asset_on_marketplace"
             onClick={() => setCreateDrawerOpen(true)}
-            className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer"
+            className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer shrink-0"
           >
             + New Listing
           </GuardedButton>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Empty search results */}
+      {q && filtered.length === 0 && (
+        <div className="bg-white border border-[#E9EDEF] rounded-xl p-6 text-center">
+          <div className="text-[22px] mb-2">🔍</div>
+          <p className="text-[13px] font-extrabold text-[#111B21] mb-1">No Matching Assets</p>
+          <p className="text-[12px] text-[#667781]">No listings match "{search}". Try a different search term.</p>
+          <button onClick={() => setSearch("")} className="mt-2 px-3 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[#667781] hover:bg-[#F0F2F5] cursor-pointer">
+            Clear Search
+          </button>
+        </div>
+      )}
+
+      {(!q || filtered.length > 0) && <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-[#F8F9FA] border-b border-[#E9EDEF]">
               <th className="text-left font-extrabold text-[#667781] px-3 py-2">Asset</th>
+              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Vehicle</th>
               <th className="text-left font-extrabold text-[#667781] px-3 py-2">Rate</th>
               <th className="text-left font-extrabold text-[#667781] px-3 py-2">Window</th>
-              <th className="text-left font-extrabold text-[#667781] px-3 py-2">Visibility</th>
               <th className="text-left font-extrabold text-[#667781] px-3 py-2">Status</th>
               <th className="text-right font-extrabold text-[#667781] px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {listings.map((l) => {
+            {filtered.map((l) => {
               const title = l.asset_summary?.display_name ?? l.asset_uid;
               const cls = l.asset_summary?.asset_class;
               const isPending = pendingUid === l.listing_uid;
               const window = l.availability_start || l.availability_end
                 ? `${l.availability_start ?? "-"} -> ${l.availability_end ?? "open"}`
                 : "Available now";
+              const carMake = l.asset_summary?.car_make;
+              const carModel = l.asset_summary?.car_model;
+              const carYear = l.asset_summary?.car_year;
+              const vin = l.asset_summary?.vin_number;
+              const imei = l.asset_summary?.imei || l.asset_uid;
 
               return (
                 <tr key={l.listing_uid} className="border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8F9FA] transition-colors">
                   <td className="px-3 py-2.5">
                     <div className="font-extrabold text-[#111B21]">{title}</div>
+                    <div className="text-[10px] text-[#667781] font-mono">{imei}</div>
                     <div className="text-[11px] text-[#667781]">
-                      {[cls, l.asset_summary?.owner_org, l.asset_summary?.country].filter(Boolean).join(" * ")}
+                      {[cls, l.asset_summary?.owner_org, l.asset_summary?.country].filter(Boolean).join(" · ")}
                     </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {carMake ? (
+                      <div>
+                        <div className="text-[12px] text-[#111B21] font-extrabold">{carMake} {carModel || ""}</div>
+                        {carYear && <div className="text-[10px] text-[#667781]">{carYear}</div>}
+                        {vin && <div className="text-[10px] text-[#667781] font-mono">VIN: {vin}</div>}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-[#C4CCD5]">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{formatRate(l)}</td>
                   <td className="px-3 py-2.5 text-[#667781] whitespace-nowrap">{window}</td>
-                  <td className="px-3 py-2.5">{l.visibility === "tenant" ? "Tenant-private" : "Marketplace"}</td>
                   <td className="px-3 py-2.5"><StatusPill status={l.status} /></td>
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1.5 justify-end">
@@ -572,7 +627,7 @@ export function MyListings() {
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {/* Drawers */}
       {editingListing && (

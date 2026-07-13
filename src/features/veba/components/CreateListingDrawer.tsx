@@ -60,6 +60,49 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
   // Derive asset details from the selected device
   const selectedDevice = devices.find((d) => d.device_imei === selectedImei) ?? null;
 
+  // VIN lookup
+  const [vinInput, setVinInput] = useState("");
+  const [vinLoading, setVinLoading] = useState(false);
+  const [vinResult, setVinResult] = useState<{ make: string; model: string; year: string } | null>(null);
+  const [vinError, setVinError] = useState<string | null>(null);
+
+  // Auto-populate VIN from selected device
+  useEffect(() => {
+    if (selectedDevice?.vin_number) {
+      setVinInput(selectedDevice.vin_number);
+    } else {
+      setVinInput("");
+      setVinResult(null);
+    }
+    setVinError(null);
+  }, [selectedDevice]);
+
+  const lookupVin = async () => {
+    const vin = vinInput.trim().toUpperCase();
+    if (vin.length !== 17) { setVinError("VIN must be exactly 17 characters."); return; }
+    setVinLoading(true);
+    setVinError(null);
+    setVinResult(null);
+    try {
+      const resp = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`);
+      const json = await resp.json();
+      const results: Array<{ Variable: string; Value: string | null }> = json?.Results ?? [];
+      const get = (varName: string) => results.find((r) => r.Variable === varName)?.Value || "";
+      const make = get("Make");
+      const model = get("Model");
+      const year = get("Model Year");
+      if (!make && !model) {
+        setVinError("VIN not recognized. Please check and try again.");
+      } else {
+        setVinResult({ make, model, year });
+      }
+    } catch {
+      setVinError("VIN lookup failed. Check your internet connection.");
+    } finally {
+      setVinLoading(false);
+    }
+  };
+
   // Pricing
   const [dailyRate, setDailyRate] = useState("");
   const [currency, setCurrency] = useState("UGX");
@@ -126,6 +169,11 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
       return;
     }
 
+    const carMake = vinResult?.make || selectedDevice?.car_make || undefined;
+    const carModel = vinResult?.model || selectedDevice?.car_model || undefined;
+    const carYear = vinResult?.year || undefined;
+    const vin = vinInput.trim().toUpperCase() || selectedDevice?.vin_number || undefined;
+
     const assetSummary = selectedDevice
       ? {
           asset_uid: selectedImei,
@@ -133,6 +181,11 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
           asset_class: selectedDevice.car_type || undefined,
           owner_org: selectedDevice.client_name || undefined,
           country: undefined,
+          imei: selectedImei,
+          vin_number: vin,
+          car_make: carMake,
+          car_model: carModel,
+          car_year: carYear,
         }
       : undefined;
 
@@ -252,6 +305,68 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
               </>
             )}
           </div>
+
+          {/* VIN Lookup */}
+          {selectedDevice && (
+            <div className="bg-white border border-[#E9EDEF] rounded-xl p-3">
+              <div className="text-[11px] font-extrabold text-[#111B21] mb-2">Vehicle Details (VIN Lookup)</div>
+              <div className="flex gap-2 items-end">
+                <label className="flex flex-col gap-1 flex-1">
+                  <span className="text-[10px] font-medium text-[#667781] uppercase tracking-wide">VIN (17 characters)</span>
+                  <input
+                    type="text"
+                    value={vinInput}
+                    onChange={(e) => setVinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                    placeholder="e.g. JTDKN3DU5A0123456"
+                    maxLength={17}
+                    disabled={busy}
+                    className={inp}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={lookupVin}
+                  disabled={busy || vinLoading || vinInput.length !== 17}
+                  className="h-[30px] px-3 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                >
+                  {vinLoading ? "Looking up..." : "Decode VIN"}
+                </button>
+              </div>
+              {vinError && <p className="text-[10px] text-[#B00020] mt-1.5">{vinError}</p>}
+              {vinResult && (
+                <div className="mt-2 bg-[#E9F7F4] border border-[#C2E8E1] rounded-lg p-2.5 grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-[9px] font-bold text-[#667781] uppercase">Make</div>
+                    <div className="text-[12px] font-extrabold text-[#111B21]">{vinResult.make || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-bold text-[#667781] uppercase">Model</div>
+                    <div className="text-[12px] font-extrabold text-[#111B21]">{vinResult.model || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-bold text-[#667781] uppercase">Year</div>
+                    <div className="text-[12px] font-extrabold text-[#111B21]">{vinResult.year || "—"}</div>
+                  </div>
+                </div>
+              )}
+              {!vinResult && selectedDevice.car_make && (
+                <div className="mt-2 bg-[#F0F2F5] border border-[#E9EDEF] rounded-lg p-2.5 grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-[9px] font-bold text-[#667781] uppercase">Make</div>
+                    <div className="text-[12px] font-extrabold text-[#111B21]">{selectedDevice.car_make || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-bold text-[#667781] uppercase">Model</div>
+                    <div className="text-[12px] font-extrabold text-[#111B21]">{selectedDevice.car_model || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-bold text-[#667781] uppercase">Type</div>
+                    <div className="text-[12px] font-extrabold text-[#111B21]">{selectedDevice.car_type || "—"}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Photo */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl p-3">

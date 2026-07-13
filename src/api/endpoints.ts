@@ -104,12 +104,16 @@ export const ENDPOINTS = {
     TRANSFER: "/tokens/transfer",
     BALANCE:  "/tokens",               // append /{client_uid}/balance
     BUDGET_OFFER: "/tokens/budget-offer", // POST {data:{currency, amount}}
+    BY_PRODUCT: "/tokens/product",       // GET  /{product_uid}/list
     /** Subscription management */
     SUB_PAUSE:   "/tokens/subscriptions/pause",    // POST {device_imei}
     SUB_RESTORE: "/tokens/subscriptions/restore",  // POST {device_imei}
     SUB_UPDATE:  "/tokens/subscriptions/update",   // POST {new_token_billing_uid, device_imei}
     /** Payment status check */
     PAYMENT_STATUS: "/payments/transactions",      // GET  /{transaction_uid}/status
+  },
+  PRODUCTS: {
+    LIST: "/billing/products/list",       // GET — all products
   },
   FINANCE: {
     PAYMENTS: "/finance/payments",
