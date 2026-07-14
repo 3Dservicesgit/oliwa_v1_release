@@ -500,24 +500,18 @@ function GenerateForm({
     <div className="flex flex-col gap-4">
       {/* Report Type — dynamically loaded */}
       <div>
-        <label className="block text-[12px] font-black text-[#111B21] mb-2">Report Type</label>
-        <div className="grid grid-cols-2 gap-1.5">
+        <label className="block text-[12px] font-black text-[#111B21] mb-1.5">Report Type</label>
+        <select
+          value={reportType}
+          onChange={(e) => setReportType(e.target.value as ReportType)}
+          className="w-full h-11 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all cursor-pointer"
+        >
           {reportTypes.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setReportType(t.key as ReportType)}
-              className={`flex items-center gap-2 h-9 px-3 rounded-lg text-[12px] font-black border cursor-pointer transition-all text-left ${
-                reportType === t.key
-                  ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
-                  : "bg-white border-[#E9EDEF] text-[#667781] hover:border-[#128C7E]/40"
-              }`}
-            >
-              <span className="text-[14px]">{t.icon}</span>
-              {t.label}
-            </button>
+            <option key={t.key} value={t.key}>
+              {t.icon} {t.label}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* Date Range */}
