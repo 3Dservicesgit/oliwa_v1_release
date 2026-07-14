@@ -209,13 +209,18 @@ function ReportDetailsDrawer({
   onClose,
   onToast,
   onRefresh,
+  devices,
+  ownerUid,
 }: {
   report: PreviousReport;
   onClose: () => void;
   onToast: (msg: string, type: "success" | "error") => void;
   onRefresh: () => void;
+  devices: ClientDevice[];
+  ownerUid: string;
 }) {
   const [statusChecking, setStatusChecking] = useState(false);
+  const [drawerRegenerating, setDrawerRegenerating] = useState(false);
   const isCompleted = report.file_progress === "completed";
   const isFailed = report.file_progress === "failed" || report.file_progress === "no-data";
   const isProcessing = !isCompleted && !isFailed;
@@ -250,6 +255,68 @@ function ReportDetailsDrawer({
       return;
     }
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  /**
+   * Parse the report's datestamp to build a 90-day window ending at the
+   * original generation date. Falls back to 90 days from today.
+   */
+  const getDrawerDateRange = (): { sd: string; ed: string } => {
+    let endDate = new Date();
+    const raw = report.file_datestamp;
+    if (raw) {
+      const dateMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})/);
+      if (dateMatch) {
+        const parsed = new Date(
+          parseInt(dateMatch[3], 10),
+          parseInt(dateMatch[2], 10) - 1,
+          parseInt(dateMatch[1], 10),
+        );
+        if (!isNaN(parsed.getTime())) endDate = parsed;
+      }
+    }
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 90);
+    return { sd: formatDateForApi(startDate), ed: formatDateForApi(endDate) };
+  };
+
+  /** Re-generate a client-side report from the details drawer. */
+  const handleDrawerRegenerate = async () => {
+    if (devices.length === 0) {
+      onToast("No devices available. Cannot re-generate report.", "error");
+      return;
+    }
+    setDrawerRegenerating(true);
+    try {
+      const formatStr = report.file_link.replace("client-download-", "").toLowerCase();
+      const format: ReportFormat = formatStr === "excel" ? "excel" : "pdf";
+      const typeMap: Record<string, ReportType> = {
+        TRIPS: "trips", OVERSPEEDING: "overspeeding", FUEL: "fuel",
+        GEOZONE: "geozone", NIGHT_DRIVING: "night_driving",
+        IDILING: "IDILING", PARKING: "PARKING",
+      };
+      const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
+      const allImeis = devices.map((d) => d.device_imei);
+      const { sd, ed } = getDrawerDateRange();
+      await generateReport(reportType, format, {
+        report_devices: allImeis,
+        start_date: sd,
+        end_date: ed,
+        origin_user: ownerUid,
+      });
+      onToast(`${label} report re-downloaded successfully!`, "success");
+      onRefresh();
+    } catch (e) {
+      let msg = "Failed to re-generate report.";
+      if (e instanceof Error) {
+        msg = e.message.startsWith("NO_DATA::")
+          ? "No data found. Try generating a new report from the form with a specific date range."
+          : e.message;
+      }
+      onToast(msg, "error");
+    } finally {
+      setDrawerRegenerating(false);
+    }
   };
 
   return (
@@ -311,8 +378,26 @@ function ReportDetailsDrawer({
 
           {/* Action buttons */}
           <div className="mt-6 flex flex-col gap-2">
-            {/* Download — only for completed reports with valid file */}
-            {isCompleted && report.file_link && report.file_link !== "NO_DIR_PATH" && (
+            {/* Re-download — for client-generated reports */}
+            {isClientDownload && (
+              <button
+                onClick={handleDrawerRegenerate}
+                disabled={drawerRegenerating}
+                className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[#0E7A6E] disabled:opacity-50 transition-all"
+              >
+                {drawerRegenerating ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Re-generating...
+                  </>
+                ) : (
+                  <>&#11015; Re-download Report</>
+                )}
+              </button>
+            )}
+
+            {/* Download — for server-side completed reports with valid file */}
+            {!isClientDownload && isCompleted && report.file_link && report.file_link !== "NO_DIR_PATH" && (
               <button
                 onClick={handleDownload}
                 className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[#0E7A6E] transition-all"
@@ -689,6 +774,7 @@ function ReportHistory({
   reports,
   loading,
   ownerUid,
+  devices,
   onRefresh,
   onDeleted,
   onToast,
@@ -696,6 +782,7 @@ function ReportHistory({
   reports: PreviousReport[];
   loading: boolean;
   ownerUid: string;
+  devices: ClientDevice[];
   onRefresh: () => void;
   onDeleted: () => void;
   onToast: (msg: string, type: "success" | "error") => void;
@@ -706,6 +793,7 @@ function ReportHistory({
   const [deleteTarget, setDeleteTarget] = useState<PreviousReport | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
 
   // Filter out failed/no-data reports by default unless toggled on
   const visibleReports = showFailed
@@ -768,6 +856,82 @@ function ReportHistory({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  /**
+   * Parse the report's datestamp to determine when it was originally generated,
+   * then build a date range: 90 days before that date → that date.
+   * Falls back to 90 days before today → today if parsing fails.
+   */
+  const getRegenDateRange = (report: PreviousReport): { sd: string; ed: string } => {
+    let endDate = new Date();
+    const raw = report.file_datestamp;
+    if (raw) {
+      // Extract DD-MM-YYYY from "DD-MM-YYYY_..." or "DD-MM-YYYY ..."
+      const dateMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})/);
+      if (dateMatch) {
+        const parsed = new Date(
+          parseInt(dateMatch[3], 10),
+          parseInt(dateMatch[2], 10) - 1,
+          parseInt(dateMatch[1], 10),
+        );
+        if (!isNaN(parsed.getTime())) endDate = parsed;
+      }
+    }
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 90);
+    return { sd: formatDateForApi(startDate), ed: formatDateForApi(endDate) };
+  };
+
+  /** Re-generate a client-side report (one that was originally generated in the browser). */
+  const handleRegenerate = async (report: PreviousReport) => {
+    if (devices.length === 0) {
+      onToast("No devices available. Cannot re-generate report.", "error");
+      return;
+    }
+    setRegenerating(report.file_request_uid);
+    try {
+      // Parse format from file_link: "client-download-pdf" → "pdf", "client-download-excel" → "excel"
+      const formatStr = report.file_link.replace("client-download-", "").toLowerCase();
+      const format: ReportFormat = formatStr === "excel" ? "excel" : "pdf";
+
+      // Map report_type (uppercase from backend) to our ReportType
+      const typeMap: Record<string, ReportType> = {
+        TRIPS: "trips", OVERSPEEDING: "overspeeding", FUEL: "fuel",
+        GEOZONE: "geozone", NIGHT_DRIVING: "night_driving",
+        IDILING: "IDILING", PARKING: "PARKING",
+      };
+      const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
+
+      // Use all customer devices; date range = 90 days ending at the report's original creation date
+      const allImeis = devices.map((d) => d.device_imei);
+      const { sd, ed } = getRegenDateRange(report);
+
+      console.log("[Reports] Re-generating:", { reportType, format, devices: allImeis.length, sd, ed });
+
+      await generateReport(reportType, format, {
+        report_devices: allImeis,
+        start_date: sd,
+        end_date: ed,
+        origin_user: ownerUid,
+      });
+
+      onToast(`${report.report_type} report re-downloaded successfully!`, "success");
+      onRefresh();
+    } catch (e) {
+      console.error("[Reports] Re-generation failed:", e);
+      let msg = "Failed to re-generate report.";
+      if (e instanceof Error) {
+        if (e.message.startsWith("NO_DATA::")) {
+          msg = "No data found. Try generating a new report from the form with a specific date range.";
+        } else {
+          msg = e.message;
+        }
+      }
+      onToast(msg, "error");
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Details drawer */}
@@ -777,6 +941,8 @@ function ReportHistory({
           onClose={() => setDetailReport(null)}
           onToast={onToast}
           onRefresh={() => { setDetailReport(null); onRefresh(); }}
+          devices={devices}
+          ownerUid={ownerUid}
         />
       )}
 
@@ -927,14 +1093,20 @@ function ReportHistory({
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1">
-                        {/* Download / Already Downloaded */}
+                        {/* Download / Re-download */}
                         {isClientDownload ? (
-                          <span
-                            title="Already downloaded to your device"
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-[12px]"
+                          <button
+                            onClick={() => handleRegenerate(r)}
+                            disabled={regenerating === r.file_request_uid}
+                            title="Re-download report"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[12px] cursor-pointer hover:bg-[#128C7E]/20 disabled:opacity-50 transition-all"
                           >
-                            &#10003;
-                          </span>
+                            {regenerating === r.file_request_uid ? (
+                              <span className="w-3 h-3 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>&#11015;</>
+                            )}
+                          </button>
                         ) : isCompleted && r.file_link && r.file_link !== "NO_DIR_PATH" ? (
                           <button
                             onClick={() => handleDownload(r)}
@@ -1153,6 +1325,7 @@ export function ReportsPage() {
                 reports={reports}
                 loading={reportsLoading}
                 ownerUid={ownerUid}
+                devices={devices}
                 onRefresh={fetchReports}
                 onDeleted={fetchReports}
                 onToast={showToast}

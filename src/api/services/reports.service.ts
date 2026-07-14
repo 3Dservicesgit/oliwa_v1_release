@@ -316,6 +316,8 @@ export function getReportStatus(
 /**
  * Build the full download URL for a completed report.
  * The file_link from the listing response may be a full URL or just a filename.
+ * Relative paths are prefixed with the API base URL so the browser fetches
+ * from the backend server, not the frontend origin.
  */
 export function getReportDownloadUrl(fileLink: string): string {
   if (!fileLink) return "";
@@ -323,8 +325,9 @@ export function getReportDownloadUrl(fileLink: string): string {
   if (fileLink.startsWith("http://") || fileLink.startsWith("https://")) {
     return fileLink;
   }
-  // Otherwise build from CDN base
-  return `${ENDPOINTS.REPORTS.CDN}/${fileLink}`;
+  // Prepend the API base URL so the request goes to the backend CDN
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+  return `${apiBase}${ENDPOINTS.REPORTS.CDN}/${fileLink}`;
 }
 
 // ── Delete report ──────────────────────────────────────────────────────────
