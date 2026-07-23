@@ -569,7 +569,14 @@ export default function NocBridgePage() {
       ]) as any;
       console.log("[LiveMonitoring] fleetFetch response status:", resp?.status, "data count:", Array.isArray(resp?.data) ? resp.data.length : "not-array");
       if (!resp || resp.status !== "success" || !Array.isArray(resp.data)) {
-        setListError(resp?.message || "No devices found for this account.");
+        // If devices are already loaded (e.g. from a concurrent call), don't overwrite with error
+        if (units.current.size > 0) { setLoading(false); return; }
+        // Sanitize technical backend errors for the customer
+        let errMsg = resp?.message || "No devices found for this account.";
+        if (typeof errMsg === "string" && /cassandra|connect|timeout|internal/i.test(errMsg)) {
+          errMsg = "Could not reach the tracking server. Your devices may appear offline. Please try refreshing.";
+        }
+        setListError(errMsg);
         setLoading(false);
         return;
       }
@@ -981,7 +988,7 @@ export default function NocBridgePage() {
                 <div className="text-[12px] text-[#667781] mt-2">Loading devices…</div>
               </div>
             )}
-            {listError && <div className="px-4 py-3 text-[12px] text-[#D93025]">{listError}</div>}
+            {listError && list.length === 0 && <div className="px-4 py-3 text-[12px] text-[#D93025]">{listError}</div>}
             {!loading && !listError && list.length === 0 && (
               <div className="px-4 py-8 text-center text-[12px] text-[#667781]">
                 {q || statusFilter ? "No devices match your filter." : "No devices configured."}

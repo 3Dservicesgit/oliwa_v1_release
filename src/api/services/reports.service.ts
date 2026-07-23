@@ -74,6 +74,87 @@ export async function generateReport(
   // These fetch data from lightweight JSON endpoints, then generate PDF/Excel
   // in the browser — no server-side WeasyPrint / GTK3 dependencies needed.
 
+  // ── Summary format — multi-sheet Excel with customizable columns ────────
+  if (format === "summary") {
+    const reportGen = await import("../../utils/reportGenerator");
+    const config = payload.summary_config;
+    const sections = config?.sections ?? { cover: true, statistics: true, detail: true };
+    const columns = config?.columns ?? reportGen.getSummaryColumns(type).filter((c) => c.default).map((c) => c.key);
+    const groupName = config?.groupName;
+    const isState = type === "PARKING" || type === "IDILING";
+
+    // Pick the right backend endpoint for this report type
+    const summaryEndpointMap: Record<string, string> = {
+      trips: ENDPOINTS.REPORTS.TRIPS_DATA,
+      fuel: ENDPOINTS.REPORTS.TRIPS_DATA,
+      night_driving: ENDPOINTS.REPORTS.NIGHT_DRIVING_DATA,
+      overspeeding: ENDPOINTS.REPORTS.OVERSPEEDING_DATA,
+      geozone: ENDPOINTS.REPORTS.GEOZONE_DATA,
+      PARKING: ENDPOINTS.REPORTS.STATE_DATA,
+      IDILING: ENDPOINTS.REPORTS.STATE_DATA,
+    };
+    const endpointUrl = summaryEndpointMap[type] ?? ENDPOINTS.REPORTS.TRIPS_DATA;
+
+    const labelMap: Record<string, string> = {
+      trips: "Trip", fuel: "Fuel", night_driving: "Night Driving",
+      overspeeding: "Overspeeding", geozone: "Geozone",
+      PARKING: "Parking", IDILING: "Idling",
+    };
+    const typeLabel = labelMap[type] ?? type;
+
+    console.log("[Reports] Generating summary report:", { type, devices: payload.report_devices.length, columns: columns.length });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let resp: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body: any = {
+        data: {
+          report_devices: payload.report_devices,
+          start_date: payload.start_date,
+          end_date: payload.end_date,
+        },
+      };
+      if (isState) body.data.report_state = type;
+
+      resp = await post<unknown>(endpointUrl, body, opts);
+    } catch (e) {
+      console.error("[Reports] Summary data fetch failed:", e);
+      const msg = e instanceof Error ? e.message : `Failed to fetch ${typeLabel.toLowerCase()} data for summary.`;
+      if (msg.includes("No ") && (msg.includes("Found") || msg.includes("Data"))) {
+        throw new Error(`NO_DATA::${typeLabel} Summary::No data found for the selected devices and date range. Try expanding your date range.`);
+      }
+      throw new Error(msg);
+    }
+
+    const reportData = resp?.data;
+    if (!Array.isArray(reportData) || reportData.length === 0) {
+      throw new Error(`NO_DATA::${typeLabel} Summary::No data found for the selected devices and date range. Try expanding your date range.`);
+    }
+
+    try {
+      reportGen.generateSummaryExcel(reportData, payload.start_date, payload.end_date, type, sections, columns, groupName);
+    } catch (genErr) {
+      console.error("[Reports] Summary generation failed:", genErr);
+      throw new Error("Failed to generate the summary report. Please try again.");
+    }
+
+    // Log the download
+    try {
+      await post(ENDPOINTS.REPORTS.LOG_DOWNLOAD, {
+        data: {
+          report_caller: payload.origin_user,
+          report_type: type,
+          format: "summary",
+        },
+      });
+    } catch (logErr) {
+      console.warn("[Reports] Failed to log summary download (non-blocking):", logErr);
+    }
+
+    return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
+  }
+
   // All report types now use client-side generation via lightweight JSON endpoints
   const CLIENT_SIDE_TYPES = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone"];
   if (CLIENT_SIDE_TYPES.includes(type)) {

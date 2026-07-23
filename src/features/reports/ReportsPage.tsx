@@ -40,6 +40,8 @@ import type {
   AvailableReportType,
 } from "../../api/types";
 import type { ClientDevice } from "../../api/types";
+import { getSummaryColumns } from "../../utils/reportGenerator";
+import type { SummarySections } from "../../utils/reportGenerator";
 
 // ── Fallback report types (used if backend endpoint is unavailable) ────────
 
@@ -474,6 +476,10 @@ function GenerateForm({
     (reportTypes[0]?.key || "trips") as ReportType,
   );
   const [format, setFormat] = useState<ReportFormat>("pdf");
+  const [summarySections, setSummarySections] = useState<SummarySections>({ cover: true, statistics: true, detail: true });
+  const [summaryColumns, setSummaryColumns] = useState<string[]>(() =>
+    getSummaryColumns("trips").filter((c) => c.default).map((c) => c.key),
+  );
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -484,6 +490,16 @@ function GenerateForm({
   const [generating, setGenerating] = useState(false);
   const [searchDevice, setSearchDevice] = useState("");
   const [noDataInfo, setNoDataInfo] = useState<{ label: string; hint: string } | null>(null);
+
+  // Reset summary columns to defaults when report type changes
+  const currentSummaryCols = getSummaryColumns(reportType);
+  const prevTypeRef = useRef(reportType);
+  useEffect(() => {
+    if (prevTypeRef.current !== reportType) {
+      prevTypeRef.current = reportType;
+      setSummaryColumns(getSummaryColumns(reportType).filter((c) => c.default).map((c) => c.key));
+    }
+  }, [reportType]);
 
   const toggleDevice = (imei: string) => {
     setSelectedDevices((prev) =>
@@ -523,6 +539,14 @@ function GenerateForm({
       onToast("Please select a date range.", "error");
       return;
     }
+    if (format === "summary" && summaryColumns.length === 0) {
+      onToast("Please select at least one column for the summary report.", "error");
+      return;
+    }
+    if (format === "summary" && !summarySections.statistics && !summarySections.detail) {
+      onToast("Please enable at least one data sheet (Statistics or Detail).", "error");
+      return;
+    }
 
     setGenerating(true);
     setNoDataInfo(null); // Clear any previous "no data" banner
@@ -531,15 +555,27 @@ function GenerateForm({
       const ed = formatDateForApi(fromInputDate(endDate));
       console.log("[GenerateForm] Generating:", { reportType, format, selectedDevices, sd, ed });
 
-      await generateReport(reportType, format, {
+      // Build payload — include summary config when format is "summary"
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload: any = {
         report_devices: selectedDevices,
         start_date: sd,
         end_date: ed,
         origin_user: ownerUid,
-      });
+      };
+      if (format === "summary") {
+        payload.summary_config = {
+          sections: summarySections,
+          columns: summaryColumns,
+        };
+      }
+
+      await generateReport(reportType, format, payload);
 
       const clientSideTypes = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone"];
-      if (clientSideTypes.includes(reportType)) {
+      if (format === "summary") {
+        onToast(`${currentTypeLabel} summary report downloaded!`, "success");
+      } else if (clientSideTypes.includes(reportType)) {
         onToast(`${currentTypeLabel} report downloaded successfully!`, "success");
       } else {
         onToast(
@@ -720,8 +756,129 @@ function GenerateForm({
           >
             Excel
           </button>
+          <button
+            type="button"
+            onClick={() => setFormat("summary")}
+            className={`flex-1 h-10 rounded-lg text-[13px] font-black border cursor-pointer transition-all ${
+              format === "summary"
+                ? "bg-[#8B5CF6]/10 border-[#8B5CF6]/30 text-[#8B5CF6]"
+                : "bg-white border-[#E9EDEF] text-[#667781]"
+            }`}
+          >
+            Summary
+          </button>
         </div>
       </div>
+
+      {/* Summary Report Customization — shown only when format is "summary" */}
+      {format === "summary" && (
+        <div className="flex flex-col gap-3 p-3 rounded-xl border border-[#8B5CF6]/20 bg-[#8B5CF6]/5">
+          <div className="text-[12px] font-black text-[#8B5CF6]">Customize Summary Report</div>
+
+          {/* Sections toggle */}
+          <div>
+            <div className="text-[11px] font-black text-[#667781] mb-1.5 uppercase tracking-wider">Sheets to Include</div>
+            <div className="flex flex-col gap-1">
+              {([
+                { key: "cover" as const, label: "Cover", desc: "Report metadata & info" },
+                { key: "statistics" as const, label: "Statistics", desc: "Per-device aggregates" },
+                { key: "detail" as const, label: "Detail", desc: "Detailed data rows" },
+              ]).map((s) => (
+                <label key={s.key} className="flex items-center gap-2 cursor-pointer hover:bg-white/60 px-2 py-1 rounded-lg transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={summarySections[s.key]}
+                    onChange={() => setSummarySections((prev) => ({ ...prev, [s.key]: !prev[s.key] }))}
+                    className="accent-[#8B5CF6] shrink-0"
+                  />
+                  <span className="text-[12px] text-[#111B21] font-black">{s.label}</span>
+                  <span className="text-[10px] text-[#667781]">{s.desc}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Statistics columns — dynamic per report type */}
+          {summarySections.statistics && currentSummaryCols.filter((c) => c.section === "statistics").length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-black text-[#667781] uppercase tracking-wider">Statistics Columns</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const statKeys = currentSummaryCols.filter((c) => c.section === "statistics").map((c) => c.key);
+                    const allSelected = statKeys.every((k) => summaryColumns.includes(k));
+                    setSummaryColumns((prev) =>
+                      allSelected ? prev.filter((k) => !statKeys.includes(k)) : [...new Set([...prev, ...statKeys])],
+                    );
+                  }}
+                  className="text-[10px] font-black text-[#8B5CF6] cursor-pointer border-none bg-transparent"
+                >
+                  {currentSummaryCols.filter((c) => c.section === "statistics").every((c) => summaryColumns.includes(c.key))
+                    ? "Deselect All" : "Select All"}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {currentSummaryCols.filter((c) => c.section === "statistics").map((col) => (
+                  <label key={col.key} className="flex items-center gap-1.5 cursor-pointer hover:bg-white/60 px-2 py-1 rounded-lg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={summaryColumns.includes(col.key)}
+                      onChange={() =>
+                        setSummaryColumns((prev) =>
+                          prev.includes(col.key) ? prev.filter((k) => k !== col.key) : [...prev, col.key],
+                        )
+                      }
+                      className="accent-[#8B5CF6] shrink-0"
+                    />
+                    <span className="text-[11px] text-[#111B21]">{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Detail columns — dynamic per report type */}
+          {summarySections.detail && currentSummaryCols.filter((c) => c.section === "detail").length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-black text-[#667781] uppercase tracking-wider">Detail Columns</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const detailKeys = currentSummaryCols.filter((c) => c.section === "detail").map((c) => c.key);
+                    const allSelected = detailKeys.every((k) => summaryColumns.includes(k));
+                    setSummaryColumns((prev) =>
+                      allSelected ? prev.filter((k) => !detailKeys.includes(k)) : [...new Set([...prev, ...detailKeys])],
+                    );
+                  }}
+                  className="text-[10px] font-black text-[#8B5CF6] cursor-pointer border-none bg-transparent"
+                >
+                  {currentSummaryCols.filter((c) => c.section === "detail").every((c) => summaryColumns.includes(c.key))
+                    ? "Deselect All" : "Select All"}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {currentSummaryCols.filter((c) => c.section === "detail").map((col) => (
+                  <label key={col.key} className="flex items-center gap-1.5 cursor-pointer hover:bg-white/60 px-2 py-1 rounded-lg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={summaryColumns.includes(col.key)}
+                      onChange={() =>
+                        setSummaryColumns((prev) =>
+                          prev.includes(col.key) ? prev.filter((k) => k !== col.key) : [...prev, col.key],
+                        )
+                      }
+                      className="accent-[#8B5CF6] shrink-0"
+                    />
+                    <span className="text-[11px] text-[#111B21]">{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Generate Button */}
       <button

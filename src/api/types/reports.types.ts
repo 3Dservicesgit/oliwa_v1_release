@@ -41,7 +41,7 @@ export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
 
 // ── Export format ───────────────────────────────────────────────────────────
 
-export type ReportFormat = "pdf" | "excel";
+export type ReportFormat = "pdf" | "excel" | "summary";
 
 // ── State report subtypes (sent as report_state in payload) ─────────────────
 
@@ -61,6 +61,12 @@ export interface GenerateReportRequest {
   end_date: string;              // DD-MM-YYYY
   origin_user: string;           // Account UID of the requester
   report_state?: string;         // Only for state reports: "IDILING" | "PARKING"
+  /** Summary report config — which sections & columns to include */
+  summary_config?: {
+    sections: { cover: boolean; statistics: boolean; detail: boolean };
+    columns: string[];
+    groupName?: string;
+  };
 }
 
 // ── Generate report response ────────────────────────────────────────────────
