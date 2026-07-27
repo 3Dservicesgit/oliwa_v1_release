@@ -17,8 +17,11 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
+  attachDevicesToEvent,
+  removeDeviceFromEvent,
 } from "../../api/services/events.service";
 import { getGeozones } from "../../api/services/geozones.service";
+import { getClientDevices } from "../../api/services/clients.service";
 import { getNotifications } from "../../api/services/notifications.service";
 import {
   EVENT_CONDITION_LABELS,
@@ -31,6 +34,7 @@ import type {
   UpdateEventRequest,
   EventNotification,
   Geozone,
+  ClientDevice,
 } from "../../api/types";
 import { getCookie } from "../../utils/cookies";
 
@@ -203,6 +207,152 @@ function GeofenceZoneSelector({
   );
 }
 
+// ── Device Selector for Events ─────────────────────────────────────────────
+
+function EventDeviceSelector({
+  selectedImeis,
+  onSelectionChange,
+  accountRoot,
+  eventUid,
+}: {
+  selectedImeis: string[];
+  onSelectionChange: (imeis: string[]) => void;
+  accountRoot: string;
+  /** When editing, pass the event UID to auto-select devices that already have this event attached. */
+  eventUid?: string;
+}) {
+  const [devices, setDevices] = useState<ClientDevice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!accountRoot) return;
+    let cancelled = false;
+    setLoading(true);
+    getClientDevices(accountRoot)
+      .then((res) => {
+        if (cancelled) return;
+        const devs = res.data ?? [];
+        setDevices(devs);
+        // Auto-select devices already attached to this event
+        if (eventUid) {
+          const attached = devs
+            .filter((d) => {
+              try {
+                const arr = JSON.parse(d.events_attached || "[]");
+                return Array.isArray(arr) && arr.includes(eventUid);
+              } catch { return false; }
+            })
+            .map((d) => d.device_imei);
+          if (attached.length > 0) onSelectionChange(attached);
+        }
+      })
+      .catch(() => { if (!cancelled) setDevices([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [accountRoot, eventUid]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return devices;
+    const q = search.toLowerCase();
+    return devices.filter(
+      (d) =>
+        d.device_name.toLowerCase().includes(q) ||
+        d.device_imei.toLowerCase().includes(q) ||
+        d.car_make.toLowerCase().includes(q) ||
+        d.car_model.toLowerCase().includes(q),
+    );
+  }, [devices, search]);
+
+  const toggle = (imei: string) => {
+    onSelectionChange(
+      selectedImeis.includes(imei)
+        ? selectedImeis.filter((i) => i !== imei)
+        : [...selectedImeis, imei],
+    );
+  };
+
+  const selectAll = () => onSelectionChange(filtered.map((d) => d.device_imei));
+  const clearAll = () => onSelectionChange([]);
+
+  return (
+    <div>
+      <label className="block text-[12px] font-black text-[#111B21] mb-1.5">
+        Tag Devices (Units)
+      </label>
+      <p className="text-[11px] text-[#667781] mb-2">
+        Select which devices this event rule should monitor. Leave empty to apply to all devices.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-3">
+          <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[12px] text-[#667781]">Loading devices...</span>
+        </div>
+      ) : devices.length === 0 ? (
+        <div className="bg-[#F0F2F5] rounded-lg px-3 py-3 text-[12px] text-[#667781]">
+          No devices found for this account.
+        </div>
+      ) : (
+        <>
+          {/* Search + bulk actions */}
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search devices..."
+              className="flex-1 h-8 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+            />
+            <button
+              type="button"
+              onClick={selectedImeis.length === filtered.length ? clearAll : selectAll}
+              className="h-8 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#F0F2F5]"
+            >
+              {selectedImeis.length === filtered.length ? "Clear" : "All"}
+            </button>
+          </div>
+
+          {/* Device list */}
+          <div className="flex flex-col gap-1 max-h-[180px] overflow-y-auto rounded-lg border border-[#E9EDEF] p-2 [scrollbar-width:thin]">
+            {filtered.map((d) => (
+              <label
+                key={d.device_imei}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer transition-all ${
+                  selectedImeis.includes(d.device_imei)
+                    ? "bg-[#128C7E]/8 border border-[#128C7E]/30"
+                    : "border border-transparent hover:bg-[#F0F2F5]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedImeis.includes(d.device_imei)}
+                  onChange={() => toggle(d.device_imei)}
+                  className="accent-[#128C7E] w-3.5 h-3.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-black text-[#111B21] truncate">
+                    {d.device_name || d.device_imei}
+                  </div>
+                  <div className="text-[10px] text-[#667781] truncate">
+                    {d.device_imei}
+                    {d.car_make ? ` · ${d.car_make} ${d.car_model}` : ""}
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {selectedImeis.length > 0 && (
+            <p className="text-[11px] text-[#128C7E] mt-1 font-black">
+              {selectedImeis.length} device{selectedImeis.length !== 1 ? "s" : ""} selected
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Drawer: Create Event ────────────────────────────────────────────────────
 
 function CreateEventDrawer({
@@ -227,6 +377,9 @@ function CreateEventDrawer({
   // Geofence breach-specific state
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [breachType, setBreachType] = useState<BreachType>("both");
+
+  // Device tagging state
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
 
   const ownerUid =
     authState.accountUid || getCookie("_nvxs_account_uid") || "";
@@ -263,7 +416,18 @@ function CreateEventDrawer({
         alert_channels: alertChannels,
         event_owner_uid: ownerUid,
       };
-      await create.mutate(payload);
+      const res = await create.mutate(payload);
+
+      // Attach selected devices to the newly created event.
+      // Backend returns the new event_uid in res.data.
+      if (selectedDevices.length > 0 && res.data) {
+        try {
+          await attachDevicesToEvent(res.data, selectedDevices);
+        } catch {
+          console.warn("Event created but device attach failed");
+        }
+      }
+
       // Reset form
       setName("");
       setDescription("");
@@ -271,6 +435,7 @@ function CreateEventDrawer({
       setConditionValue("");
       setSelectedZones([]);
       setBreachType("both");
+      setSelectedDevices([]);
       setAlertEmail("");
       setAlertPhone("");
       setAlertChannels(["email"]);
@@ -457,6 +622,13 @@ function CreateEventDrawer({
               <p className="text-[11px] text-[#667781] mt-1">Comma-separated phone numbers with country code.</p>
             </div>
           )}
+
+          {/* Device Tagging */}
+          <EventDeviceSelector
+            selectedImeis={selectedDevices}
+            onSelectionChange={setSelectedDevices}
+            accountRoot={accountRoot}
+          />
         </div>
 
         {/* Footer */}
@@ -506,6 +678,11 @@ function EditEventDrawer({
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [breachType, setBreachType] = useState<BreachType>("both");
 
+  // Device tagging state
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const initialDevicesRef = React.useRef<string[]>([]);
+  const deviceInitDone = React.useRef(false);
+
   const { state: authState } = useAuth();
   const accountRoot =
     authState.accountRoot || getCookie("_nvxs_account_root") || getCookie("_nvxs_account_uid") || "";
@@ -514,6 +691,15 @@ function EditEventDrawer({
     "events.update",
     (uid: string, payload: UpdateEventRequest) => updateEvent(uid, payload),
   );
+
+  // Wraps setSelectedDevices — captures the first call as the baseline for diffing
+  const handleDeviceChange = useCallback((imeis: string[]) => {
+    if (!deviceInitDone.current) {
+      initialDevicesRef.current = imeis;
+      deviceInitDone.current = true;
+    }
+    setSelectedDevices(imeis);
+  }, []);
 
   // Populate form when event changes
   useEffect(() => {
@@ -540,6 +726,10 @@ function EditEventDrawer({
         setSelectedZones([]);
         setBreachType("both");
       }
+      // Reset device state — EventDeviceSelector will re-populate via eventUid
+      setSelectedDevices([]);
+      initialDevicesRef.current = [];
+      deviceInitDone.current = false;
       setError("");
     }
   }, [event]);
@@ -571,6 +761,23 @@ function EditEventDrawer({
         alert_channels: alertChannels,
       };
       await update.mutate(event.event_uid, payload);
+
+      // Diff device selections and apply changes
+      const baseline = initialDevicesRef.current;
+      const toAttach = selectedDevices.filter((d) => !baseline.includes(d));
+      const toRemove = baseline.filter((d) => !selectedDevices.includes(d));
+
+      try {
+        if (toAttach.length > 0) {
+          await attachDevicesToEvent(event.event_uid, toAttach);
+        }
+        await Promise.all(
+          toRemove.map((imei) => removeDeviceFromEvent(imei, event.event_uid)),
+        );
+      } catch {
+        console.warn("Event updated but device changes partially failed");
+      }
+
       onUpdated();
       onClose();
     } catch (e) {
@@ -734,6 +941,14 @@ function EditEventDrawer({
               />
             </div>
           )}
+
+          {/* Device Tagging */}
+          <EventDeviceSelector
+            selectedImeis={selectedDevices}
+            onSelectionChange={handleDeviceChange}
+            accountRoot={accountRoot}
+            eventUid={event.event_uid}
+          />
         </div>
 
         {/* Footer */}
@@ -915,6 +1130,14 @@ function EventCard({
                 {ch}
               </span>
             ))}
+          </span>
+        )}
+        {Number(event.device_count || 0) > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="font-black">Devices:</span>
+            <span className="bg-[#34B7F1]/10 text-[#34B7F1] px-1.5 py-0.5 rounded text-[10px] font-black">
+              {event.device_count}
+            </span>
           </span>
         )}
         {event.alert_email && (

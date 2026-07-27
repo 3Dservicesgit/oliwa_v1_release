@@ -14,7 +14,7 @@
 
 import type { ApiResponse, RequestOptions } from "./types";
 import { ApiError } from "./types";
-import { getCookie, clearAllCookies } from "../utils/cookies";
+import { getCookie } from "../utils/cookies";
 
 // ── Base URL ─────────────────────────────────────────────────────────────────
 
@@ -169,15 +169,11 @@ async function baseFetch(
       });
     }
 
-    // Refresh failed — session is dead, force logout.
-    // BUT: if a new token was set very recently (e.g. login just completed),
-    // don't nuke the session — the 401 was from a stale request.
-    if (Date.now() - lastTokenSetTime > 3000) {
-      clearAllCookies();
-      setAccessToken(null);
-      sessionStorage.removeItem("_nvxs_redirect_in_progress");
-      setTimeout(() => { window.location.href = "/"; }, 100);
-    }
+    // Refresh failed — clear in-memory JWT so next call can retry refresh,
+    // but do NOT clear cookies or redirect. The session cookies are the
+    // user's proof of login; destroying them forces an unexpected re-login.
+    // Let the 401 propagate — callers handle API errors gracefully.
+    setAccessToken(null);
   }
 
   return response;
@@ -318,10 +314,8 @@ export async function postMultipart<T>(
         ...fetchOpts,
       });
     } else {
-      clearAllCookies();
+      // Clear in-memory JWT but preserve cookies — same rationale as baseFetch
       setAccessToken(null);
-      sessionStorage.removeItem("_nvxs_redirect_in_progress");
-      window.location.href = "/";
     }
   }
 

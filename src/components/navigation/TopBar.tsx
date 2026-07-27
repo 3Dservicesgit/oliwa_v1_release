@@ -214,6 +214,10 @@ export function TopBar({
 
   useEffect(() => {
     if (!authState.accountUid) return;
+    // Skip if we already have a name from cookies/auth state — avoids a
+    // guaranteed 401 when the in-memory JWT is unavailable (e.g. after refresh
+    // when /auth/refresh is down).
+    if (authState.accountName || getCookie("_nvxs_account_name")) return;
     const fetchDetails = async () => {
       try {
         const json = await getRaw<{ status: string; data: any }>(
@@ -227,7 +231,7 @@ export function TopBar({
       }
     };
     fetchDetails();
-  }, [authState.accountUid]);
+  }, [authState.accountUid, authState.accountName]);
 
   // Derive display values from fetched details → auth state → safe fallbacks
   const displayName = userDetails?.account_name || authState.accountName || getCookie("_nvxs_account_name") || "User";

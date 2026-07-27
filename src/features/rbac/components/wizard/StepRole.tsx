@@ -12,11 +12,11 @@ interface Props {
 }
 
 export function StepRole({ preSelectedPermissionUids, onSuccess, onClose, onNext }: Props) {
-  const { state: { accountUid } } = useAuth();
+  const { state: { accountUid, accountRoot } } = useAuth();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState("Tenant");
-  const [tenant, setTenant] = useState("engine");
+  const tenant = accountRoot || accountUid || "";
 
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [permsLoading, setPermsLoading] = useState(false);
@@ -29,7 +29,7 @@ export function StepRole({ preSelectedPermissionUids, onSuccess, onClose, onNext
   // Fetch permissions
   useEffect(() => {
     setPermsLoading(true);
-    getAllPermissions("engine")
+    getAllPermissions(accountRoot || "engine")
       .then((res) => {
         setPermissions(res.data);
         // Pre-select permissions from previous step if available
@@ -120,9 +120,7 @@ export function StepRole({ preSelectedPermissionUids, onSuccess, onClose, onNext
               </select>
             </Field>
             <Field label="Account Root" required>
-              <select value={tenant} onChange={(e) => setTenant(e.target.value)} className={SELECT_CLS}>
-                <option value="engine">engine</option>
-              </select>
+              <input value={tenant} readOnly className={`${SELECT_CLS} bg-[#F0F2F5] cursor-default`} />
             </Field>
           </div>
         </div>

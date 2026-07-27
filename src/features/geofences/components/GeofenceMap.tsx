@@ -85,6 +85,10 @@ export interface GeofenceMapProps {
   editingUid?: string | null;
   /** Live device markers to render on the map. */
   deviceMarkers?: DeviceMarkerData[];
+  /** Path of a newly created polygon that should be rendered as editable (pre-save). */
+  creatingPath?: LatLng[] | null;
+  /** Called when the user edits the creating polygon's vertices. */
+  onCreatingPathEdited?: (newPath: LatLng[]) => void;
 }
 
 export function GeofenceMap({
@@ -96,6 +100,8 @@ export function GeofenceMap({
   onPolygonEdited,
   editingUid,
   deviceMarkers = [],
+  creatingPath,
+  onCreatingPathEdited,
 }: GeofenceMapProps) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -105,6 +111,19 @@ export function GeofenceMap({
   const polygonRefs = useRef<Record<string, google.maps.Polygon>>({});
   const [mapReady, setMapReady] = useState(false);
   const [activeDevice, setActiveDevice] = useState<DeviceMarkerData | null>(null);
+
+  // ── Creation-edit polygon ref ───────────────────────────────────────────
+  const creatingPolyRef = useRef<google.maps.Polygon | null>(null);
+
+  const handleCreatingEditEnd = useCallback(() => {
+    const poly = creatingPolyRef.current;
+    if (!poly || !onCreatingPathEdited) return;
+    const path = poly
+      .getPath()
+      .getArray()
+      .map((p) => ({ lat: p.lat(), lng: p.lng() }));
+    onCreatingPathEdited(path);
+  }, [onCreatingPathEdited]);
 
   // ── Click-to-draw state ─────────────────────────────────────────────────
   const [drawPoints, setDrawPoints] = useState<LatLng[]>([]);
@@ -256,10 +275,10 @@ export function GeofenceMap({
                 ...baseStyle,
                 editable: isEditing,
                 draggable: isEditing,
-                clickable: true,
+                clickable: !drawingMode,
                 zIndex: isSelected ? 2 : 1,
               }}
-              onClick={() => onSelectGeozone?.(gz.geozone_uid)}
+              onClick={() => { if (!drawingMode) onSelectGeozone?.(gz.geozone_uid); }}
               onLoad={(poly) => onPolygonLoad(gz.geozone_uid, poly)}
               onUnmount={() => onPolygonUnmount(gz.geozone_uid)}
               onMouseUp={() => {
@@ -331,6 +350,28 @@ export function GeofenceMap({
               }}
             />
           ))}
+
+        {/* ── Editable creation polygon (post-draw, pre-save) ──── */}
+        {creatingPath && creatingPath.length >= 3 && !drawingMode && (
+          <Polygon
+            key="creating-editable"
+            paths={creatingPath}
+            options={{
+              fillColor: "#25D366",
+              fillOpacity: 0.2,
+              strokeColor: "#25D366",
+              strokeWeight: 2,
+              editable: true,
+              draggable: true,
+              clickable: true,
+              zIndex: 10,
+            }}
+            onLoad={(poly) => { creatingPolyRef.current = poly; }}
+            onUnmount={() => { creatingPolyRef.current = null; }}
+            onMouseUp={handleCreatingEditEnd}
+            onDragEnd={handleCreatingEditEnd}
+          />
+        )}
 
         {/* ── Attached device markers ─────────────────────────────── */}
         {deviceMarkers.map((d) => {

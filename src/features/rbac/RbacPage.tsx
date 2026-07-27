@@ -16,6 +16,7 @@ import {
   getAllUsers,
   blockUser,
   unblockUser,
+  deleteUser,
   resetUserPassword,
   assignUserRole,
   getAllRoles,
@@ -417,7 +418,7 @@ function AddMemberDrawer({
 }
 
 // ── Tab type ─────────────────────────────────────────────────────────────────
-type UserTab = "team" | "blocked";
+type UserTab = "team" | "blocked" | "deactivated" | "all";
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
@@ -498,6 +499,9 @@ export function RbacPage() {
       } else if (action === "unblock") {
         await unblockUser(user.account_uid);
         setToast({ message: `${user.account_name} has been restored`, type: "success" });
+      } else if (action === "delete") {
+        await deleteUser(user.account_uid);
+        setToast({ message: `${user.account_name} has been removed`, type: "success" });
       } else if (action === "reset") {
         const res = await resetUserPassword(user.account_uid);
         const pwd = res?.data?.temporary_password;
@@ -517,14 +521,19 @@ export function RbacPage() {
   };
 
   // ── Derived stats ────────────────────────────────────────────────────────
-  const totalUsers = users.length;
-  const activeCount = users.filter((u) => u.access_status === "active").length;
-  const blockedCount = users.filter((u) => u.access_status !== "active").length;
+  const liveUsers = users.filter((u) => u.access_status !== "deactivated");
+  const deactivatedUsers = users.filter((u) => u.access_status === "deactivated");
+  const totalUsers = liveUsers.length;
+  const activeCount = liveUsers.filter((u) => u.access_status === "active").length;
+  const blockedCount = liveUsers.filter((u) => u.access_status === "locked" || u.access_status === "blocked").length;
+  const deactivatedCount = deactivatedUsers.length;
 
   // ── Tab-scoped + search-filtered users ───────────────────────────────────
   const tabUsers = activeTab === "blocked"
-    ? users.filter((u) => u.access_status !== "active")
-    : users;
+    ? liveUsers.filter((u) => u.access_status !== "active")
+    : activeTab === "deactivated"
+    ? deactivatedUsers
+    : liveUsers;
 
   const filteredUsers = tabUsers.filter((u) => {
     if (!search.trim()) return true;
@@ -551,15 +560,22 @@ export function RbacPage() {
           </div>
 
           {/* KPI Strip */}
-          <div className="grid grid-cols-3 gap-3">
-            <KpiCard label="Team Members" value={String(totalUsers)} color="teal" loading={loading} />
-            <KpiCard label="Active" value={String(activeCount)} color="green" loading={loading} />
+          <div className="grid grid-cols-4 gap-3">
+            <KpiCard label="Team Members" value={String(totalUsers)} color="teal" loading={loading} onClick={() => setActiveTab("all")} />
+            <KpiCard label="Active" value={String(activeCount)} color="green" loading={loading} onClick={() => setActiveTab("all")} />
             <KpiCard
               label="Blocked"
               value={String(blockedCount)}
               color="red"
               loading={loading}
               onClick={blockedCount > 0 ? () => setActiveTab("blocked") : undefined}
+            />
+            <KpiCard
+              label="Deactivated"
+              value={String(deactivatedCount)}
+              color="red"
+              loading={loading}
+              onClick={deactivatedCount > 0 ? () => setActiveTab("deactivated") : undefined}
             />
           </div>
 
@@ -569,6 +585,7 @@ export function RbacPage() {
             <div className="flex gap-1.5 mr-2">
               <TabBtn active={activeTab === "team"} onClick={() => setActiveTab("team")} label="All Team" count={totalUsers} />
               <TabBtn active={activeTab === "blocked"} onClick={() => setActiveTab("blocked")} label="Blocked" count={blockedCount} danger />
+              <TabBtn active={activeTab === "deactivated"} onClick={() => setActiveTab("deactivated")} label="Deactivated" count={deactivatedCount} danger />
             </div>
 
             {/* Search */}
@@ -602,11 +619,13 @@ export function RbacPage() {
             {/* Table heading */}
             <div className="px-4 py-2.5 border-b border-[#E9EDEF] bg-[#F8FAFC]">
               <span className="font-black text-[12px] text-[#111B21]">
-                {activeTab === "blocked" ? "Blocked Users" : "Team Members"}
+                {activeTab === "blocked" ? "Blocked Users" : activeTab === "deactivated" ? "Deactivated Users" : "Team Members"}
               </span>
               <span className="text-[11px] text-[#667781] ml-2">
                 {activeTab === "blocked"
                   ? "These users cannot log in until restored"
+                  : activeTab === "deactivated"
+                  ? "These accounts have been permanently removed"
                   : `Showing users under your account`}
               </span>
             </div>
@@ -656,6 +675,7 @@ export function RbacPage() {
                   <tbody>
                     {filteredUsers.map((u) => {
                       const isActive = u.access_status === "active";
+                      const isDeactivated = u.access_status === "deactivated";
                       const isSelf = u.account_uid === ownerUid;
                       return (
                         <tr key={u.account_uid} className="border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8FAFC] transition-colors">
@@ -684,9 +704,15 @@ export function RbacPage() {
                           </td>
                           {/* Status */}
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black ${isActive ? "bg-[#128C7E]/10 text-[#128C7E]" : "bg-[#EF4444]/10 text-[#EF4444]"}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-[#128C7E]" : "bg-[#EF4444]"}`} />
-                              {isActive ? "Active" : "Blocked"}
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black ${
+                              isActive ? "bg-[#128C7E]/10 text-[#128C7E]"
+                              : isDeactivated ? "bg-[#667781]/10 text-[#667781]"
+                              : "bg-[#EF4444]/10 text-[#EF4444]"
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                isActive ? "bg-[#128C7E]" : isDeactivated ? "bg-[#667781]" : "bg-[#EF4444]"
+                              }`} />
+                              {isActive ? "Active" : isDeactivated ? "Deactivated" : "Blocked"}
                             </span>
                           </td>
                           {/* Joined */}
@@ -709,7 +735,7 @@ export function RbacPage() {
                                 />
                               )}
                               {/* Block / Restore */}
-                              {!isSelf && (
+                              {!isSelf && !isDeactivated && (
                                 isActive ? (
                                   <ActionBtn
                                     label="Block"
@@ -726,6 +752,15 @@ export function RbacPage() {
                                   />
                                 )
                               )}
+                              {/* Delete (deactivate) */}
+                              {!isSelf && !isDeactivated && (
+                                <ActionBtn
+                                  label="Delete"
+                                  icon="🗑"
+                                  color="text-[#EF4444]"
+                                  onClick={() => setConfirmAction({ user: u, action: "delete" })}
+                                />
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -739,7 +774,7 @@ export function RbacPage() {
             {/* Footer count */}
             {!loading && filteredUsers.length > 0 && (
               <div className="px-4 py-2 border-t border-[#E9EDEF] bg-[#F8FAFC] text-[10px] text-[#667781]">
-                Showing {filteredUsers.length} of {activeTab === "blocked" ? blockedCount : totalUsers} {activeTab === "blocked" ? "blocked users" : "team members"}
+                Showing {filteredUsers.length} of {activeTab === "blocked" ? blockedCount : activeTab === "deactivated" ? deactivatedCount : totalUsers} {activeTab === "blocked" ? "blocked users" : activeTab === "deactivated" ? "deactivated users" : "team members"}
               </div>
             )}
           </div>
@@ -750,21 +785,25 @@ export function RbacPage() {
       {confirmAction && (
         <ConfirmDialog
           title={
+            confirmAction.action === "delete" ? "Delete User" :
             confirmAction.action === "block" ? "Block User" :
             confirmAction.action === "unblock" ? "Restore User" : "Reset Password"
           }
           message={
-            confirmAction.action === "block"
+            confirmAction.action === "delete"
+              ? `Are you sure you want to permanently remove "${confirmAction.user.account_name}"? This action cannot be undone.`
+              : confirmAction.action === "block"
               ? `Are you sure you want to block "${confirmAction.user.account_name}"? They will not be able to log in until restored.`
               : confirmAction.action === "unblock"
               ? `Restore "${confirmAction.user.account_name}"? They will regain access to the platform.`
               : `Reset the password for "${confirmAction.user.account_name}"? A temporary password will be generated.`
           }
           confirmLabel={
+            confirmAction.action === "delete" ? "Delete User" :
             confirmAction.action === "block" ? "Block User" :
             confirmAction.action === "unblock" ? "Restore User" : "Reset Password"
           }
-          confirmColor={confirmAction.action === "block" ? "bg-[#EF4444]" : "bg-[#128C7E]"}
+          confirmColor={confirmAction.action === "delete" || confirmAction.action === "block" ? "bg-[#EF4444]" : "bg-[#128C7E]"}
           onConfirm={handleConfirmAction}
           onCancel={() => setConfirmAction(null)}
           loading={actionLoading}

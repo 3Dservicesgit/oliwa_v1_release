@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
-  const { state: { accountUid } } = useAuth();
+  const { state: { accountUid, accountRoot } } = useAuth();
   const [roleName, setRoleName] = useState("");
   const [roleDescription, setRoleDescription] = useState("");
   const [allPermissions, setAllPermissions] = useState<RbacPermission[]>([]);
@@ -33,7 +33,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
 
     Promise.all([
       getRoleByUid(role.id),
-      getAllPermissions("engine"),
+      getAllPermissions(accountRoot || "engine"),
     ])
       .then(([roleRes, permsRes]) => {
         setRoleDescription(roleRes.data.role_description ?? "");

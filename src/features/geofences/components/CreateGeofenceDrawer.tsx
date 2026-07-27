@@ -1,8 +1,9 @@
 /**
- * CreateGeofenceDrawer — Slide-in drawer for saving a newly drawn polygon.
+ * CreateGeofenceDrawer — Inline panel for saving a newly drawn polygon.
  *
- * Opens after the user finishes drawing on the map. The polygon path is
- * passed in; the user provides a name and description, then saves.
+ * Renders as a side panel in the left column (not a full-screen overlay)
+ * so the user can still interact with the map to drag polygon vertices
+ * and extend the geofence shape before saving.
  */
 import React, { useState, useCallback, useEffect } from "react";
 import { createGeozone } from "../../../api/services/geozones.service";
@@ -93,156 +94,137 @@ export function CreateGeofenceDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-
-      {/* Drawer panel */}
-      <div className="relative w-[400px] max-w-full bg-white h-full flex flex-col shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF] shrink-0">
-          <div>
-            <div className="font-black text-[15px] text-[#111B21]">Save Geofence</div>
-            <div className="text-[11px] text-[#667781] mt-0.5">
-              {drawnPath?.length ?? 0} vertices drawn
-            </div>
+    <div className="bg-white border border-[#128C7E] rounded-xl shadow-lg flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#128C7E] shrink-0">
+        <div>
+          <div className="font-black text-[13px] text-white">Save Geofence</div>
+          <div className="text-[10px] text-white/70 mt-0.5">
+            {drawnPath?.length ?? 0} vertices drawn
           </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] font-black text-[13px] cursor-pointer grid place-items-center"
-          >
-            ✕
-          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-6 h-6 rounded-md bg-white/20 border-0 text-white font-black text-[12px] cursor-pointer grid place-items-center hover:bg-white/30"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Editing active banner */}
+      <div className="px-4 py-2 bg-[#E9F7F4] border-b border-[#C2E8E1] flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+        <span className="text-[11px] font-extrabold text-[#075E54]">
+          Drag vertices on map to reshape — drag midpoints to extend
+        </span>
+      </div>
+
+      {/* Form */}
+      <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-4 flex flex-col gap-3">
+        {/* Name */}
+        <div>
+          <label className="block text-[10px] font-extrabold text-[#667781] mb-1">
+            Geofence Name *
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Warehouse Zone A"
+            className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E]"
+          />
         </div>
 
-        {/* Form */}
-        <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-5 flex flex-col gap-4">
-          {/* Name */}
-          <div>
-            <label className="block text-[11px] font-extrabold text-[#667781] mb-1">
-              Geofence Name *
-            </label>
+        {/* Description */}
+        <div>
+          <label className="block text-[10px] font-extrabold text-[#667781] mb-1">
+            Description *
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe this geofence area…"
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] resize-none"
+          />
+        </div>
+
+        {/* Geofence Color */}
+        <div>
+          <label className="block text-[10px] font-extrabold text-[#667781] mb-1">
+            Geofence Color
+          </label>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {COLOR_PRESETS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setGeofenceColor(c)}
+                className="w-6 h-6 rounded-full border-2 cursor-pointer transition-all shrink-0"
+                style={{
+                  backgroundColor: c,
+                  borderColor: geofenceColor === c ? "#111B21" : "transparent",
+                }}
+              />
+            ))}
             <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Warehouse Zone A"
-              className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E]"
+              type="color"
+              value={geofenceColor}
+              onChange={(e) => setGeofenceColor(e.target.value)}
+              className="w-6 h-6 rounded cursor-pointer border border-[#E9EDEF] p-0"
+              title="Custom color"
             />
           </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-[11px] font-extrabold text-[#667781] mb-1">
-              Description *
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe this geofence area…"
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] resize-none"
-            />
-          </div>
-
-          {/* Geofence Color */}
-          <div>
-            <label className="block text-[11px] font-extrabold text-[#667781] mb-1">
-              Geofence Color
-            </label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {COLOR_PRESETS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setGeofenceColor(c)}
-                  className="w-7 h-7 rounded-full border-2 cursor-pointer transition-all shrink-0"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: geofenceColor === c ? "#111B21" : "transparent",
-                  }}
-                />
-              ))}
-              <input
-                type="color"
-                value={geofenceColor}
-                onChange={(e) => setGeofenceColor(e.target.value)}
-                className="w-7 h-7 rounded cursor-pointer border border-[#E9EDEF] p-0"
-                title="Custom color"
-              />
-            </div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: geofenceColor }} />
-              <span className="text-[10px] text-[#667781] font-mono">{geofenceColor}</span>
-            </div>
-          </div>
-
-          {/* Label Color */}
-          <div>
-            <label className="block text-[11px] font-extrabold text-[#667781] mb-1">
-              Label Color (name on map)
-            </label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {COLOR_PRESETS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setLabelColor(c)}
-                  className="w-7 h-7 rounded-full border-2 cursor-pointer transition-all shrink-0"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: labelColor === c ? "#111B21" : "transparent",
-                  }}
-                />
-              ))}
-              <input
-                type="color"
-                value={labelColor}
-                onChange={(e) => setLabelColor(e.target.value)}
-                className="w-7 h-7 rounded cursor-pointer border border-[#E9EDEF] p-0"
-                title="Custom color"
-              />
-            </div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: labelColor }} />
-              <span className="text-[10px] text-[#667781] font-mono">{labelColor}</span>
-            </div>
-          </div>
-
-          {/* Polygon info */}
-          <div className="bg-[#F0F2F5] border border-[#E9EDEF] rounded-xl p-3">
-            <div className="text-[11px] font-extrabold text-[#667781] mb-1">Polygon Preview</div>
-            <div className="text-[11px] text-[#111B21]">
-              {drawnPath?.length ?? 0} coordinate points captured
-            </div>
-            {drawnPath && drawnPath.length > 0 && (
-              <div className="mt-1 text-[10px] text-[#667781] font-mono max-h-20 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {drawnPath.slice(0, 5).map((p, i) => (
-                  <div key={i}>
-                    [{p.lat.toFixed(6)}, {p.lng.toFixed(6)}]
-                  </div>
-                ))}
-                {drawnPath.length > 5 && (
-                  <div>…and {drawnPath.length - 5} more</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="text-[11px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2">
-              {error}
-            </div>
-          )}
         </div>
 
-        {/* Footer */}
-        <div className="flex gap-2 px-5 py-3 border-t border-[#E9EDEF] shrink-0">
+        {/* Label Color */}
+        <div>
+          <label className="block text-[10px] font-extrabold text-[#667781] mb-1">
+            Label Color
+          </label>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {COLOR_PRESETS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setLabelColor(c)}
+                className="w-6 h-6 rounded-full border-2 cursor-pointer transition-all shrink-0"
+                style={{
+                  backgroundColor: c,
+                  borderColor: labelColor === c ? "#111B21" : "transparent",
+                }}
+              />
+            ))}
+            <input
+              type="color"
+              value={labelColor}
+              onChange={(e) => setLabelColor(e.target.value)}
+              className="w-6 h-6 rounded cursor-pointer border border-[#E9EDEF] p-0"
+              title="Custom color"
+            />
+          </div>
+        </div>
+
+        {/* Polygon info */}
+        <div className="bg-[#F0F2F5] border border-[#E9EDEF] rounded-lg p-2.5">
+          <div className="text-[10px] font-extrabold text-[#667781]">
+            Polygon: {drawnPath?.length ?? 0} vertices
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="text-[11px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 h-9 rounded-lg border border-[#E9EDEF] bg-white text-[12px] font-extrabold text-[#667781] cursor-pointer"
+            className="flex-1 h-8 rounded-lg border border-[#E9EDEF] bg-white text-[11px] font-extrabold text-[#667781] cursor-pointer"
           >
             Cancel
           </button>
@@ -250,7 +232,7 @@ export function CreateGeofenceDrawer({
             type="button"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isRunning}
-            className="flex-1 h-9 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[#0D7466] disabled:opacity-50"
+            className="flex-1 h-8 rounded-lg border-0 bg-[#128C7E] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[#0D7466] disabled:opacity-50"
           >
             {createMutation.isRunning ? "Saving…" : "Save Geofence"}
           </button>

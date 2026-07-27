@@ -9,7 +9,7 @@
  *   DELETE /events/{event_uid}/delete    → deleteEvent
  */
 
-import { post, get, del } from "../client";
+import { post, get, del, put } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
 import type {
@@ -83,6 +83,45 @@ export function deleteEvent(
   return del<string>(
     `${ENDPOINTS.DEVICE_EVENTS.DELETE}/${eventUid}/delete`,
     undefined,
+    opts,
+  );
+}
+
+// ── Device ↔ Event attachment ──────────────────────────────────────────────
+
+/** Attach a list of devices (by IMEI) to an event rule. */
+export function attachDevicesToEvent(
+  eventUid: string,
+  deviceImeis: string[],
+  opts?: RequestOptions,
+): Promise<ApiResponse<string>> {
+  return post<string>(
+    `${ENDPOINTS.DEVICE_EVENTS.ATTACH}/${eventUid}/attach`,
+    { data: { device_list: deviceImeis } },
+    opts,
+  );
+}
+
+/** Remove a device from an event rule. */
+export function removeDeviceFromEvent(
+  deviceImei: string,
+  eventUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string[]>> {
+  return put<string[]>(
+    `${ENDPOINTS.DEVICE_EVENTS.REMOVE}/${deviceImei}/events/${eventUid}/remove`,
+    {},
+    opts,
+  );
+}
+
+/** Get all events attached to a specific device. */
+export function getDeviceEvents(
+  deviceImei: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<Array<{ event_uid: string; event_name: string }>>> {
+  return get<Array<{ event_uid: string; event_name: string }>>(
+    `${ENDPOINTS.DEVICE_EVENTS.DEVICE_EVENTS}/${deviceImei}/events`,
     opts,
   );
 }

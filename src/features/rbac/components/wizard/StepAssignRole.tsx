@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function StepAssignRole({ preSelectedUserUid, onSuccess, onClose }: Props) {
-  const { state: { accountUid } } = useAuth();
+  const { state: { accountUid, accountRoot } } = useAuth();
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [roles, setRoles] = useState<RbacRole[]>([]);
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
@@ -33,19 +33,20 @@ export function StepAssignRole({ preSelectedUserUid, onSuccess, onClose }: Props
     setUsersLoading(true);
     setRolesLoading(true);
     setPermsLoading(true);
-    getAllUsers("engine")
+    if (!accountRoot) return;
+    getAllUsers(accountRoot)
       .then((res) => setUsers(res.data))
       .catch(() => setUsers([]))
       .finally(() => setUsersLoading(false));
-    getAllRoles("engine")
+    getAllRoles(accountRoot)
       .then((res) => setRoles(res.data))
       .catch(() => setRoles([]))
       .finally(() => setRolesLoading(false));
-    getAllPermissions("engine")
+    getAllPermissions(accountRoot)
       .then((res) => setPermissions(res.data))
       .catch(() => setPermissions([]))
       .finally(() => setPermsLoading(false));
-  }, []);
+  }, [accountRoot]);
 
   // When a role is selected, show its permissions
   useEffect(() => {

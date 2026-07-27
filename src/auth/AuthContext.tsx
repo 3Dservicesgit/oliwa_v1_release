@@ -180,10 +180,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Have cookies but no JWT — silently refresh
+    // Have cookies but no JWT — try to silently refresh.
+    // IMPORTANT: If refresh fails, DO NOT clear cookies or log out.
+    // The session cookies are still valid for routing — buildInitialState()
+    // already set status="authenticated". Individual API calls will handle
+    // 401s via the interceptor in client.ts, which tries refresh again
+    // and only then forces logout if it truly fails.
     let cancelled = false;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     (async () => {
       try {
@@ -202,21 +207,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const json = await resp.json();
           if (json?.data?.access_token) {
             setAccessToken(json.data.access_token);
+            console.log("[Auth] Boot-time JWT refresh succeeded");
           } else {
-            // Token response was OK but missing access_token — treat as failure
-            clearAllCookies();
-            dispatch({ type: "LOGOUT" });
+            // 200 OK but no token — proceed without JWT, API interceptor will retry
+            console.warn("[Auth] Refresh returned OK but no access_token — proceeding with cookies only");
           }
         } else {
-          // Refresh failed — clear stale cookies so user sees login page
-          clearAllCookies();
-          dispatch({ type: "LOGOUT" });
+          // Refresh endpoint returned an error — proceed without JWT.
+          // Don't kill the session — the user's cookies are still valid.
+          console.warn("[Auth] Boot-time refresh returned", resp.status, "— proceeding with cookies only");
         }
       } catch {
         if (cancelled) return;
-        // Network error or timeout — clear stale session
-        clearAllCookies();
-        dispatch({ type: "LOGOUT" });
+        // Network error or timeout — proceed without JWT
+        console.warn("[Auth] Boot-time refresh failed (network/timeout) — proceeding with cookies only");
       } finally {
         clearTimeout(timeout);
         if (!cancelled) setAuthReady(true);

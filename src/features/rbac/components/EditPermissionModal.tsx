@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { updatePermission, getAllPermissions } from "../../../api";
 import type { RbacPermission } from "../../../api";
 import type { PermissionSet } from "./PermissionSetsTable";
+import { useAuth } from "../../../auth/AuthContext";
 
 interface Props {
   open: boolean;
@@ -13,6 +14,7 @@ interface Props {
 const DEFAULT_MODULES = ["billing", "gps", "alerts", "tokens", "rbac", "tenants", "devices", "veba", "noc", "reports"];
 
 export function EditPermissionModal({ open, permission, onClose, onUpdated }: Props) {
+  const { state: { accountRoot } } = useAuth();
   const [permissionName, setPermissionName] = useState("");
   const [description, setDescription] = useState("");
   const [module, setModule] = useState<string>("");
@@ -32,7 +34,7 @@ export function EditPermissionModal({ open, permission, onClose, onUpdated }: Pr
 
       // Fetch all permissions to build dynamic module list
       setModulesLoading(true);
-      getAllPermissions("engine")
+      getAllPermissions(accountRoot || "engine")
         .then((res) => {
           const existing = new Set<string>();
           (res.data as RbacPermission[]).forEach((p) => {

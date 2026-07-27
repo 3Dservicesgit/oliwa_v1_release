@@ -173,6 +173,7 @@ export const ENDPOINTS = {
     ALL: "/users/all",
     ASSIGN_ROLE: "/users",           // append /{user_uid}/assign-role
     ACTION: "/users/action",         // POST {action: 'active'|'locked', account_uid}
+    DELETE: "/users",                // POST /{user_uid}/delete  (soft-delete)
     RESET_PASSWORD: "/users",        // PUT  /{user_uid}/reset-password
     CHANGE_PASSWORD: "/users",       // PUT  /{user_uid}/change-password
     DETAILS: "/users",               // GET  /{user_uid}/details
@@ -227,6 +228,9 @@ export const ENDPOINTS = {
     GET_ALL:  "/events/getall",
     DETAILS:  "/events",           // append /{event_id}/details
     DELETE:   "/events",           // append /{event_uid}/delete
+    ATTACH:   "/devices/events",   // POST  append /{event_uid}/attach  — body { data: { device_list: string[] } }
+    REMOVE:   "/devices",          // PUT   append /{device_imei}/events/{event_uid}/remove
+    DEVICE_EVENTS: "/devices",     // GET   append /{device_imei}/events
   },
   NOTIFICATIONS: {
     LOG:      "/notifications/log",          // POST — log a triggered notification

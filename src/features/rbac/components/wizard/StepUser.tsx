@@ -35,7 +35,7 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
   // Fetch roles for the dropdown
   useEffect(() => {
     setRolesLoading(true);
-    getAllRoles("engine")
+    getAllRoles(accountRoot || "engine")
       .then((res) => {
         setRoles(res.data);
         // Set default role: pre-selected from previous step, or first available
@@ -78,8 +78,8 @@ export function StepUser({ preSelectedRoleName, onSuccess, onClose, onNext, mode
         assigned_role: assignedRole,
         email: email.trim(),
         password,
-        root_account: accountType === "Customer" ? selectedClientUid : (accountRoot ?? "engine"),
-        author: accountUid ?? "engine",
+        root_account: accountRoot || accountUid || "",
+        author: accountUid || "",
         billing_type: billingType,
       });
       const uid = res.data?.account_uid;

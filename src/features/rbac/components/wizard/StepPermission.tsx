@@ -28,7 +28,7 @@ export function StepPermission({ onSuccess, onClose, onNext }: Props) {
   // Fetch existing modules
   useEffect(() => {
     setModulesLoading(true);
-    getAllPermissions("engine")
+    getAllPermissions(accountRoot || "engine")
       .then((res) => {
         const existing = new Set<string>();
         (res.data as RbacPermission[]).forEach((p) => {

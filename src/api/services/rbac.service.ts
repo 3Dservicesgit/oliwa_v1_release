@@ -207,6 +207,14 @@ export function unblockUser(
   return post<string>(ENDPOINTS.USERS.ACTION, { data: { action: "active", account_uid: accountUid } }, opts);
 }
 
+/** Soft-delete (deactivate) a user account. */
+export function deleteUser(
+  userUid: string,
+  opts?: RequestOptions,
+): Promise<ApiResponse<string>> {
+  return post<string>(`${ENDPOINTS.USERS.DELETE}/${userUid}/delete`, {}, opts);
+}
+
 /** Admin reset password — returns a temporary password. */
 export function resetUserPassword(
   userUid: string,

@@ -109,12 +109,25 @@ export function getBudgetOffer(
   return post<BudgetOfferResponse>(ENDPOINTS.TOKENS.BUDGET_OFFER, { data: payload }, opts);
 }
 
-/** Fetch tokens that belong to a specific product. */
-export function getTokensByProduct(
+/** Fetch tokens that belong to a specific product.
+ *  Falls back to fetching ALL tokens and filtering client-side
+ *  when the per-product endpoint isn't deployed yet. */
+export async function getTokensByProduct(
   productUid: string,
   opts?: RequestOptions,
 ): Promise<ApiResponse<TokenPackage[]>> {
-  return get<TokenPackage[]>(`${ENDPOINTS.TOKENS.BY_PRODUCT}/${productUid}/list`, opts);
+  try {
+    const res = await get<TokenPackage[]>(`${ENDPOINTS.TOKENS.BY_PRODUCT}/${productUid}/list`, opts);
+    if (res.status === "success") return res;
+  } catch { /* fall through to client-side filter */ }
+
+  // Fallback: fetch all tokens and filter by product UID
+  const all = await getAllTokens(opts);
+  if (all.status !== "success") return all;
+  const filtered = (all.data ?? []).filter(
+    (t) => t.token_product_uid === productUid,
+  );
+  return { ...all, data: filtered };
 }
 
 /** Fetch token balance for a client. */

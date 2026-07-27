@@ -193,6 +193,11 @@ export function GeofencesPage() {
     setDrawnPath(null);
   };
 
+  // Update drawnPath when user edits the creation polygon on the map
+  const handleCreatingPathEdited = (newPath: LatLng[]) => {
+    setDrawnPath(newPath);
+  };
+
   // ── Edit handlers ───────────────────────────────────────────────────────
   const handleEditClick = (gz: ParsedGeozone) => {
     setEditingGeozone(gz);
@@ -311,10 +316,20 @@ export function GeofencesPage() {
       <div className="flex-1 min-h-0 p-3 pt-2">
         {activeTab === "my-geofences" ? (
           <div className="flex gap-3 h-full">
-            {/* Left panel — list OR edit panel */}
-            <div className="w-[340px] shrink-0 flex flex-col gap-2">
-              {/* Inline edit panel (replaces list when editing) */}
-              {editDrawerOpen && editingGeozone ? (
+            {/* Left panel — list OR create/edit panel */}
+            <div className="w-[340px] shrink-0 flex flex-col gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {/* Inline create panel (replaces list when creating) */}
+              {createDrawerOpen ? (
+                <CreateGeofenceDrawer
+                  open={createDrawerOpen}
+                  drawnPath={drawnPath}
+                  onClose={() => {
+                    setCreateDrawerOpen(false);
+                    setDrawnPath(null);
+                  }}
+                  onCreated={fetchGeozones}
+                />
+              ) : editDrawerOpen && editingGeozone ? (
                 <EditGeofenceDrawer
                   open={editDrawerOpen}
                   geozone={editingGeozone}
@@ -351,6 +366,8 @@ export function GeofencesPage() {
                 editingUid={editingUid}
                 onPolygonEdited={handlePolygonEdited}
                 deviceMarkers={deviceMarkers}
+                creatingPath={createDrawerOpen ? drawnPath : null}
+                onCreatingPathEdited={handleCreatingPathEdited}
               />
             </div>
           </div>
@@ -367,18 +384,8 @@ export function GeofencesPage() {
         )}
       </div>
 
-      {/* ── Drawers & Modals ────────────────────────────────────────────── */}
-      <CreateGeofenceDrawer
-        open={createDrawerOpen}
-        drawnPath={drawnPath}
-        onClose={() => {
-          setCreateDrawerOpen(false);
-          setDrawnPath(null);
-        }}
-        onCreated={fetchGeozones}
-      />
-
-      {/* EditGeofenceDrawer is now rendered inline in the left panel */}
+      {/* ── Modals ────────────────────────────────────────────────────── */}
+      {/* Create & Edit drawers are now rendered inline in the left panel */}
 
       <AttachDevicesModal
         open={!!attachGeozone}
