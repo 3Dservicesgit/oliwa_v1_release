@@ -269,4 +269,10 @@ export const ENDPOINTS = {
     /** Request an audit pack export (HIC-gated) */
     EXPORT:         "/audit/export",
   },
+  WASWA: {
+    /** Ask Waswa. POST {data:{message, surface, conversation_uid, module}} */
+    CHAT:           "/assistant/chat",
+    /** Rate an answer. POST {data:{message_uid, verdict, note}} */
+    FEEDBACK:       "/assistant/feedback",
+  },
 } as const;

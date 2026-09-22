@@ -6,6 +6,7 @@
  * Scrollbar hidden cross-browser (no plugin required).
  */
 import React from "react";
+import { WaswaStatusPill } from "../waswa/WaswaWidgets";
 
 // ── Chip colour variants — matches original CSS .chip.ok/success/warn/info ──
 const chipVariant: Record<string, string> = {
@@ -73,7 +74,9 @@ export function StatusStrip({ chips = DEFAULT_CHIPS, actions = DEFAULT_ACTIONS }
 
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex gap-1.5" style={hideScrollbar}>
-          {chips.map((c) => (
+          {chips.map((c) => c.id === "waswa" ? (
+            <WaswaStatusPill key={c.id} />
+          ) : (
             <span
               key={c.id}
               className={`shrink-0 whitespace-nowrap border rounded-full px-2.5 py-1 text-[11px] font-medium ${chipVariant[c.variant ?? "default"]}`}

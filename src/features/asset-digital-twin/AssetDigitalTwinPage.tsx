@@ -5,14 +5,13 @@
  * app shell in App.tsx. This page renders only its own content area.
  *
  * Reuses from shared components:
- *   WaswaDrawer  — floating AI co-pilot chat
+ *   Waswa chat   — shared drawer + launcher from WaswaProvider (App.tsx)
  *
  * Local sub-components (components/):
  *   KpiGrid, AssetsTable, AssetTwinBlade, CreateAssetModal,
  *   MaintenancePanel, PaymentsSection
  */
 import React, { useMemo, useState } from 'react';
-import { WaswaDrawer } from '../../components/waswa';
 
 import type { Asset, PayoutProvider } from './components/types';
 import { COLORS, btn, btnPrimary, btnBlue } from './components/types';
@@ -67,7 +66,6 @@ export default function AssetDigitalTwinPage() {
   const [tenant,          setTenant]          = useState('3D Services • TOP');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [createOpen,      setCreateOpen]      = useState(false);
-  const [waswaOpen,       setWaswaOpen]       = useState(false);
 
   const selected = useMemo(() => ASSETS.find((a) => a.id === selectedAssetId) ?? null, [selectedAssetId]);
   const api = apiStub();
@@ -148,24 +146,7 @@ export default function AssetDigitalTwinPage() {
         onCreate={(payload) => { api.createAsset(payload); setCreateOpen(false); }}
       />
 
-      {/* Shared WaswaDrawer — slides in from the right */}
-      <WaswaDrawer open={waswaOpen} onClose={() => setWaswaOpen(false)} />
-
-      {/* Floating trigger */}
-      <button
-        onClick={() => setWaswaOpen((v) => !v)}
-        title="Waswa AI"
-        style={{
-          position: 'fixed', right: 18, bottom: 18,
-          width: 56, height: 56, borderRadius: 999,
-          background: COLORS.green, border: `1px solid ${COLORS.green}`,
-          boxShadow: '0 10px 24px rgba(0,0,0,0.18)',
-          display: 'grid', placeItems: 'center',
-          color: COLORS.tealDark, fontWeight: 1000, cursor: 'pointer', zIndex: 60, fontSize: 12,
-        }}
-      >
-        AI
-      </button>
+      {/* Waswa chat: shared drawer + launcher from WaswaProvider (App.tsx). */}
     </div>
   );
 }

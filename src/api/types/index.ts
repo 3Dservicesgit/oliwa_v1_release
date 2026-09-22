@@ -209,3 +209,14 @@ export type {
   GeocodeRequest,
   GeocodeResponse,
 } from "./tracking.types";
+
+export type {
+  WaswaSurface,
+  WaswaVerdict,
+  WaswaEvidence,
+  WaswaVerifiedRef,
+  WaswaChatRequest,
+  WaswaChatReply,
+  WaswaFeedbackRequest,
+  WaswaFeedbackResult,
+} from "./waswa.types";

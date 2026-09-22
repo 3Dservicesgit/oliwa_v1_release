@@ -20,6 +20,9 @@ import { AuthProvider } from "../auth/AuthContext";
 import { PermissionsProvider } from "../auth/PermissionsContext";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
 
+// ── Waswa AI: one chat drawer + launcher shared by every page ───────────────
+import { WaswaProvider } from "../components/waswa";
+
 // ── Feature pages ────────────────────────────────────────────────────────────
 import { AegisDashboardPage }  from "../features/aegis";
 import { NocBridgePage }       from "../features/noc-bridge";
@@ -32,7 +35,6 @@ import { TokensPage }          from "../features/tokens";
 import { BillingPage }         from "../features/billing";
 import { PaymentsPage }        from "../features/payments";
 import { VebaPage }            from "../features/veba";
-import { AIWorkloadsPage }     from "../features/ai-workloads";
 import { RbacPage }            from "../features/rbac";
 import { AuditPage }           from "../features/audit";
 import { TenantTowerPage }     from "../features/tenant-tower";
@@ -55,6 +57,7 @@ export default function App() {
   return (
     <AuthProvider>
     <PermissionsProvider>
+    <WaswaProvider>
     <div className="h-dvh flex flex-col bg-[#F0F2F5] overflow-hidden w-full">
       <TopBar />
 
@@ -89,7 +92,7 @@ export default function App() {
           <Route path="/billing"  element={<ProtectedRoute permission="billing.view"><BillingPage /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute permission="payments.view"><PaymentsPage /></ProtectedRoute>} />
           <Route path="/veba"     element={<ProtectedRoute permission="veba.view"><VebaPage /></ProtectedRoute>} />
-          <Route path="/ai"       element={<ProtectedRoute permission="ai.view"><AIWorkloadsPage /></ProtectedRoute>} />
+          {/* No /ai page here: training Waswa (the AI Console) lives in the CMS only. */}
           <Route path="/rbac"     element={<ProtectedRoute permission="rbac.view"><RbacPage /></ProtectedRoute>} />
           <Route path="/audit"    element={<ProtectedRoute permission="audit.view"><AuditPage /></ProtectedRoute>} />
 
@@ -103,6 +106,7 @@ export default function App() {
         Kafka lag 4.8s • Redis p95 3ms • Cassandra p95 27ms • SSE clients 2.1k • Uptime 99.82%
       </footer>
     </div>
+    </WaswaProvider>
     </PermissionsProvider>
     </AuthProvider>
   );

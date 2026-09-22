@@ -158,3 +158,4 @@ export { getActiveSubscriptions, getPausedSubscriptions, getHighSubClients, getC
 export { getAllRoles, getRoleByUid, createRole, updateRole, deleteRole, getAllPermissions, getUserPermissions, createUser, getAllUsers, assignUserRole, createPermission, updatePermission, deletePermission, getActiveRolesCount, getTotalPermissionsCount, getActiveClientsCount, getActive3dClientsCount, getClientUsersCount, getRoleUserCounts, getPermissionRoleCounts, blockUser, unblockUser, deleteUser, resetUserPassword, getUserDetails } from "./services/rbac.service";
 export { getAuditEvents, getAuditKpis, getHashChain, getAuditApprovals, approveAuditRequest, rejectAuditRequest, getComplianceSnapshot, requestAuditExport } from "./services/audit.service";
 export { getTripHistory, getTripReplay, reverseGeocode } from "./services/tracking.service";
+export { sendWaswaMessage, sendWaswaFeedback } from "./services/waswa.service";
