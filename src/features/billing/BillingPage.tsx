@@ -9,6 +9,7 @@
  *   MODAL:   Reconcile Run HITL (Purpose, Scope, Cost, Guardrails, Approvals, Preview, Proof, Audit)
  */
 import React, { useEffect, useState } from "react";
+import { SampleTag } from "../../components/ui";
 import { getActiveSubscriptions, getHighSubClients, getPausedSubscriptions, getExpiringSubscriptions, getClientTransactions, getAllClients } from "../../api";
 import type { ActiveSubscriptionsResponse, HighSubClientsResponse, PausedSubscriptionsResponse, ExpiringSubscriptionsResponse, ClientTransaction, Client } from "../../api";
 
@@ -407,7 +408,7 @@ export function BillingPage() {
                 <div className="text-[12px] text-[#128C7E] font-black mb-1">Notes</div>
                 <div className="text-[12px] text-[#667781]">Dry-run produces a signed proof report for audit and dispute resolution.</div>
               </MSection>
-              <MSection title="Preview (Top mismatches)">
+              <MSection title="Preview (Top mismatches)" tag={<SampleTag />}>
                 <table className="w-full text-[12px]">
                   <thead><tr className="border-b border-[#E9EDEF]">
                     {["Event","Type","Reason","Impact"].map(h => (
@@ -501,10 +502,10 @@ function BSection({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-function MSection({ title, children }: { title: string; children: React.ReactNode }) {
+function MSection({ title, children, tag }: { title: string; children: React.ReactNode; tag?: React.ReactNode }) {
   return (
     <div className="mb-4 border border-[#E9EDEF] rounded-xl overflow-hidden bg-white">
-      <div className="px-4 py-2.5 bg-[#F8FAFC] border-b border-[#E9EDEF]"><div className="font-black text-[13px] text-[#111B21]">{title}</div></div>
+      <div className="px-4 py-2.5 bg-[#F8FAFC] border-b border-[#E9EDEF]"><div className="font-black text-[13px] text-[#111B21]">{title}{tag}</div></div>
       <div className="p-4">{children}</div>
     </div>
   );

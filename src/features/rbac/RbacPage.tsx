@@ -444,7 +444,7 @@ export function RbacPage() {
   const [search, setSearch] = useState("");
 
   // Modals/drawers
-  const [confirmAction, setConfirmAction] = useState<{ user: UserAccount; action: "block" | "unblock" | "reset" } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ user: UserAccount; action: "block" | "unblock" | "reset" | "delete" } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [manageUser, setManageUser] = useState<UserAccount | null>(null);
   const [tempPassword, setTempPassword] = useState<{ password: string; userName: string } | null>(null);

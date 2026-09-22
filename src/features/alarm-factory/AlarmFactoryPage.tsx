@@ -10,6 +10,7 @@
  * Right panel: WaswaTriagePanel (shared component, already matches mockup)
  */
 import React, { useState } from "react";
+import { SampleDataNotice } from "../../components/ui";
 import { WaswaTriagePanel, useWaswa } from "../../components/waswa";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,6 +121,8 @@ export function AlarmFactoryPage() {
       {/* ── Main scrollable content ─────────────────────────────────────────── */}
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex flex-col gap-3 p-3">
+
+          <SampleDataNotice />
 
           {/* ── Page Header ──────────────────────────────────────────────────── */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">

@@ -22,11 +22,11 @@ import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
 import { getGeozones, getDeviceGeozones } from "../../api/services/geozones.service";
 import { getClientDevices }   from "../../api/services/clients.service";
-import { getEvents }          from "../../api/services/events.service";
-import { logNotification }    from "../../api/services/notifications.service";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
-import type { Geozone, DeviceEvent } from "../../api/types";
+import type { Geozone } from "../../api/types";
 import { checkGeozoneTransitions } from "../../utils/geofenceUtils";
+import { parseLiveFrame, liveStreamUrl } from "../../utils/livePosition";
+import type { MotionStatus } from "../../utils/livePosition";
 import type { Point }              from "../../utils/geofenceUtils";
 
 // ─── Fleet env config ─────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ const IW_CSS = `
 `;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type MotionStatus = "Moving" | "Parked" | "Idling" | "Offline";
+
 
 interface VehicleUnit {
   imei:                string;
@@ -121,17 +121,7 @@ async function fleetFetch(method: string, path: string, body?: unknown): Promise
 }
 
 function sseUrl(imei: string): string {
-  return `${FLEET_SSE}/data-stream/${encodeURIComponent(imei)}/x-location`;
-}
-
-function normalizeStatus(ms: string, spd: number): MotionStatus {
-  const s = ms.toLowerCase();
-  if (s.includes("park") || s.includes("stop")) return "Parked";
-  if (s.includes("idl")  || s === "idle")        return "Idling";
-  if (s.includes("mov")  || s.includes("driv"))  return "Moving";
-  if (Number.isFinite(spd) && spd >= 5)          return "Moving";
-  if (Number.isFinite(spd) && spd > 0)           return "Idling";
-  return "Offline";
+  return liveStreamUrl(FLEET_SSE, imei);
 }
 
 function esc(s: unknown): string {
@@ -300,10 +290,6 @@ export default function NocBridgePage() {
   const geozonePathsRef = useRef<{ uid: string; name: string; path: Point[] }[]>([]);
   // Per-device map of which geozones they're currently inside
   const deviceInsideRef = useRef(new Map<string, Map<string, boolean>>());
-  // Event rules loaded from the backend (for notification matching)
-  const eventRulesRef = useRef<DeviceEvent[]>([]);
-  // Track which notifications we already logged to avoid duplicates per session
-  const loggedNotifsRef = useRef(new Set<string>());
 
   // Geofence-attached device markers (shown on map when geofences are ON)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -406,12 +392,10 @@ export default function NocBridgePage() {
     es.onmessage = (ev) => {
       const u = units.current.get(imei);
       if (!u) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let res: any;
-      try { res = JSON.parse(ev.data); } catch { return; }
-      if (res.status === "heartbeat") return;
+      const frame = parseLiveFrame(ev.data, imei);
+      if (frame.kind === "ignore") return;
 
-      if (res.status === "no_data") {
+      if (frame.kind === "offline") {
         u.status = "Offline";
         tick();
         const m = ensureMarker(u);
@@ -429,23 +413,20 @@ export default function NocBridgePage() {
         return;
       }
 
-      if (res.status !== "success" || !res.data) return;
-      const d = res.data;
-      const lat = parseFloat(d.data_latitude), lng = parseFloat(d.data_longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const p = frame.position;
+      const { lat, lng } = p;
 
-      u.speed             = Number(d.speed_log) || 0;
-      u.motion_state      = d.motion_state || "";
-      u.status            = normalizeStatus(u.motion_state, u.speed);
+      u.speed             = p.speed;
+      u.motion_state      = p.motionState;
+      u.status            = p.status;
       u.coords            = { lat, lng };
-      const rawGeo = d.geocoded_location || u.geocoded_location || "";
-      u.geocoded_location = rawGeo.toLowerCase().includes("failure") ? "" : rawGeo;
-      u.last_sync         = `${d.local_system_datestamp || ""} ${d.local_system_timestamp || ""}`.trim();
-      u.satellites        = Number(d.data_connected_satelites) || 0;
-      u.hdop              = d.data_hdop ? String(d.data_hdop) : "";
-      u.ignition          = d.ignition_status || d.iginition || "";
-      u.mileage           = d.mileage || "";
-      u.fuel_level        = d.fuel_level || "";
+      u.geocoded_location = p.geocoded || u.geocoded_location || "";
+      u.last_sync         = p.lastSync;
+      u.satellites        = p.satellites;
+      u.hdop              = p.hdop;
+      u.ignition          = p.ignition;
+      u.mileage           = p.mileage;
+      u.fuel_level        = p.fuelLevel;
 
       // ── Geofence entry/exit detection ──
       if (geozonePathsRef.current.length > 0 && showGeofences) {
@@ -464,50 +445,10 @@ export default function NocBridgePage() {
             time: now,
           }));
           setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
-
-          // ── Match against event rules and log notifications ──
-          const deviceName = u.name || imei;
-          const ownerUid = getCookie("_nvxs_account_root") ?? getCookie("_nvxs_account_uid") ?? "";
-          for (const geoEvt of events) {
-            for (const rule of eventRulesRef.current) {
-              // Parse the rule's condition_value to check zone and breach_type match
-              let ruleZones: string[] = [];
-              let ruleBreachType = "both";
-              try {
-                const cv = JSON.parse(rule.condition_value);
-                if (cv && Array.isArray(cv.zones)) {
-                  ruleZones = cv.zones;
-                  ruleBreachType = cv.breach_type || "both";
-                }
-              } catch { continue; }
-
-              // Check if this zone matches the rule
-              if (ruleZones.length > 0 && !ruleZones.includes(geoEvt.uid)) continue;
-              // Check if the breach type matches
-              if (ruleBreachType !== "both" && ruleBreachType !== geoEvt.type) continue;
-
-              // Deduplicate: one notification per rule+device+zone+type per session
-              const dedupeKey = `${rule.event_uid}:${imei}:${geoEvt.uid}:${geoEvt.type}`;
-              if (loggedNotifsRef.current.has(dedupeKey)) continue;
-              loggedNotifsRef.current.add(dedupeKey);
-
-              // Fire-and-forget log to the backend
-              logNotification({
-                event_uid: rule.event_uid,
-                event_name: rule.event_name,
-                device_imei: imei,
-                device_name: deviceName,
-                condition: "geofence_breach",
-                trigger_value: `${geoEvt.type}:${geoEvt.name}`,
-                geozone_name: geoEvt.name,
-                breach_type: geoEvt.type,
-                alert_channels: (() => {
-                  try { return JSON.parse(rule.alert_methods || "[]"); } catch { return []; }
-                })(),
-                owner_uid: ownerUid,
-              }).catch(() => { /* ignore logging errors */ });
-            }
-          }
+          // Alerts themselves are sent by the server (endpoints/alert_engine.py):
+          // it remembers where each unit was between sessions, only alerts on
+          // units attached to the rule, and works whether or not this screen
+          // is open. What is shown here is this screen's own live view.
         }
       }
 
@@ -833,43 +774,20 @@ export default function NocBridgePage() {
         }
         geozonePathsRef.current = alertPaths;
 
-        // 4b. Load event rules to match geofence_breach events for notifications
-        try {
-          const ownerUid = getCookie("_nvxs_account_uid") ?? accountRoot;
-          const evRes = await getEvents(ownerUid, "usri");
-          if (!cancelled && evRes.status === "success" && Array.isArray(evRes.data)) {
-            eventRulesRef.current = evRes.data.filter(
-              (ev: DeviceEvent) => ev.condition === "geofence_breach",
-            );
-            console.log(`[LiveMonitoring] Loaded ${eventRulesRef.current.length} geofence_breach event rules`);
-          }
-        } catch {
-          // Silently ignore — events may not exist yet
-        }
-
         // 5. Open SSE for attached devices NOT already tracked by the fleet
         for (const imei of allAttachedImeis) {
           // Fleet devices already have SSE via startAll() — only open extra SSE for non-fleet devices
           if (sseConns.current.has(imei)) continue;
 
-          const url = `${FLEET_SSE}/data-stream/${encodeURIComponent(imei)}/x-location`;
-          const es = new EventSource(url);
+          const es = new EventSource(sseUrl(imei));
           geoDeviceSse.current.set(imei, es);
 
           es.onmessage = (ev) => {
             if (cancelled) return;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let d: any;
-            try { d = JSON.parse(ev.data); } catch { return; }
-            if (d.status === "heartbeat" || d.status === "no_data") return;
-            if (d.status !== "success" || !d.data) return;
+            const frame = parseLiveFrame(ev.data, imei);
+            if (frame.kind !== "position") return;
 
-            const lat = parseFloat(d.data?.data_latitude ?? d.data?.latitude ?? 0);
-            const lng = parseFloat(d.data?.data_longitude ?? d.data?.longitude ?? 0);
-            if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return;
-
-            const spd = Number(d.data?.speed_log ?? d.data?.speed ?? 0);
-            const status = normalizeStatus(d.data?.motion_state ?? "", spd);
+            const { lat, lng, status } = frame.position;
             const iconKey = status === "Moving" ? "moving" : status === "Parked" ? "parked"
                           : status === "Idling" ? "idling" : "unknown";
             const icon = { url: ICONS[iconKey], scaledSize: new G.Size(28, 28), anchor: new G.Point(14, 14) };

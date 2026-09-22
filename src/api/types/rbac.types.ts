@@ -41,6 +41,16 @@ export interface RbacUserPermissions {
   role: string;
   role_uid: string;
   permissions: RbacPermission[];
+  /** The account's type (e.g. "customer", "client", "system_user"). */
+  account_type?: string | null;
+  /** True for a fleet customer's login — decided by the server. */
+  is_customer?: boolean;
+  display_name?: string;
+  username?: string;
+  /** The client account this login belongs to (account_root). */
+  client_uid?: string;
+  /** The client's name, e.g. "Mukwano Co Ltd". */
+  client_name?: string;
 }
 
 // ── Create Role ──────────────────────────────────────────────────────────────

@@ -11,6 +11,16 @@
 /** A single coordinate pair as stored in the backend (lng, lat order). */
 export type GeozoneCoord = [number, number];
 
+/** What the customer drew. Every shape is also stored as a polygon ring in
+ *  geozone_points (a circle as a 64-gon, a line as its corridor). */
+export type GeozoneShape = "polygon" | "circle" | "line";
+
+/** The drawn shape's details, as sent to and returned by the API. */
+export type ShapeParams =
+  | { points: LatLng[] }                           // polygon (4+ corners)
+  | { center: LatLng; radius_m: number }           // circle
+  | { points: LatLng[]; width_m: number };         // line (2+ points) + thickness
+
 /** A geozone as returned by the list / details endpoints. */
 export interface Geozone {
   geozone_uid: string;
@@ -26,6 +36,10 @@ export interface Geozone {
   geozone_color?: string;
   /** Hex color for the geofence name label on the map. */
   geozone_label_color?: string;
+  /** polygon | circle | line (older zones: polygon). */
+  geozone_shape?: GeozoneShape;
+  /** The drawn shape; null for zones created before shapes existed. */
+  geozone_shape_params?: ShapeParams | null;
 }
 
 // ── Create / Update payloads ────────────────────────────────────────────────
@@ -37,12 +51,16 @@ export interface CreateGeozoneRequest {
   geozone_owner: string;
   geozone_color?: string;       // hex color for the geofence polygon (e.g. "#128C7E")
   geozone_label_color?: string; // hex color for the geofence name label on the map
+  geozone_shape?: GeozoneShape;
+  geozone_shape_params?: ShapeParams;
 }
 
 export interface UpdateGeozoneRequest {
   new_geozone_name: string;
   new_geozone_decription: string;  // backend spelling
   new_geozone_points: string;      // JSON-stringified coordinate array
+  new_geozone_shape?: GeozoneShape;
+  new_geozone_shape_params?: ShapeParams;
 }
 
 // ── Device attachment ───────────────────────────────────────────────────────

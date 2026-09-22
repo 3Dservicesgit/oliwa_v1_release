@@ -20,11 +20,22 @@ export interface BookingRequest {
   created_at:     string;
   updated_at:     string;
 
-  rate_snapshot:  {
+  /** The rate the requester saw, frozen at request time. Absent on a row
+   *  the server couldn't parse. */
+  rate_snapshot?: {
     daily_rate:     number;
     currency:       string;
     pricing_basis:  string;
-  };
+  } | null;
+
+  /** The asset's details, carried over from its listing so a request can be
+   *  shown by name rather than by UID. */
+  asset_summary?: {
+    display_name?: string;
+    asset_class?:  string;
+    owner_org?:    string;
+    country?:      string;
+  } | null;
 }
 
 export interface CreateBookingRequest {

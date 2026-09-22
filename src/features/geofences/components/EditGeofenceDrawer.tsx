@@ -1,20 +1,28 @@
 /**
- * EditGeofenceDrawer — Inline panel for editing an existing geofence.
+ * EditGeofenceDrawer — inline panel for editing an existing geofence.
  *
- * Renders as a side panel BELOW the geofence list (not a full-screen overlay)
- * so the user can still interact with the map to drag polygon vertices.
+ * Name and description can always be changed. The shape (polygon, circle or
+ * line) and its points are edited with the same editor as when creating: type
+ * coordinates, click the map to add points, or drag the markers. If the shape
+ * is left untouched it is saved exactly as it was — so an older 3-corner
+ * polygon can still be renamed without being forced to 4 corners.
  */
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { updateGeozone } from "../../../api/services/geozones.service";
 import { useGuardedMutation } from "../../../auth/guards";
-import type { ParsedGeozone, LatLng } from "../../../api/types";
+import type { ParsedGeozone } from "../../../api/types";
 import { serializeGeozonePoints } from "../../../api/types/geozones.types";
+import { draftToParams, ringFor, type ShapeDraft } from "../../../utils/geofenceShapes";
+import { ShapeEditor } from "./ShapeEditor";
 
 interface EditGeofenceDrawerProps {
   open: boolean;
   geozone: ParsedGeozone | null;
-  /** Updated path if user dragged vertices on the map. */
-  editedPath?: LatLng[] | null;
+  /** The shape being edited — shared with the map. */
+  draft: ShapeDraft;
+  onDraftChange: (draft: ShapeDraft) => void;
+  /** True once the customer has changed the shape or its points. */
+  shapeChanged: boolean;
   onClose: () => void;
   onUpdated?: () => void;
 }
@@ -22,22 +30,17 @@ interface EditGeofenceDrawerProps {
 export function EditGeofenceDrawer({
   open,
   geozone,
-  editedPath,
+  draft,
+  onDraftChange,
+  shapeChanged,
   onClose,
   onUpdated,
 }: EditGeofenceDrawerProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  // Mounted fresh (keyed by geofence) each time editing starts, so the fields
+  // are filled from the geofence here rather than in an effect.
+  const [name, setName] = useState(geozone?.geozone_name ?? "");
+  const [description, setDescription] = useState(geozone?.geozone_description ?? "");
   const [error, setError] = useState<string | null>(null);
-
-  // Populate form when geozone changes
-  useEffect(() => {
-    if (open && geozone) {
-      setName(geozone.geozone_name);
-      setDescription(geozone.geozone_description);
-      setError(null);
-    }
-  }, [open, geozone]);
 
   const updateMutation = useGuardedMutation(
     "can_edit_geofence",
@@ -51,15 +54,26 @@ export function EditGeofenceDrawer({
         setError("Description must be at least 6 characters.");
         return;
       }
-      setError(null);
 
-      const pathToSave = editedPath && editedPath.length >= 3 ? editedPath : geozone.path;
+      let shapeFields = {};
+      let points = serializeGeozonePoints(geozone.path);
+      if (shapeChanged) {
+        const checked = draftToParams(draft);
+        if ("error" in checked) {
+          setError(checked.error);
+          return;
+        }
+        points = serializeGeozonePoints(ringFor(draft.type, checked.params));
+        shapeFields = { new_geozone_shape: draft.type, new_geozone_shape_params: checked.params };
+      }
+      setError(null);
 
       try {
         const res = await updateGeozone(geozone.geozone_uid, {
           new_geozone_name: name.trim(),
           new_geozone_decription: description.trim(),
-          new_geozone_points: serializeGeozonePoints(pathToSave),
+          new_geozone_points: points,
+          ...shapeFields,
         });
 
         if (res.status === "success") {
@@ -71,13 +85,10 @@ export function EditGeofenceDrawer({
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to update geofence.");
       }
-    }, [geozone, name, description, editedPath, onUpdated, onClose]),
+    }, [geozone, name, description, draft, shapeChanged, onUpdated, onClose]),
   );
 
   if (!open || !geozone) return null;
-
-  const currentPath = editedPath && editedPath.length >= 3 ? editedPath : geozone.path;
-  const pathChanged = editedPath && editedPath.length >= 3;
 
   return (
     <div className="bg-white border border-[#128C7E] rounded-xl shadow-lg flex flex-col overflow-hidden">
@@ -86,33 +97,27 @@ export function EditGeofenceDrawer({
         <div>
           <div className="font-black text-[13px] text-white">Edit Geofence</div>
           <div className="text-[10px] text-white/70 mt-0.5">
-            Drag vertices on the map to reshape
+            Change the points below, click the map to add one, or drag a marker
           </div>
         </div>
         <button
           onClick={onClose}
+          aria-label="Close"
           className="w-6 h-6 rounded-md bg-white/20 border-0 text-white font-black text-[12px] cursor-pointer grid place-items-center hover:bg-white/30"
         >
           ✕
         </button>
       </div>
 
-      {/* Editing active banner */}
-      <div className="px-4 py-2 bg-[#E9F7F4] border-b border-[#C2E8E1] flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-        <span className="text-[11px] font-extrabold text-[#075E54]">
-          Edit mode active — drag the white squares on the map to reshape
-        </span>
-      </div>
-
       {/* Form */}
       <div className="p-4 flex flex-col gap-3">
         {/* Name */}
         <div>
-          <label className="block text-[10px] font-extrabold text-[#667781] mb-1">
+          <label className="block text-[10px] font-extrabold text-[#667781] mb-1" htmlFor="gf-edit-name">
             Geofence Name *
           </label>
           <input
+            id="gf-edit-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -122,10 +127,11 @@ export function EditGeofenceDrawer({
 
         {/* Description */}
         <div>
-          <label className="block text-[10px] font-extrabold text-[#667781] mb-1">
+          <label className="block text-[10px] font-extrabold text-[#667781] mb-1" htmlFor="gf-edit-desc">
             Description *
           </label>
           <textarea
+            id="gf-edit-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -133,23 +139,17 @@ export function EditGeofenceDrawer({
           />
         </div>
 
-        {/* Polygon status */}
-        <div className="bg-[#F0F2F5] border border-[#E9EDEF] rounded-lg p-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-[#667781]">
-              Polygon: {currentPath.length} points
-            </span>
-            {pathChanged && (
-              <span className="text-[10px] font-extrabold text-[#128C7E]">
-                Modified
-              </span>
-            )}
-          </div>
-        </div>
+        <div className="h-px bg-[#E9EDEF]" />
+
+        <ShapeEditor draft={draft} onChange={onDraftChange} />
+
+        {shapeChanged && (
+          <div className="text-[10px] font-extrabold text-[#128C7E]">Shape changed — saved when you press Save Changes.</div>
+        )}
 
         {/* Error */}
         {error && (
-          <div className="text-[11px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2">
+          <div role="alert" className="text-[11px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2">
             {error}
           </div>
         )}

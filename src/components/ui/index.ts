@@ -8,3 +8,4 @@ export { MiniGateway } from "./MiniGateway";
 export { MiniStat } from "./MiniStat";
 export { StatCard } from "./StatCard";
 export { Placeholder } from "./Placeholder";
+export { SampleDataNotice, SampleTag } from "./SampleDataNotice";

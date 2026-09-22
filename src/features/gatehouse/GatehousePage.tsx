@@ -59,9 +59,24 @@ function fmtDate(d: Date): string {
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
-/** Format date as YYYY-MM-DD for <input type="date">. */
+/** Format date as YYYY-MM-DD for <input type="date"> — in local time
+ *  (toISOString is UTC, which shows yesterday before 03:00 in Kampala). */
 function toInputDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/** "YYYY-MM-DD" + "HH:MM" → sortable "YYYY-MM-DD HH:MM:SS". */
+function stamp(date: string, time: string, seconds: string): string {
+  return `${date} ${time}:${seconds}`;
+}
+
+/** A record's "DD-MM-YYYY" + "HH:MM:SS" → sortable "YYYY-MM-DD HH:MM:SS". */
+function recordStamp(ds: string, ts: string): string {
+  const [d, m, y] = (ds || "").split("-");
+  const [hh = "00", mi = "00", ss = "00"] = (ts || "").split(":");
+  return `${y}-${(m || "").padStart(2, "0")}-${(d || "").padStart(2, "0")} ${hh.padStart(2, "0")}:${mi.padStart(2, "0")}:${ss.padStart(2, "0")}`;
 }
 
 /** Parse YYYY-MM-DD from input. */
@@ -144,6 +159,12 @@ function TripCard({ trip, index, selected, onClick }: {
   );
 }
 
+// History is fetched a page at a time until the range is covered. Without this
+// a busy day stopped at the first 10,000 points — and since the server returns
+// the newest first, it was the START of the range that quietly went missing.
+const HISTORY_PAGE_SIZE = 5000;
+const HISTORY_MAX_POINTS = 50000;   // a hard stop, reported to the customer
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function GatehousePage() {
   // ── Device list ────────────────────────────────────────────────────────
@@ -156,6 +177,8 @@ export default function GatehousePage() {
   const today = new Date();
   const [fromDate, setFromDate] = useState(toInputDate(today));
   const [toDate, setToDate]     = useState(toInputDate(today));
+  const [fromTime, setFromTime] = useState("00:00");
+  const [toTime, setToTime]     = useState("23:59");
 
   // ── Trip data ──────────────────────────────────────────────────────────
   const [rawData, setRawData]         = useState<PositionRecord[]>([]);
@@ -163,6 +186,11 @@ export default function GatehousePage() {
   const [tripLoading, setTripLoading] = useState(false);
   const [tripError, setTripError]     = useState<string | null>(null);
   const [selTripIdx, setSelTripIdx]   = useState<number | null>(null);
+  // True when the range holds more points than we are willing to draw.
+  const [truncated, setTruncated]     = useState(false);
+  const [loadedPages, setLoadedPages] = useState(0);
+  // Bumped on every new search, so a slow load can't overwrite a newer one.
+  const loadToken = useRef(0);
 
   // ── Replay ─────────────────────────────────────────────────────────────
   const [playing, setPlaying]           = useState(false);
@@ -204,6 +232,11 @@ export default function GatehousePage() {
     }
     return rawData;
   })();
+
+  // The points in the order they happened. The server returns newest first;
+  // everything the customer sees — the drawn route, the replay, the readout —
+  // works from this one oldest-first list.
+  const orderedPoints: PositionRecord[] = [...activePoints].reverse();
 
   // ── Stop replay helper ─────────────────────────────────────────────────
   const stopReplay = useCallback(() => {
@@ -366,64 +399,117 @@ export default function GatehousePage() {
   // ── Load trips ─────────────────────────────────────────────────────────
   async function loadTrips() {
     if (!selImei) return;
+    const start = stamp(fromDate, fromTime || "00:00", "00");
+    const end   = stamp(toDate, toTime || "23:59", "59");
+    if (!fromDate || !toDate) {
+      setTripError("Choose a start and an end date.");
+      return;
+    }
+    if (start > end) {
+      setTripError("The end date and time must be after the start.");
+      return;
+    }
     setTripLoading(true);
     setTripError(null);
     setTrips([]);
     setRawData([]);
     setSelTripIdx(null);
+    setTruncated(false);
+    setLoadedPages(0);
     stopReplay();
+
+    const token = ++loadToken.current;
+    const mine = () => token === loadToken.current;
 
     try {
       const from = parseInputDate(fromDate);
       const to   = parseInputDate(toDate);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const resp = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, {
-        data: {
-          device_imei:  selImei,
-          from_date:    fmtDate(from),
-          to_date:      fmtDate(to),
-          offset_log:   0,
-          record_count: 10000,
-        },
-      }) as any;
-      console.log("[TrackPlayback] trips/history/replay full response:", JSON.stringify(resp));
+      const collected: PositionRecord[] = [];
+      const seen = new Set<number>();
+      let offset = 0;
+      let pages = 0;
+      let hitCap = false;
+      let lastMessage = "";
 
-      if (resp?.status === "success" && Array.isArray(resp.data)) {
-        // Map replay response fields to PositionRecord shape
+      // Ask for one page at a time until the range runs out (a short page) or
+      // we reach the cap. Pages can overlap, so points are matched on data_idx.
+      for (;;) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rd: PositionRecord[] = resp.data.map((p: any) => ({
-          data_longitude:          p.data_longitude,
-          data_latitude:           p.data_latitude,
-          speed_log:               p.speed_log,
-          data_hdop:               p.data_hdop,
-          local_system_datestamp:   p.local_system_datestamp,
-          record_io_events_uid:    p.record_io_events_uid,
-          geocoded_location:       p.geocoded_location,
-          local_system_timestamp:  p.local_system_timestamp,
-          data_connected_satelites: p.data_connected_satelites,
-          batch_uid:               p.batch_uid,
-          data_idx:                p.data_idx,
-          data_index:              p.data_index,
-        }));
-        setRawData(rd);
-        setTrips([]);  // replay endpoint doesn't return grouped trips
-        drawRoute(rd);
-        if (rd.length === 0) {
-          setTripError("No trips found for this date range.");
+        const resp = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, {
+          data: {
+            device_imei:  selImei,
+            from_date:    fmtDate(from),
+            to_date:      fmtDate(to),
+            from_time:    fromTime || "00:00",
+            to_time:      toTime || "23:59",
+            offset_log:   offset,
+            record_count: HISTORY_PAGE_SIZE,
+          },
+        }) as any;
+        if (!mine()) return;               // a newer search replaced this one
+
+        lastMessage = resp?.message || lastMessage;
+        const batch = resp?.status === "success" && Array.isArray(resp.data) ? resp.data : [];
+        pages += 1;
+        setLoadedPages(pages);
+
+        for (const p of batch) {
+          const idx = Number(p.data_idx);
+          if (Number.isFinite(idx)) {
+            if (seen.has(idx)) continue;
+            seen.add(idx);
+          }
+          collected.push({
+            data_longitude:          p.data_longitude,
+            data_latitude:           p.data_latitude,
+            speed_log:               p.speed_log,
+            data_hdop:               p.data_hdop,
+            local_system_datestamp:   p.local_system_datestamp,
+            record_io_events_uid:    p.record_io_events_uid,
+            geocoded_location:       p.geocoded_location,
+            local_system_timestamp:  p.local_system_timestamp,
+            data_connected_satelites: p.data_connected_satelites,
+            batch_uid:               p.batch_uid,
+            data_idx:                p.data_idx,
+            data_index:              p.data_index,
+            io_events_data:          p.io_events_data ?? "no-data",
+            enduser_data:            p.enduser_data,
+          });
         }
-      } else {
-        setTripError(resp?.message || "No trips found for this date range.");
+
+        if (batch.length < HISTORY_PAGE_SIZE) break;     // end of the range
+        if (collected.length >= HISTORY_MAX_POINTS) { hitCap = true; break; }
+        offset += HISTORY_PAGE_SIZE;
+      }
+
+      // Keep only the chosen time window. The server filters too; this also
+      // covers an API that doesn't know about times yet.
+      const rd = collected.filter((p) => {
+        const t = recordStamp(p.local_system_datestamp, p.local_system_timestamp);
+        return t >= start && t <= end;
+      });
+
+      if (!mine()) return;
+      setRawData(rd);
+      setTrips([]);  // replay endpoint doesn't return grouped trips
+      setTruncated(hitCap);
+      drawRoute(rd);
+      if (rd.length === 0) {
+        setTripError(lastMessage || "No trips found for this date and time range.");
       }
     } catch {
-      setTripError("Failed to load trip data. Please try again.");
+      if (mine()) setTripError("Failed to load trip data. Please try again.");
     }
-    setTripLoading(false);
+    if (mine()) setTripLoading(false);
   }
 
   // ── Replay controls ────────────────────────────────────────────────────
-  function startReplay() {
-    const points = [...activePoints].reverse();
+  // `from` is passed in rather than read from state: pressing Replay after a
+  // run had finished used to read the old index (React had not applied the
+  // reset yet), so the vehicle sat at the end and nothing moved.
+  function startReplay(from: number) {
+    const points = orderedPoints;
     if (points.length < 2) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google?.maps;
@@ -431,7 +517,9 @@ export default function GatehousePage() {
     if (!G || !map) return;
 
     setPlaying(true);
-    let idx = replayIdx;
+    let idx = Math.min(Math.max(from, 0), points.length - 1);
+    if (idx >= points.length - 1) idx = 0;      // finished — start again
+    setReplayIdx(idx);
 
     // Create or reposition car marker
     const pos = {
@@ -474,19 +562,46 @@ export default function GatehousePage() {
 
   function toggleReplay() {
     if (playing) { stopReplay(); return; }
-    const pts = [...activePoints].reverse();
-    if (replayIdx >= pts.length - 1) setReplayIdx(0);
-    startReplay();
+    startReplay(replayIdx);
+  }
+
+  /** Jump the replay to a point (0 = start of the route, 1 = end). */
+  function seekReplay(fraction: number) {
+    const points = orderedPoints;
+    if (points.length < 2) return;
+    const idx = Math.round(Math.min(Math.max(fraction, 0), 1) * (points.length - 1));
+    const wasPlaying = playing;
+    stopReplay();
+    setReplayIdx(idx);
+    const p = {
+      lat: parseFloat(points[idx].data_latitude),
+      lng: parseFloat(points[idx].data_longitude),
+    };
+    if (carMarker.current && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+      carMarker.current.setPosition(p);
+      gMap.current?.panTo(p);
+    }
+    if (wasPlaying) startReplay(idx);
   }
 
   // Cleanup on unmount
   useEffect(() => () => stopReplay(), [stopReplay]);
 
   // Current replay point info
-  const replayPoints = [...activePoints].reverse();
+  const replayPoints = orderedPoints;
   const currentPoint = replayPoints[replayIdx] || null;
 
   // ── Quick stats for loaded data ────────────────────────────────────────
+  /** "06:12 → 18:40" — the span the loaded points actually cover. */
+  const coveredRange = (() => {
+    const first = orderedPoints[0];
+    const last = orderedPoints[orderedPoints.length - 1];
+    if (!first || !last) return "—";
+    const hhmm = (t: string) => (t || "").slice(0, 5) || "—";
+    return first.local_system_datestamp === last.local_system_datestamp
+      ? `${hhmm(first.local_system_timestamp)} → ${hhmm(last.local_system_timestamp)}`
+      : `${first.local_system_datestamp} → ${last.local_system_datestamp}`;
+  })();
   const totalDistance = trips.reduce((s, t) => s + (t.mileage_passed || 0), 0);
   const totalPoints  = rawData.length;
   const selectedDevice = devices.find((d) => d.imei === selImei);
@@ -513,7 +628,7 @@ export default function GatehousePage() {
           {/* Controls card */}
           <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
             <div className="px-4 py-2.5 border-b border-[#E9EDEF]">
-              <div className="font-black text-[14px] text-[#111B21]">Select Device & Date</div>
+              <div className="font-black text-[14px] text-[#111B21]">Select Device, Date & Time</div>
             </div>
             <div className="p-4 flex flex-col gap-3">
               {/* Device picker */}
@@ -550,19 +665,47 @@ export default function GatehousePage() {
                 )}
               </div>
 
-              {/* Date range */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Date and time range */}
+              <div className="flex flex-col gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-[#667781] block mb-1">From</label>
-                  <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                      text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                  <label className="text-[11px] font-bold text-[#667781] block mb-1">Start</label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <input type="date" aria-label="Start date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
+                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                    <input type="time" aria-label="Start time" value={fromTime} onChange={(e) => setFromTime(e.target.value)}
+                      className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px]
+                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-[#667781] block mb-1">To</label>
-                  <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                      text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                  <label className="text-[11px] font-bold text-[#667781] block mb-1">End</label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <input type="date" aria-label="End date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
+                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                    <input type="time" aria-label="End time" value={toTime} onChange={(e) => setToTime(e.target.value)}
+                      className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px]
+                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                  </div>
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[
+                    { label: "Whole day", apply: () => { setFromTime("00:00"); setToTime("23:59"); } },
+                    { label: "Last hour", apply: () => {
+                      const now = new Date(); const back = new Date(now.getTime() - 3600_000);
+                      const hm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                      setFromDate(toInputDate(back)); setFromTime(hm(back));
+                      setToDate(toInputDate(now)); setToTime(hm(now));
+                    } },
+                    { label: "Working hours", apply: () => { setFromTime("08:00"); setToTime("17:00"); } },
+                  ].map((p) => (
+                    <button key={p.label} type="button" onClick={p.apply}
+                      className="h-6 px-2.5 rounded-full border border-[#E9EDEF] bg-white text-[10px] font-extrabold
+                        text-[#667781] cursor-pointer hover:bg-[#F0F2F5]">
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -593,12 +736,31 @@ export default function GatehousePage() {
             </div>
           </div>
 
-          {/* Quick stats strip */}
+          {/* How much of the range we are showing */}
+          {tripLoading && loadedPages > 0 && (
+            <div className="shrink-0 text-[11px] text-[#667781] px-1">
+              Loading history… {loadedPages * HISTORY_PAGE_SIZE >= HISTORY_MAX_POINTS
+                ? `${HISTORY_MAX_POINTS.toLocaleString()} points`
+                : `page ${loadedPages}`}
+            </div>
+          )}
+          {truncated && !tripLoading && (
+            <div className="shrink-0 text-[11px] text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-3 py-2">
+              This range has more than {HISTORY_MAX_POINTS.toLocaleString()} points. Showing the
+              most recent {HISTORY_MAX_POINTS.toLocaleString()} — choose a shorter period to see the rest.
+            </div>
+          )}
+
+          {/* Quick stats strip. Trips and distance only appear when the server
+              actually grouped the range into trips — showing "0 trips, 0 km"
+              beside 7,000 positions reads as "nothing happened". */}
           {rawData.length > 0 && (
-            <div className="shrink-0 grid grid-cols-3 gap-2">
+            <div className={`shrink-0 grid gap-2 ${trips.length > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
               {[
-                { label: "Trips", value: String(trips.length) },
-                { label: "Distance", value: `${totalDistance} km` },
+                ...(trips.length > 0
+                  ? [{ label: "Trips", value: String(trips.length) },
+                     { label: "Distance", value: `${totalDistance} km` }]
+                  : [{ label: "Covered", value: coveredRange }]),
                 { label: "Points", value: totalPoints.toLocaleString() },
               ].map((s) => (
                 <div key={s.label} className="bg-white border border-[#E9EDEF] rounded-lg px-3 py-2 text-center">
@@ -634,7 +796,7 @@ export default function GatehousePage() {
               )}
               {!tripLoading && !tripError && trips.length === 0 && rawData.length === 0 && (
                 <div className="px-4 py-8 text-center text-[12px] text-[#667781]">
-                  Select a device and date range, then click <b>Load Track History</b>.
+                  Select a device, a start and an end date and time, then click <b>Load Track History</b>.
                 </div>
               )}
               {!tripLoading && trips.length === 0 && rawData.length > 0 && (
@@ -702,11 +864,32 @@ export default function GatehousePage() {
               )}
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar — click or drag anywhere on it to jump */}
             {activePoints.length >= 2 && (
-              <div className="shrink-0 h-1.5 bg-[#E9EDEF]">
-                <div className="h-full bg-[#128C7E] transition-all duration-200"
-                  style={{ width: `${(replayIdx / Math.max(1, replayPoints.length - 1)) * 100}%` }} />
+              <div
+                role="slider"
+                aria-label="Replay position"
+                aria-valuemin={0}
+                aria-valuemax={Math.max(1, replayPoints.length - 1)}
+                aria-valuenow={replayIdx}
+                tabIndex={0}
+                className="shrink-0 h-3 bg-[#E9EDEF] cursor-pointer flex items-center"
+                onClick={(ev) => {
+                  const box = ev.currentTarget.getBoundingClientRect();
+                  seekReplay((ev.clientX - box.left) / Math.max(1, box.width));
+                }}
+                onKeyDown={(ev) => {
+                  const last = Math.max(1, replayPoints.length - 1);
+                  if (ev.key === "ArrowRight") seekReplay((replayIdx + 1) / last);
+                  else if (ev.key === "ArrowLeft") seekReplay((replayIdx - 1) / last);
+                  else if (ev.key === "Home") seekReplay(0);
+                  else if (ev.key === "End") seekReplay(1);
+                }}
+              >
+                <div className="h-1.5 w-full bg-transparent">
+                  <div className="h-full bg-[#128C7E] transition-all duration-200"
+                    style={{ width: `${(replayIdx / Math.max(1, replayPoints.length - 1)) * 100}%` }} />
+                </div>
               </div>
             )}
 

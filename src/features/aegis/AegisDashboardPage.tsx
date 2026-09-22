@@ -34,6 +34,10 @@ export function AegisDashboard() {
   const [balances, setBalances] = useState<ClientTokenBalance[]>([]);
   const [transactions, setTransactions] = useState<ClientTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  // Which figures the server didn't give us on the last load.
+  const [missing, setMissing] = useState<string[]>([]);
+  // Bumped by "Try again".
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Fetch customer-specific stats
   // Devices belong to the CLIENT (accountRoot), not the individual user.
@@ -50,6 +54,7 @@ export function AegisDashboard() {
 
       // Helper: call an API with a 10-second timeout.
       // Returns data on success, null on any error (incl. 400 "no data" or timeout).
+      const failed: string[] = [];
       const safeFetch = async <T,>(fn: () => Promise<{ data: T }>, label: string): Promise<T | null> => {
         try {
           const timeout = new Promise<never>((_, reject) =>
@@ -60,6 +65,7 @@ export function AegisDashboard() {
           return res.data;
         } catch (err) {
           console.warn(`[Dashboard] ${label} failed:`, err);
+          failed.push(label);
           return null;
         }
       };
@@ -84,12 +90,16 @@ export function AegisDashboard() {
       }
       if (txnData) setTransactions(Array.isArray(txnData) ? txnData : []);
 
+      // A tile showing 0 because the request failed is a lie — say which
+      // figures are missing instead.
+      setMissing(failed);
+
       if (!cancelled) setLoading(false);
     };
 
     fetchStats();
     return () => { cancelled = true; };
-  }, [ownerUid, clientUid]);
+  }, [ownerUid, clientUid, reloadKey]);
 
   // Derived stats
   const totalDevices = devices.length;
@@ -123,6 +133,23 @@ export function AegisDashboard() {
           Your devices, tokens, and subscription summary at a glance.
         </div>
       </div>
+
+      {/* Figures that didn't load. Showing a zero instead would read as
+          "you have none", which is a different thing entirely. */}
+      {!loading && missing.length > 0 && (
+        <div role="alert" className="bg-[#FFF5F5] border border-[#FFD6D6] rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
+          <span className="text-[12px] text-[#B00020]">
+            Some figures couldn't be loaded ({missing.join(", ")}). What you see below may be incomplete.
+          </span>
+          <button
+            type="button"
+            onClick={() => setReloadKey((n) => n + 1)}
+            className="h-7 px-3 rounded-lg border border-[#FFD6D6] bg-white text-[11px] font-extrabold text-[#B00020] cursor-pointer shrink-0"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* ── Device Stats ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

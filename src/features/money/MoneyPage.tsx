@@ -94,24 +94,6 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US").format(amount);
 }
 
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-const PIPELINE = [
-  { step:"1. Pay-In Initiated",   val:"31 pending", dot:"bg-[#FBBF24]" },
-  { step:"2. Webhook Confirm",    val:"19 failed",  dot:"bg-[#F97316]" },
-  { step:"3. Token Mint",         val:"14 queued",  dot:"bg-[#F97316]" },
-  { step:"4. FIFO Allocate",      val:"OK",         dot:"bg-[#25D366]" },
-  { step:"5. VEBA Escrow Lock",   val:"OK",         dot:"bg-[#25D366]" },
-  { step:"6. Payout/Settlement",  val:"—",          dot:"bg-[#F97316]" },
-];
-
-const BLADE_TRACE = [
-  { step:"Pay-In initiated",  badge:"OK",      badgeTone:"bg-[#25D366] text-white", dot:"bg-[#25D366]" },
-  { step:"Webhook received",  badge:"OK",      badgeTone:"bg-[#25D366] text-white", dot:"bg-[#25D366]" },
-  { step:"Mint tokens",       badge:"WAIT",    badgeTone:"bg-[#FBBF24] text-[#92400E]", dot:"bg-[#F97316]" },
-  { step:"FIFO allocate",     badge:"BLOCKED", badgeTone:"bg-[#EF4444] text-white", dot:"bg-[#25D366]" },
-  { step:"Post to Odoo",      badge:"WAIT",    badgeTone:"bg-[#FBBF24] text-[#92400E]", dot:"bg-[#F97316]" },
-];
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 export function MoneyPage() {
   const [bladeOpen, setBladeOpen] = useState(false);

@@ -141,19 +141,29 @@ export function MyBookings() {
           <tbody>
             {requests.map((r) => {
               const isPending = pendingUid === r.request_uid;
+              // The rate is a snapshot taken when the request was made. If it
+              // didn't come back, show a dash rather than crashing the table.
               const rate = r.rate_snapshot;
+              const rateText = rate && typeof rate.daily_rate === "number"
+                ? `${rate.currency} ${rate.daily_rate.toLocaleString()} / ${String(rate.pricing_basis || "per_day").replace("per_", "")}`
+                : "—";
               return (
                 <tr key={r.request_uid} className="border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8F9FA] transition-colors">
                   <td className="px-3 py-2.5">
-                    <div className="font-extrabold text-[#111B21] truncate max-w-[180px]">{r.asset_uid}</div>
-                    <div className="text-[11px] text-[#667781] truncate">{r.listing_uid}</div>
+                    <div className="font-extrabold text-[#111B21] truncate max-w-[180px]"
+                         title={r.asset_summary?.display_name ?? r.asset_uid}>
+                      {r.asset_summary?.display_name ?? r.asset_uid}
+                    </div>
+                    <div className="text-[11px] text-[#667781] truncate">
+                      {r.asset_summary?.asset_class ?? r.listing_uid}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-[#667781]">{r.owner_root}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-[#667781]">
                     {r.start_date} → {r.end_date}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
-                    {rate.currency} {rate.daily_rate.toLocaleString()} / {rate.pricing_basis.replace("per_", "")}
+                    {rateText}
                   </td>
                   <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
                   <td className="px-3 py-2.5">

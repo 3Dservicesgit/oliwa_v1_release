@@ -11,7 +11,7 @@
  *   GET   /tenants/trashed          → getTrashedTenants
  */
 
-import { get, post, patch } from "../client";
+import { get, post, patch, getStoredAuthToken } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
 import type {
@@ -69,9 +69,12 @@ export async function importTenants(
   const form = new FormData();
   form.append("file", file);
 
+  const token = getStoredAuthToken();
   const res = await fetch(`${BASE_URL}${ENDPOINTS.TENANTS.IMPORT}`, {
     method: "POST",
     body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    credentials: "include",
   });
 
   return res.json();

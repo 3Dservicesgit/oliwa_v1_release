@@ -35,8 +35,9 @@ import { TokensPage }          from "../features/tokens";
 import { BillingPage }         from "../features/billing";
 import { PaymentsPage }        from "../features/payments";
 import { VebaPage }            from "../features/veba";
-import { RbacPage }            from "../features/rbac";
-import { AuditPage }           from "../features/audit";
+// User Management and Audit Trail: a customer gets their own team and sign-in
+// history; staff get the platform RBAC and audit pages.
+import { UserManagementRoute, AuditTrailRoute } from "../features/team";
 import { TenantTowerPage }     from "../features/tenant-tower";
 import { BillingInvoicingPage } from "../features/billing-invoicing";
 import { MoneyPage }            from "../features/money";
@@ -93,8 +94,8 @@ export default function App() {
           <Route path="/payments" element={<ProtectedRoute permission="payments.view"><PaymentsPage /></ProtectedRoute>} />
           <Route path="/veba"     element={<ProtectedRoute permission="veba.view"><VebaPage /></ProtectedRoute>} />
           {/* No /ai page here: training Waswa (the AI Console) lives in the CMS only. */}
-          <Route path="/rbac"     element={<ProtectedRoute permission="rbac.view"><RbacPage /></ProtectedRoute>} />
-          <Route path="/audit"    element={<ProtectedRoute permission="audit.view"><AuditPage /></ProtectedRoute>} />
+          <Route path="/rbac"     element={<ProtectedRoute permission="rbac.view"><UserManagementRoute /></ProtectedRoute>} />
+          <Route path="/audit"    element={<ProtectedRoute permission="audit.view"><AuditTrailRoute /></ProtectedRoute>} />
 
           {/* ── 404 ─────────────────────────────────────────────────────── */}
           <Route path="*" element={<NotFoundPage />} />

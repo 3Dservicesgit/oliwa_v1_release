@@ -3,7 +3,7 @@
  *
  * Lets users create event rules that monitor their devices for conditions
  * (speed, geofence breach, ignition, low battery, device offline) and fire
- * alerts via email, SMS, or push channels.
+ * alerts via email, SMS, WhatsApp, or push channels.
  *
  * Layout: Header + KPIs → Tabs (Event Rules | Alert History) →
  *         Create/Edit drawers with zone selectors for geofence breach.
@@ -37,6 +37,21 @@ import type {
   ClientDevice,
 } from "../../api/types";
 import { getCookie } from "../../utils/cookies";
+
+// ── Alert channels ──────────────────────────────────────────────────────────
+// Stored as-is in the event's alert_channels list. SMS and WhatsApp both use
+// the event's phone numbers.
+const ALERT_CHANNELS = ["email", "sms", "whatsapp", "push"] as const;
+
+function channelLabel(ch: string): string {
+  switch (ch) {
+    case "email": return "Email";
+    case "sms": return "SMS";
+    case "whatsapp": return "WhatsApp";
+    case "push": return "Push";
+    default: return ch;
+  }
+}
 
 // ── Breach type for geofence_breach condition ──────────────────────────────
 
@@ -398,6 +413,10 @@ function CreateEventDrawer({
       setError("Please select at least one geofence zone.");
       return;
     }
+    if (alertChannels.includes("whatsapp") && !alertPhone.trim()) {
+      setError("Add at least one phone number for WhatsApp alerts.");
+      return;
+    }
     setError("");
     try {
       // Build condition_value based on condition type
@@ -455,7 +474,7 @@ function CreateEventDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/35 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/35 z-[150] flex justify-end" onClick={onClose}>
       <div
         className="w-[480px] max-w-full h-full bg-white flex flex-col shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -577,8 +596,8 @@ function CreateEventDrawer({
           {/* Alert Channels */}
           <div>
             <label className="block text-[12px] font-black text-[#111B21] mb-2">Alert Channels</label>
-            <div className="flex gap-2">
-              {["email", "sms", "push"].map((ch) => (
+            <div className="flex gap-2 flex-wrap">
+              {ALERT_CHANNELS.map((ch) => (
                 <button
                   key={ch}
                   type="button"
@@ -589,7 +608,7 @@ function CreateEventDrawer({
                       : "bg-white border-[#E9EDEF] text-[#667781]"
                   }`}
                 >
-                  {ch === "email" ? "Email" : ch === "sms" ? "SMS" : "Push"}
+                  {channelLabel(ch)}
                 </button>
               ))}
             </div>
@@ -610,7 +629,7 @@ function CreateEventDrawer({
           )}
 
           {/* Alert Phone */}
-          {alertChannels.includes("sms") && (
+          {(alertChannels.includes("sms") || alertChannels.includes("whatsapp")) && (
             <div>
               <label className="block text-[12px] font-black text-[#111B21] mb-1">Phone Numbers</label>
               <input
@@ -619,7 +638,7 @@ function CreateEventDrawer({
                 placeholder="+256700123456, +254712345678"
                 className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
               />
-              <p className="text-[11px] text-[#667781] mt-1">Comma-separated phone numbers with country code.</p>
+              <p className="text-[11px] text-[#667781] mt-1">Comma-separated phone numbers with country code. Used for SMS and WhatsApp alerts.</p>
             </div>
           )}
 
@@ -744,6 +763,10 @@ function EditEventDrawer({
       setError("Please select at least one geofence zone.");
       return;
     }
+    if (alertChannels.includes("whatsapp") && !alertPhone.trim()) {
+      setError("Add at least one phone number for WhatsApp alerts.");
+      return;
+    }
     setError("");
     try {
       const finalConditionValue =
@@ -794,7 +817,7 @@ function EditEventDrawer({
   if (!open || !event) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/35 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/35 z-[150] flex justify-end" onClick={onClose}>
       <div
         className="w-[480px] max-w-full h-full bg-white flex flex-col shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -899,8 +922,8 @@ function EditEventDrawer({
           {/* Alert Channels */}
           <div>
             <label className="block text-[12px] font-black text-[#111B21] mb-2">Alert Channels</label>
-            <div className="flex gap-2">
-              {["email", "sms", "push"].map((ch) => (
+            <div className="flex gap-2 flex-wrap">
+              {ALERT_CHANNELS.map((ch) => (
                 <button
                   key={ch}
                   type="button"
@@ -911,7 +934,7 @@ function EditEventDrawer({
                       : "bg-white border-[#E9EDEF] text-[#667781]"
                   }`}
                 >
-                  {ch === "email" ? "Email" : ch === "sms" ? "SMS" : "Push"}
+                  {channelLabel(ch)}
                 </button>
               ))}
             </div>
@@ -931,7 +954,7 @@ function EditEventDrawer({
           )}
 
           {/* Alert Phone */}
-          {alertChannels.includes("sms") && (
+          {(alertChannels.includes("sms") || alertChannels.includes("whatsapp")) && (
             <div>
               <label className="block text-[12px] font-black text-[#111B21] mb-1">Phone Numbers</label>
               <input
@@ -1004,7 +1027,7 @@ function DeleteConfirmModal({
   if (!open || !event) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/35 z-50 grid place-items-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/35 z-[150] grid place-items-center" onClick={onClose}>
       <div
         className="w-[420px] max-w-[calc(100vw-24px)] bg-white rounded-xl overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -1127,7 +1150,7 @@ function EventCard({
             <span className="font-black">Channels:</span>
             {channels.map((ch) => (
               <span key={ch} className="bg-[#128C7E]/10 text-[#128C7E] px-1.5 py-0.5 rounded text-[10px] font-black">
-                {ch}
+                {channelLabel(ch)}
               </span>
             ))}
           </span>
@@ -1160,16 +1183,24 @@ function EventCard({
 function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
   const [notifications, setNotifications] = useState<EventNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filterCondition, setFilterCondition] = useState<string>("all");
 
   const fetchNotifications = useCallback(async () => {
     if (!ownerUid) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await getNotifications(ownerUid);
       setNotifications(res.data ?? []);
-    } catch {
-      setNotifications([]);
+    } catch (err) {
+      // "No alerts yet" and "we couldn't ask" are different things.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("No") && msg.toLowerCase().includes("found")) {
+        setNotifications([]);
+      } else {
+        setLoadError(msg || "Couldn't load your alerts.");
+      }
     } finally {
       setLoading(false);
     }
@@ -1191,6 +1222,22 @@ function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
           <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
           <span className="text-[13px] text-[#667781]">Loading alerts...</span>
         </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
+        <h3 className="font-black text-[15px] text-[#111B21] mb-1">Couldn't load your alerts</h3>
+        <p className="text-[12px] text-[#B00020] mb-3">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => void fetchNotifications()}
+          className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-extrabold border-none cursor-pointer"
+        >
+          Try again
+        </button>
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { buyTokens, getAllTokens, getClientTransactions } from "../../../api";
-import type { TokenPackage, ClientTransaction } from "../../../api";
+import { buyTokens, getAllTokens, getPaymentStatus } from "../../../api";
+import type { TokenPackage } from "../../../api";
 
 interface Props {
   open: boolean;
@@ -18,10 +18,19 @@ const POLL_INTERVAL = 5_000;   // 5 seconds
 const POLL_TIMEOUT  = 120_000; // 2 minutes
 
 /** Convert hours to a human-readable string (e.g. 720 → "30 days"). */
-function fmtValidity(hours: number): string {
+function fmtValidity(hours: number | null | undefined): string {
+  if (hours == null) return "Validity not set";
   if (hours >= 8760) return `${Math.round(hours / 8760)} year${hours >= 17520 ? "s" : ""}`;
   if (hours >= 720)  return `${Math.round(hours / 24)} days`;
   return `${hours} hours`;
+}
+
+/** Payment states the gateway reports that mean the payment will not complete. */
+const FAILED_STATES = new Set(["failed", "cancelled", "canceled", "declined", "rejected", "expired"]);
+
+/** "12,000 UGX", or "Price not set" when the package has no price yet. */
+function fmtPrice(amount: number | null | undefined, currency: string | null | undefined): string {
+  return amount == null ? "Price not set" : `${amount.toLocaleString()} ${currency ?? ""}`.trim();
 }
 
 /** Phone placeholder based on currency. */
@@ -91,6 +100,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
   async function handleSubmit() {
     if (!clientUid) return;
     if (!selectedPkg)     { setError("Select a token package"); return; }
+    if (selectedPkg.token_amount == null) { setError("This package has no price yet. Choose another package."); return; }
     const qty = Number(quantity);
     if (!qty || qty <= 0) { setError("Enter a valid quantity"); return; }
     if (!phone.trim())    { setError("Enter a Mobile Money number"); return; }
@@ -104,7 +114,13 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
         mobile_money_number: phone.trim(),
         token_quantity:      qty,
       });
-      txnIdRef.current = res.data.transaction_id;
+      // The server returns transaction_uid (older builds: transaction_id).
+      const txnId = res.data?.transaction_uid ?? res.data?.transaction_id ?? null;
+      if (!txnId) {
+        setError("The payment request was sent, but no payment reference came back. Check the client's payments before trying again.");
+        return;
+      }
+      txnIdRef.current = txnId;
       setStep("waiting");
       startPolling();
     } catch (e: unknown) {
@@ -117,7 +133,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
 
   // ── Step 2: Poll for payment confirmation ─────────────────────────────────
   function startPolling() {
-    if (!clientUid) return;
+    if (!txnIdRef.current) return;
 
     // Timeout after 2 minutes
     timerRef.current = setTimeout(() => {
@@ -128,16 +144,15 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
 
     pollRef.current = setInterval(async () => {
       try {
-        const res = await getClientTransactions(clientUid!);
-        const txn = res.data.find((t: ClientTransaction) => t.transaction_uid === txnIdRef.current);
-        if (!txn) return;
+        const res = await getPaymentStatus(txnIdRef.current!);
+        const status = (res.data?.transaction_status ?? "").toLowerCase();
 
-        if (txn.payment_status.toLowerCase() === "successful") {
+        if (status === "successful") {
           stopPolling();
           setResultStatus("success");
           setStep("result");
           onSuccess();
-        } else if (txn.payment_status.toLowerCase() === "failed") {
+        } else if (FAILED_STATES.has(status)) {
           stopPolling();
           setResultStatus("failed");
           setStep("result");
@@ -157,7 +172,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
   if (!open) return null;
 
   const qty      = Math.max(Number(quantity) || 0, 0);
-  const total    = selectedPkg ? selectedPkg.token_amount * qty : 0;
+  const total    = selectedPkg?.token_amount != null ? selectedPkg.token_amount * qty : null;
   const currency = selectedPkg?.token_currency ?? "";
 
   return (
@@ -208,7 +223,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                         </div>
                         <div className="shrink-0 text-right">
                           <div className="font-black text-[12px] text-[#111B21]">
-                            {pkg.token_amount.toLocaleString()} {pkg.token_currency}
+                            {fmtPrice(pkg.token_amount, pkg.token_currency)}
                           </div>
                           <div className="text-[10px] text-[#667781]">per unit</div>
                         </div>
@@ -248,10 +263,10 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                 <div className="mb-3 px-3 py-2 rounded-lg bg-[#F8FAFC] border border-[#E9EDEF]">
                   <div className="flex items-center justify-between text-[12px]">
                     <span className="text-[#667781]">Total</span>
-                    <span className="font-black text-[#111B21]">{total.toLocaleString()} {currency}</span>
+                    <span className="font-black text-[#111B21]">{total == null ? "—" : `${total.toLocaleString()} ${currency}`}</span>
                   </div>
                   <div className="text-[10px] text-[#667781] mt-0.5">
-                    {selectedPkg.token_amount.toLocaleString()} × {qty} unit{qty > 1 ? "s" : ""}
+                    {fmtPrice(selectedPkg.token_amount, selectedPkg.token_currency)} × {qty} unit{qty > 1 ? "s" : ""}
                   </div>
                 </div>
               )}
@@ -298,7 +313,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
               </div>
               {selectedPkg && (
                 <div className="text-[12px] text-[#667781] mt-0.5">
-                  Total: <span className="font-black text-[#111B21]">{total.toLocaleString()} {currency}</span>
+                  Total: <span className="font-black text-[#111B21]">{total == null ? "—" : `${total.toLocaleString()} ${currency}`}</span>
                 </div>
               )}
               <button onClick={handleClose} className="mt-3 h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer">Done</button>

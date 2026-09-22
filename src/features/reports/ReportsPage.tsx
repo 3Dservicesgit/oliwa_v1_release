@@ -57,8 +57,13 @@ const FALLBACK_REPORT_TYPES: AvailableReportType[] = [
 
 // ── Date helpers ────────────────────────────────────────────────────────────
 
+/** "YYYY-MM-DD" for <input type="date"> in LOCAL time. toISOString is UTC,
+ *  which in Kampala (UTC+3) hands back yesterday's date before 03:00 — so a
+ *  report run early in the morning quietly asked for the wrong day. */
 function toInputDate(date: Date): string {
-  return date.toISOString().split("T")[0];
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
 function fromInputDate(s: string): Date {
@@ -239,7 +244,7 @@ function ReportDetailsDrawer({
     try {
       const res = await getReportStatus(report.file_request_uid);
       console.log("[ReportDetails] Status:", JSON.stringify(res));
-      const status = (res?.data as Record<string, unknown>)?.status || "unknown";
+      const status = res?.data?.status || "unknown";
       onToast(`Report status: ${status}`, "success");
       onRefresh();
     } catch {
@@ -991,7 +996,7 @@ function ReportHistory({
     console.log("[Reports] Checking status for:", report.file_request_uid);
     try {
       const res = await getReportStatus(report.file_request_uid);
-      const status = (res?.data as Record<string, unknown>)?.status || res?.data?.status || "unknown";
+      const status = res?.data?.status || "unknown";
       console.log("[Reports] Status response:", JSON.stringify(res));
       onToast(`Report status: ${status}`, "success");
       onRefresh(); // Refresh the list in case status changed
@@ -1328,6 +1333,10 @@ export function ReportsPage() {
   const { state: authState } = useAuth();
   const [devices, setDevices] = useState<ClientDevice[]>([]);
   const [devicesLoading, setDevicesLoading] = useState(true);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  // Bumped by "Try again" so the unit list is fetched once more.
+  const [deviceReloadKey, setDeviceReloadKey] = useState(0);
   const [reports, setReports] = useState<PreviousReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
   const [reportTypes, setReportTypes] = useState<AvailableReportType[]>(FALLBACK_REPORT_TYPES);
@@ -1376,16 +1385,20 @@ export function ReportsPage() {
 
     (async () => {
       setDevicesLoading(true);
+      setDevicesError(null);
       try {
         const res = await getClientDevices(cuid);
         setDevices(res.data ?? []);
-      } catch {
+      } catch (err) {
+        // An empty picker used to stand in for "the request failed", which
+        // reads as "you have no vehicles".
+        setDevicesError(err instanceof Error ? err.message : "Couldn't load your units.");
         setDevices([]);
       } finally {
         setDevicesLoading(false);
       }
     })();
-  }, [clientUid]);
+  }, [clientUid, deviceReloadKey]);
 
   // ── Fetch previous reports ──────────────────────────────────────────────
   const reportsFetchedRef = useRef(false);
@@ -1396,9 +1409,11 @@ export function ReportsPage() {
     try {
       const data = await getAllPreviousReports(uid);
       setReports(data);
-    } catch {
-      // Don't clear existing reports on fetch failure — keep stale data
-      // so the list doesn't flicker to "No Reports" on transient errors.
+      setReportsError(null);
+    } catch (err) {
+      // Keep whatever is already listed — the list shouldn't flicker to
+      // "No Reports" on a blip — but say that it is not up to date.
+      setReportsError(err instanceof Error ? err.message : "Couldn't refresh the list of reports.");
     } finally {
       setReportsLoading(false);
     }
@@ -1452,6 +1467,19 @@ export function ReportsPage() {
               </div>
             </div>
           </div>
+
+          {(devicesError || reportsError) && (
+            <div role="alert" className="text-[12px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+              <span>{devicesError ?? reportsError}</span>
+              <button
+                type="button"
+                onClick={() => { devicesFetchedRef.current = false; setDevicesError(null); setReportsError(null); fetchReports(); setDeviceReloadKey((n) => n + 1); }}
+                className="h-7 px-3 rounded-lg border border-[#FFD6D6] bg-white text-[11px] font-extrabold text-[#B00020] cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          )}
 
           {/* Two-panel layout */}
           <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-3 min-h-[500px]">

@@ -175,7 +175,7 @@ export function ListOnVebaDrawer({ asset, open, onClose, onListed }: ListOnVebaD
 
     try {
       const res = await listMutation.mutate(payload);
-      onListed?.({ listing_uid: res.data?.listing_uid ?? "" });
+      onListed?.({ listing_uid: res?.listing_uid ?? "" });
       handleClose();
     } catch {
       // listMutation.error already set; footer renders it

@@ -100,7 +100,7 @@ export function AttachDevicesModal({
   if (!open || !geozone) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[150] grid place-items-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <div
         className="relative w-[520px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-48px)] bg-white rounded-xl flex flex-col shadow-xl overflow-hidden"

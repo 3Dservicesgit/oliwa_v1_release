@@ -35,7 +35,15 @@ export function isPointInPolygon(point: Point, polygon: Point[]): boolean {
 /**
  * Check a device position against all geozones and return entry/exit events.
  *
- * @param imei         Device IMEI
+ * The FIRST position seen for a zone is only recorded — it never counts as a
+ * crossing. A vehicle parked inside a zone before the screen was opened has
+ * not just driven into it, and reporting that as an entry was where the false
+ * "entered zone" alerts came from.
+ *
+ * These events are for what the screen shows. The alerts customers receive are
+ * decided on the server (endpoints/alert_engine.py), which keeps the same
+ * answer between sessions.
+ *
  * @param position     Current device position
  * @param geozones     Array of geozones with their polygon paths
  * @param prevInside   Map of geozone_uid → was device inside on last check
@@ -50,7 +58,13 @@ export function checkGeozoneTransitions(
 
   for (const gz of geozones) {
     const nowInside = isPointInPolygon(position, gz.path);
-    const wasInside = prevInside.get(gz.uid) ?? false;
+    const wasInside = prevInside.get(gz.uid);
+
+    if (wasInside === undefined) {
+      // First sighting: remember where it is, report nothing.
+      prevInside.set(gz.uid, nowInside);
+      continue;
+    }
 
     if (nowInside && !wasInside) {
       events.push({ type: "enter", uid: gz.uid, name: gz.name });

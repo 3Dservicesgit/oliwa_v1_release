@@ -2,22 +2,29 @@
  * GeofenceMap — Interactive Google Maps component for geofence management.
  *
  * Capabilities:
- *   - Renders existing geofence polygons
- *   - Drawing mode: click-to-place vertices, then "Finish" to create polygon
- *     (DrawingManager was removed from Google Maps API v3.65+)
- *   - Edit mode: selected polygon becomes editable/draggable
- *   - Click-to-select: clicking a polygon highlights it and notifies parent
- *   - Fit bounds: auto-zooms to show all polygons on load
+ *   - Renders existing geofences by shape: polygons, circles, and lines (the
+ *     route plus its corridor)
+ *   - Creating / editing: map clicks are passed to the page (which adds a
+ *     point or sets a circle's centre); the draft is previewed live and its
+ *     markers can be dragged
+ *   - Click-to-select: clicking a geofence highlights it and notifies parent
+ *   - Fit bounds: auto-zooms to show all geofences on load
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
+// The "F" (function) versions of the overlays. The older class versions leave
+// a copy behind on the map under React StrictMode, so a cancelled drawing or
+// a removed point stayed visible after it was gone from the page.
 import {
   GoogleMap,
   useJsApiLoader,
-  Polygon,
-  Marker,
+  PolygonF as Polygon,
+  PolylineF as Polyline,
+  CircleF as Circle,
+  MarkerF as Marker,
+  InfoWindowF as InfoWindow,
 } from "@react-google-maps/api";
-import { InfoWindow } from "@react-google-maps/api";
 import type { LatLng, ParsedGeozone } from "../../../api/types";
+import type { DraftPreview } from "../../../utils/geofenceShapes";
 
 /** A device with its live position to show on the geofence map. */
 export interface DeviceMarkerData {
@@ -35,29 +42,9 @@ const MAP_CONTAINER: React.CSSProperties = { width: "100%", height: "100%" };
 const DEFAULT_CENTER = { lat: 0.3476, lng: 32.5825 }; // Kampala
 const DEFAULT_ZOOM = 12;
 
-// ── Polygon style presets ───────────────────────────────────────────────────
-const POLYGON_DEFAULT = {
-  fillColor: "#128C7E",
-  fillOpacity: 0.15,
-  strokeColor: "#128C7E",
-  strokeOpacity: 0.8,
-  strokeWeight: 2,
-};
-
-const POLYGON_SELECTED = {
-  fillColor: "#075E54",
-  fillOpacity: 0.25,
-  strokeColor: "#075E54",
-  strokeOpacity: 1,
-  strokeWeight: 3,
-};
-
-const POLYGON_DRAWING = {
-  fillColor: "#25D366",
-  fillOpacity: 0.2,
-  strokeColor: "#25D366",
-  strokeWeight: 2,
-};
+const DEFAULT_COLOR = "#128C7E";
+const SELECTED_COLOR = "#075E54";
+const DRAFT_COLOR = "#25D366";
 
 // ── Device marker styles ───────────────────────────────────────────────────
 const DEVICE_COLORS: Record<string, string> = {
@@ -69,71 +56,72 @@ const DEVICE_COLORS: Record<string, string> = {
 
 // ── Props ───────────────────────────────────────────────────────────────────
 export interface GeofenceMapProps {
-  /** All geozones to render as polygons. */
+  /** All geozones to render. */
   geozones: ParsedGeozone[];
   /** UID of the currently selected/highlighted geozone. */
   selectedUid?: string | null;
-  /** Called when user clicks a polygon on the map. */
+  /** Called when user clicks a geofence on the map. */
   onSelectGeozone?: (uid: string) => void;
-  /** Whether drawing mode is active — user is creating a new polygon. */
-  drawingMode?: boolean;
-  /** Called when user completes drawing a polygon. Returns the coordinate path. */
-  onPolygonComplete?: (path: LatLng[]) => void;
-  /** Called when user finishes editing a polygon's vertices. */
-  onPolygonEdited?: (uid: string, newPath: LatLng[]) => void;
-  /** UID of the geozone currently being edited (vertices draggable). */
-  editingUid?: string | null;
   /** Live device markers to render on the map. */
   deviceMarkers?: DeviceMarkerData[];
-  /** Path of a newly created polygon that should be rendered as editable (pre-save). */
-  creatingPath?: LatLng[] | null;
-  /** Called when the user edits the creating polygon's vertices. */
-  onCreatingPathEdited?: (newPath: LatLng[]) => void;
+  /** The shape being created or edited, if any. */
+  preview?: DraftPreview | null;
+  /** A geozone not to draw (it is being edited and shown as the preview). */
+  hiddenUid?: string | null;
+  /** Map clicked while a shape is being drawn. */
+  onMapClick?: (point: LatLng) => void;
+  /** A draft point marker was dragged (index into the draft's points). */
+  onPointMoved?: (index: number, point: LatLng) => void;
+  /** The circle's centre marker was dragged. */
+  onCenterMoved?: (point: LatLng) => void;
+  /** Remove the last point placed (or a circle's centre). */
+  onUndo?: () => void;
+  /** Remove every point placed. */
+  onClear?: () => void;
+}
+
+function pointLabel(i: number) {
+  return { text: String(i + 1), color: "#fff", fontSize: "10px", fontWeight: "800" };
+}
+
+function vertexIcon(): google.maps.Symbol {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 9,
+    fillColor: SELECTED_COLOR,
+    fillOpacity: 1,
+    strokeColor: "#fff",
+    strokeWeight: 2,
+  };
+}
+
+function fromEvent(e: google.maps.MapMouseEvent): LatLng | null {
+  return e.latLng ? { lat: e.latLng.lat(), lng: e.latLng.lng() } : null;
 }
 
 export function GeofenceMap({
   geozones,
   selectedUid,
   onSelectGeozone,
-  drawingMode = false,
-  onPolygonComplete,
-  onPolygonEdited,
-  editingUid,
   deviceMarkers = [],
-  creatingPath,
-  onCreatingPathEdited,
+  preview = null,
+  hiddenUid = null,
+  onMapClick,
+  onPointMoved,
+  onCenterMoved,
+  onUndo,
+  onClear,
 }: GeofenceMapProps) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
   });
 
   const mapRef = useRef<google.maps.Map | null>(null);
-  const polygonRefs = useRef<Record<string, google.maps.Polygon>>({});
   const [mapReady, setMapReady] = useState(false);
   const [activeDevice, setActiveDevice] = useState<DeviceMarkerData | null>(null);
+  const drawing = !!preview;
 
-  // ── Creation-edit polygon ref ───────────────────────────────────────────
-  const creatingPolyRef = useRef<google.maps.Polygon | null>(null);
-
-  const handleCreatingEditEnd = useCallback(() => {
-    const poly = creatingPolyRef.current;
-    if (!poly || !onCreatingPathEdited) return;
-    const path = poly
-      .getPath()
-      .getArray()
-      .map((p) => ({ lat: p.lat(), lng: p.lng() }));
-    onCreatingPathEdited(path);
-  }, [onCreatingPathEdited]);
-
-  // ── Click-to-draw state ─────────────────────────────────────────────────
-  const [drawPoints, setDrawPoints] = useState<LatLng[]>([]);
-
-  // Reset draw points when leaving drawing mode
-  useEffect(() => {
-    if (!drawingMode) setDrawPoints([]);
-  }, [drawingMode]);
-
-  // ── Fit bounds to show all polygons ─────────────────────────────────────
+  // ── Fit bounds to show all geofences ────────────────────────────────────
   const fitBounds = useCallback(() => {
     if (!mapRef.current || geozones.length === 0) return;
     const bounds = new google.maps.LatLngBounds();
@@ -144,16 +132,14 @@ export function GeofenceMap({
         hasPoints = true;
       }
     }
-    if (hasPoints) {
-      mapRef.current.fitBounds(bounds, 60);
-    }
+    if (hasPoints) mapRef.current.fitBounds(bounds, 60);
   }, [geozones]);
 
   useEffect(() => {
     if (mapReady) fitBounds();
   }, [mapReady, fitBounds]);
 
-  // ── Pan to selected polygon ─────────────────────────────────────────────
+  // ── Pan to selected geofence ────────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || !selectedUid) return;
     const gz = geozones.find((g) => g.geozone_uid === selectedUid);
@@ -163,65 +149,14 @@ export function GeofenceMap({
     mapRef.current.fitBounds(bounds, 80);
   }, [selectedUid, geozones]);
 
-  // ── Map click handler — places points in drawing mode ──────────────────
   const handleMapClick = useCallback(
     (e: google.maps.MapMouseEvent) => {
-      if (!drawingMode) return;
-      if (!e.latLng) return;
-      const pt: LatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-      setDrawPoints((prev) => [...prev, pt]);
+      if (!drawing) return;
+      const p = fromEvent(e);
+      if (p) onMapClick?.(p);
     },
-    [drawingMode],
+    [drawing, onMapClick],
   );
-
-  const handleFinishDraw = useCallback(() => {
-    if (drawPoints.length >= 3) {
-      onPolygonComplete?.(drawPoints);
-    }
-    setDrawPoints([]);
-  }, [drawPoints, onPolygonComplete]);
-
-  const handleUndoPoint = useCallback(() => {
-    setDrawPoints((prev) => prev.slice(0, -1));
-  }, []);
-
-  // ── Edit complete handler ───────────────────────────────────────────────
-  const handleEditEnd = useCallback(
-    (uid: string) => {
-      const poly = polygonRefs.current[uid];
-      if (!poly) return;
-      const path = poly
-        .getPath()
-        .getArray()
-        .map((p) => ({ lat: p.lat(), lng: p.lng() }));
-      onPolygonEdited?.(uid, path);
-    },
-    [onPolygonEdited],
-  );
-
-  // ── Store polygon refs & apply editable on load ─────────────────────────
-  const onPolygonLoad = useCallback(
-    (uid: string, poly: google.maps.Polygon) => {
-      polygonRefs.current[uid] = poly;
-      const shouldEdit = uid === editingUid;
-      poly.setEditable(shouldEdit);
-      poly.setDraggable(shouldEdit);
-    },
-    [editingUid],
-  );
-
-  const onPolygonUnmount = useCallback((uid: string) => {
-    delete polygonRefs.current[uid];
-  }, []);
-
-  // ── Programmatically toggle editable/draggable via refs ─────────────────
-  useEffect(() => {
-    for (const [uid, poly] of Object.entries(polygonRefs.current)) {
-      const shouldEdit = uid === editingUid;
-      poly.setEditable(shouldEdit);
-      poly.setDraggable(shouldEdit);
-    }
-  }, [editingUid]);
 
   if (!isLoaded) {
     return (
@@ -232,6 +167,24 @@ export function GeofenceMap({
         </div>
       </div>
     );
+  }
+
+  const visible = geozones.filter((gz) => gz.geozone_uid !== hiddenUid);
+
+  // What to tell the customer while drawing.
+  let hint = "";
+  if (preview) {
+    if (preview.type === "circle") {
+      hint = preview.center ? "Drag the centre or click the map to move it" : "Click the map to place the centre";
+    } else {
+      const min = preview.type === "line" ? 2 : 4;
+      const n = preview.points.length;
+      hint = n === 0
+        ? "Click the map to place the first point"
+        : n < min
+          ? `${n} point${n === 1 ? "" : "s"} placed — at least ${min} needed`
+          : `${n} points — click to add more, drag to adjust`;
+    }
   }
 
   return (
@@ -251,130 +204,123 @@ export function GeofenceMap({
           mapTypeControl: true,
           streetViewControl: false,
           fullscreenControl: true,
-          draggableCursor: drawingMode ? "crosshair" : undefined,
-          styles: [
-            { featureType: "poi", stylers: [{ visibility: "off" }] },
-          ],
+          draggableCursor: drawing ? "crosshair" : undefined,
+          styles: [{ featureType: "poi", stylers: [{ visibility: "off" }] }],
         }}
       >
-        {/* ── Existing polygons ──────────────────────────────────────── */}
-        {geozones.map((gz) => {
+        {/* ── Existing geofences ─────────────────────────────────────── */}
+        {visible.map((gz) => {
           const isSelected = gz.geozone_uid === selectedUid;
-          const isEditing = gz.geozone_uid === editingUid;
-          const customColor = gz.geozone_color;
-          const baseStyle = isSelected
-            ? { ...POLYGON_SELECTED }
-            : customColor
-              ? { fillColor: customColor, fillOpacity: 0.15, strokeColor: customColor, strokeOpacity: 0.8, strokeWeight: 2 }
-              : { ...POLYGON_DEFAULT };
-          return (
-            <Polygon
-              key={`${gz.geozone_uid}-${isEditing ? "edit" : "view"}`}
-              paths={gz.path}
-              options={{
-                ...baseStyle,
-                editable: isEditing,
-                draggable: isEditing,
-                clickable: !drawingMode,
-                zIndex: isSelected ? 2 : 1,
-              }}
-              onClick={() => { if (!drawingMode) onSelectGeozone?.(gz.geozone_uid); }}
-              onLoad={(poly) => onPolygonLoad(gz.geozone_uid, poly)}
-              onUnmount={() => onPolygonUnmount(gz.geozone_uid)}
-              onMouseUp={() => {
-                if (isEditing) handleEditEnd(gz.geozone_uid);
-              }}
-              onDragEnd={() => {
-                if (isEditing) handleEditEnd(gz.geozone_uid);
-              }}
-            />
-          );
+          const color = isSelected ? SELECTED_COLOR : gz.geozone_color || DEFAULT_COLOR;
+          const style = {
+            fillColor: color,
+            fillOpacity: isSelected ? 0.25 : 0.15,
+            strokeColor: color,
+            strokeOpacity: isSelected ? 1 : 0.8,
+            strokeWeight: isSelected ? 3 : 2,
+            clickable: !drawing,
+            zIndex: isSelected ? 2 : 1,
+          };
+          const select = () => { if (!drawing) onSelectGeozone?.(gz.geozone_uid); };
+          const params = gz.geozone_shape_params;
+
+          if (gz.geozone_shape === "circle" && params && "center" in params) {
+            return (
+              <Circle
+                key={gz.geozone_uid}
+                center={params.center}
+                radius={params.radius_m}
+                options={style}
+                onClick={select}
+              />
+            );
+          }
+          if (gz.geozone_shape === "line" && params && "width_m" in params) {
+            return (
+              <React.Fragment key={gz.geozone_uid}>
+                <Polygon paths={gz.path} options={{ ...style, strokeWeight: 1 }} onClick={select} />
+                <Polyline
+                  path={params.points}
+                  options={{ strokeColor: color, strokeOpacity: 1, strokeWeight: isSelected ? 4 : 3, clickable: !drawing, zIndex: 3 }}
+                  onClick={select}
+                />
+              </React.Fragment>
+            );
+          }
+          return <Polygon key={gz.geozone_uid} paths={gz.path} options={style} onClick={select} />;
         })}
 
         {/* ── Geofence name labels ────────────────────────────────── */}
-        {geozones.map((gz) => {
+        {visible.map((gz) => {
           if (gz.path.length === 0) return null;
-          // Compute centroid for label placement
-          const cx = gz.path.reduce((s, p) => s + p.lat, 0) / gz.path.length;
-          const cy = gz.path.reduce((s, p) => s + p.lng, 0) / gz.path.length;
+          const params = gz.geozone_shape_params;
+          const at = gz.geozone_shape === "circle" && params && "center" in params
+            ? params.center
+            : {
+                lat: gz.path.reduce((s, p) => s + p.lat, 0) / gz.path.length,
+                lng: gz.path.reduce((s, p) => s + p.lng, 0) / gz.path.length,
+              };
           const lblColor = gz.geozone_label_color || gz.geozone_color || "#075E54";
           return (
             <Marker
               key={`label-${gz.geozone_uid}`}
-              position={{ lat: cx, lng: cy }}
-              label={{
-                text: gz.geozone_name,
-                color: lblColor,
-                fontSize: "11px",
-                fontWeight: "800",
-              }}
-              icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 0,
-                fillOpacity: 0,
-                strokeOpacity: 0,
-              }}
+              position={at}
+              label={{ text: gz.geozone_name, color: lblColor, fontSize: "11px", fontWeight: "800" }}
+              icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 0, fillOpacity: 0, strokeOpacity: 0 }}
               clickable={false}
             />
           );
         })}
 
-        {/* ── Drawing preview polygon ──────────────────────────────── */}
-        {drawingMode && drawPoints.length >= 2 && (
-          <Polygon
-            paths={drawPoints}
-            options={{
-              ...POLYGON_DRAWING,
-              editable: false,
-              clickable: false,
-              zIndex: 5,
-              // Transparent enough that map clicks pass through visually
-              fillOpacity: 0.12,
-            }}
+        {/* ── The shape being drawn ─────────────────────────────────── */}
+        {preview && preview.type === "circle" && preview.center && preview.radius && (
+          <Circle
+            center={preview.center}
+            radius={preview.radius}
+            options={{ fillColor: DRAFT_COLOR, fillOpacity: 0.2, strokeColor: DRAFT_COLOR, strokeWeight: 2, clickable: false, zIndex: 5 }}
+          />
+        )}
+        {preview && preview.type === "circle" && preview.center && (
+          <Marker
+            position={preview.center}
+            draggable
+            title="Centre — drag to move"
+            icon={vertexIcon()}
+            label={{ text: "C", color: "#fff", fontSize: "10px", fontWeight: "800" }}
+            onDragEnd={(e) => { const p = fromEvent(e); if (p) onCenterMoved?.(p); }}
           />
         )}
 
-        {/* ── Vertex markers while drawing ─────────────────────────── */}
-        {drawingMode &&
-          drawPoints.map((pt, i) => (
+        {preview && preview.type !== "circle" && preview.ring.length >= 3 && (
+          <Polygon
+            paths={preview.ring}
+            options={{ fillColor: DRAFT_COLOR, fillOpacity: 0.2, strokeColor: DRAFT_COLOR, strokeWeight: preview.type === "line" ? 1 : 2, clickable: false, zIndex: 5 }}
+          />
+        )}
+        {preview && preview.type !== "circle" && preview.points.length >= 2 && (
+          <Polyline
+            path={preview.type === "polygon" && preview.points.length >= 3 ? [...preview.points, preview.points[0]] : preview.points}
+            options={{ strokeColor: SELECTED_COLOR, strokeOpacity: 0.9, strokeWeight: preview.type === "line" ? 3 : 2, clickable: false, zIndex: 6 }}
+          />
+        )}
+        {preview && preview.type !== "circle" &&
+          preview.points.map((pt, i) => (
             <Marker
-              key={`draw-pt-${i}`}
+              key={`draft-pt-${i}`}
               position={pt}
-              icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 6,
-                fillColor: "#25D366",
-                fillOpacity: 1,
-                strokeColor: "#fff",
-                strokeWeight: 2,
-              }}
+              draggable
+              title={`Point ${(preview.indexes[i] ?? i) + 1} — drag to move`}
+              icon={vertexIcon()}
+              label={pointLabel(preview.indexes[i] ?? i)}
+              zIndex={20}
+              onDragEnd={(e) => { const p = fromEvent(e); if (p) onPointMoved?.(preview.indexes[i] ?? i, p); }}
             />
           ))}
 
-        {/* ── Editable creation polygon (post-draw, pre-save) ──── */}
-        {creatingPath && creatingPath.length >= 3 && !drawingMode && (
-          <Polygon
-            key="creating-editable"
-            paths={creatingPath}
-            options={{
-              fillColor: "#25D366",
-              fillOpacity: 0.2,
-              strokeColor: "#25D366",
-              strokeWeight: 2,
-              editable: true,
-              draggable: true,
-              clickable: true,
-              zIndex: 10,
-            }}
-            onLoad={(poly) => { creatingPolyRef.current = poly; }}
-            onUnmount={() => { creatingPolyRef.current = null; }}
-            onMouseUp={handleCreatingEditEnd}
-            onDragEnd={handleCreatingEditEnd}
-          />
-        )}
-
         {/* ── Attached device markers ─────────────────────────────── */}
-        {deviceMarkers.map((d) => {
+        {/* A unit with no position yet (never reported, or offline before we
+            heard from it) has nothing to draw — it is listed, not mapped. */}
+        {deviceMarkers.filter((d) => Number.isFinite(d.lat) && Number.isFinite(d.lng)).map((d) => {
           const color = DEVICE_COLORS[d.status] ?? DEVICE_COLORS.Offline;
           return (
             <Marker
@@ -428,52 +374,31 @@ export function GeofenceMap({
         )}
       </GoogleMap>
 
-      {/* ── Drawing toolbar (overlaid on map) ───────────────────────── */}
-      {drawingMode && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 16,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10,
-          }}
-        >
-          <div className="bg-white rounded-xl shadow-lg border border-[#E9EDEF] px-4 py-2.5 flex items-center gap-3">
+      {/* ── Drawing hint (overlaid on map) ──────────────────────────── */}
+      {preview && (
+        <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>
+          <div className="bg-white rounded-xl shadow-lg border border-[#E9EDEF] px-4 py-2.5 flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-            <span className="text-[12px] text-[#667781]">
-              {drawPoints.length === 0
-                ? "Click on the map to start placing vertices"
-                : drawPoints.length < 3
-                  ? `${drawPoints.length} point${drawPoints.length !== 1 ? "s" : ""} placed — need at least 3`
-                  : `${drawPoints.length} points placed — click to add more or finish`}
-            </span>
-            {drawPoints.length > 0 && (
-              <button
-                type="button"
-                onClick={handleUndoPoint}
-                className="h-7 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[11px] font-extrabold text-[#667781] cursor-pointer hover:bg-[#F0F2F5]"
-              >
-                Undo
-              </button>
-            )}
-            {drawPoints.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setDrawPoints([])}
-                className="h-7 px-3 rounded-lg border border-[#EF4444]/30 bg-white text-[11px] font-extrabold text-[#EF4444] cursor-pointer hover:bg-[#FEF2F2]"
-              >
-                Clear All
-              </button>
-            )}
-            {drawPoints.length >= 3 && (
-              <button
-                type="button"
-                onClick={handleFinishDraw}
-                className="h-7 px-3 rounded-lg border-0 bg-[#128C7E] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[#0D7466]"
-              >
-                Finish ({drawPoints.length} pts)
-              </button>
+            <span className="text-[12px] text-[#667781]">{hint}</span>
+            {(preview.points.length > 0 || preview.center) && (
+              <>
+                <button
+                  type="button"
+                  onClick={onUndo}
+                  className="h-7 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[11px] font-extrabold text-[#667781] cursor-pointer hover:bg-[#F0F2F5]"
+                >
+                  Undo
+                </button>
+                {preview.points.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={onClear}
+                    className="h-7 px-3 rounded-lg border border-[#EF4444]/30 bg-white text-[11px] font-extrabold text-[#EF4444] cursor-pointer hover:bg-[#FEF2F2]"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

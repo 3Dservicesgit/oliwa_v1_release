@@ -38,11 +38,13 @@ export interface ListingCardProps {
   /** True when the logged-in client owns this listing (enables photo upload). */
   isOwner?: boolean;
   onRequestBooking?: (listing: VebaListing) => void;
+  /** False for a listing the viewer can't book (their own). */
+  bookable?: boolean;
   /** Called after a successful photo upload so the parent can refresh. */
   onPhotoUploaded?: () => void;
 }
 
-export function ListingCard({ listing, isOwner, onRequestBooking, onPhotoUploaded }: ListingCardProps) {
+export function ListingCard({ listing, isOwner, onRequestBooking, onPhotoUploaded, bookable = true }: ListingCardProps) {
   const summary = listing.asset_summary;
   const title   = summary?.display_name ?? listing.asset_uid;
   const cls     = summary?.asset_class;
@@ -194,13 +196,19 @@ export function ListingCard({ listing, isOwner, onRequestBooking, onPhotoUploade
         {listing.notes && <p className="text-[11px] text-[#667781] line-clamp-2 mt-1">{listing.notes}</p>}
 
         <div className="mt-auto pt-2">
-          <GuardedButton
-            permission="can_book_asset"
-            onClick={() => onRequestBooking?.(listing)}
-            className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Request booking
-          </GuardedButton>
+          {bookable ? (
+            <GuardedButton
+              permission="can_book_asset"
+              onClick={() => onRequestBooking?.(listing)}
+              className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Request booking
+            </GuardedButton>
+          ) : (
+            <div className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#F0F2F5] text-[#667781] text-center">
+              This is your asset
+            </div>
+          )}
         </div>
       </div>
 

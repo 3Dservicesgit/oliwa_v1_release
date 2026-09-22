@@ -8,6 +8,7 @@
  *   MODAL:  HIC Approval Required (dual-control checklist + reason/notes)
  */
 import React, { useState } from "react";
+import { SampleDataNotice } from "../../components/ui";
 
 // ─── Status colors ───────────────────────────────────────────────────────────
 const stColor: Record<string, string> = {
@@ -53,6 +54,8 @@ export function InvoicingPage() {
       {/* ── Left: Main Content ────────────────────────────────────── */}
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex flex-col gap-3 p-3">
+
+          <SampleDataNotice />
 
           {/* Header */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">

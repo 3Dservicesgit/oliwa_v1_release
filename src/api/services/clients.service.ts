@@ -88,10 +88,11 @@ export function getClientDevices(
   clientUid: string,
   opts?: RequestOptions,
 ): Promise<ApiResponse<ClientDevice[]>> {
-  return post<ClientDevice[]>(ENDPOINTS.FLEET.LIST_UNITS, {
-    ...opts,
-    data: { data_level: "client", account_uid: clientUid },
-  });
+  return post<ClientDevice[]>(
+    ENDPOINTS.FLEET.LIST_UNITS,
+    { data: { data_level: "client", account_uid: clientUid } },
+    opts,
+  );
 }
 
 /** Fetch all available token packages from the registry. */

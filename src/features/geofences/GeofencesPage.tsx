@@ -3,7 +3,7 @@
  *
  * Layout: split-panel
  *   Left panel  — GeofenceList (card list with search) + action drawers/modals
- *   Right panel — GeofenceMap (interactive Google Maps with polygon drawing)
+ *   Right panel — GeofenceMap (Google Maps; polygon, circle and line geofences)
  *
  * Tabs:
  *   "my-geofences"  — CRUD geofences with map integration
@@ -16,6 +16,18 @@ import { useAuth } from "../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../auth/guards";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
 import type { ParsedGeozone, LatLng, Geozone } from "../../api/types";
+import {
+  emptyDraft,
+  draftFromZone,
+  previewOf,
+  toDraftPoint,
+  withMapPoint,
+  undoLast,
+  clearPoints,
+  type ShapeDraft,
+} from "../../utils/geofenceShapes";
+
+import { parseLiveFrame, liveStreamUrl } from "../../utils/livePosition";
 
 import { GeofenceMap } from "./components/GeofenceMap";
 import type { DeviceMarkerData } from "./components/GeofenceMap";
@@ -36,15 +48,8 @@ const TABS: { key: GeofenceTab; label: string }[] = [
 
 const FLEET_SSE = (import.meta.env.VITE_FLEET_SSE_URL as string) ?? "https://narvasocket.3dservices.co.ug";
 
-function normalizeStatus(ms: string, spd: number): "Moving" | "Parked" | "Idling" | "Offline" {
-  const s = ms.toLowerCase();
-  if (s.includes("park") || s.includes("stop")) return "Parked";
-  if (s.includes("idl")  || s === "idle")        return "Idling";
-  if (s.includes("mov")  || s.includes("driv"))  return "Moving";
-  if (Number.isFinite(spd) && spd >= 5)          return "Moving";
-  if (Number.isFinite(spd) && spd > 0)           return "Idling";
-  return "Offline";
-}
+/** Wait this long before reopening a stream that dropped. */
+const STREAM_RETRY_MS = 4000;
 
 export function GeofencesPage() {
   const { state: authState } = useAuth();
@@ -53,10 +58,13 @@ export function GeofencesPage() {
   // ── Data ────────────────────────────────────────────────────────────────
   const [geozones, setGeozones] = useState<ParsedGeozone[]>([]);
   const [loading, setLoading] = useState(false);
+  // A failed load used to look exactly like "you have no geofences".
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchGeozones = useCallback(() => {
     if (!authState.accountRoot) return;
     setLoading(true);
+    setLoadError(null);
     getGeozones(authState.accountRoot, "client")
       .then((res) => {
         if (res.status === "success" && Array.isArray(res.data)) {
@@ -69,7 +77,10 @@ export function GeofencesPage() {
           setGeozones([]);
         }
       })
-      .catch(() => setGeozones([]))
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : "Couldn't load your geofences.");
+        setGeozones([]);
+      })
       .finally(() => setLoading(false));
   }, [authState.accountRoot]);
 
@@ -81,16 +92,15 @@ export function GeofencesPage() {
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  // Drawing mode
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [drawnPath, setDrawnPath] = useState<LatLng[] | null>(null);
+  // The shape being created or edited (shared by the side panel and the map)
+  const [draft, setDraft] = useState<ShapeDraft | null>(null);
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
 
   // Editing
   const [editingGeozone, setEditingGeozone] = useState<ParsedGeozone | null>(null);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [editingUid, setEditingUid] = useState<string | null>(null);
-  const [editedPath, setEditedPath] = useState<LatLng[] | null>(null);
+  const [editBaseline, setEditBaseline] = useState("");
 
   // Attach devices
   const [attachGeozone, setAttachGeozone] = useState<ParsedGeozone | null>(null);
@@ -99,12 +109,15 @@ export function GeofencesPage() {
   const [deviceMarkers, setDeviceMarkers] = useState<DeviceMarkerData[]>([]);
   const sseRefs = useRef<Map<string, EventSource>>(new Map());
   const deviceDataRef = useRef<Map<string, DeviceMarkerData>>(new Map());
+  const retryTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // Fetch attached devices when a geofence is selected
   useEffect(() => {
     // Close existing SSE connections
     for (const es of sseRefs.current.values()) es.close();
     sseRefs.current.clear();
+    for (const timer of retryTimers.current) clearTimeout(timer);
+    retryTimers.current.clear();
     deviceDataRef.current.clear();
     setDeviceMarkers([]);
 
@@ -132,37 +145,66 @@ export function GeofencesPage() {
 
         const nameMap = new Map<string, string>();
         for (const d of allDevices) {
-          nameMap.set(d.device_imei, d.device_name || d.car_make ? `${d.device_name || ""}` : d.device_imei);
+          const plate = [d.car_make, d.car_model].filter(Boolean).join(" ");
+          nameMap.set(d.device_imei, d.device_name || plate || d.device_imei);
         }
 
-        // 3. Connect SSE for each attached device
-        for (const imei of attachedImeis) {
-          const url = `${FLEET_SSE}/data-stream/${encodeURIComponent(imei)}/x-location`;
-          const es = new EventSource(url);
+        const show = (marker: DeviceMarkerData) => {
+          deviceDataRef.current.set(marker.imei, marker);
+          setDeviceMarkers(Array.from(deviceDataRef.current.values()));
+        };
+
+        // 3. Follow each attached unit's live position
+        const connect = (imei: string) => {
+          if (cancelled) return;
+          let es: EventSource;
+          try {
+            es = new EventSource(liveStreamUrl(FLEET_SSE, imei));
+          } catch {
+            return;
+          }
           sseRefs.current.set(imei, es);
 
           es.onmessage = (ev) => {
-            try {
-              const d = JSON.parse(ev.data);
-              const lat = parseFloat(d.latitude ?? d.lat ?? 0);
-              const lng = parseFloat(d.longitude ?? d.lng ?? 0);
-              if (lat === 0 && lng === 0) return;
+            const frame = parseLiveFrame(ev.data, imei);
+            if (frame.kind === "ignore") return;
 
-              const spd = parseFloat(d.speed ?? 0);
-              const marker: DeviceMarkerData = {
-                imei,
-                name: nameMap.get(imei) ?? imei,
-                lat,
-                lng,
-                speed: Math.round(spd),
-                status: normalizeStatus(d.motion_state ?? d.status ?? "", spd),
-                lastSync: d.device_time ?? d.timestamp ?? "—",
-              };
-              deviceDataRef.current.set(imei, marker);
-              setDeviceMarkers(Array.from(deviceDataRef.current.values()));
-            } catch { /* skip bad frames */ }
+            if (frame.kind === "offline") {
+              const known = deviceDataRef.current.get(imei);
+              show(known
+                ? { ...known, status: "Offline" }
+                : { imei, name: nameMap.get(imei) ?? imei, lat: NaN, lng: NaN,
+                    speed: 0, status: "Offline", lastSync: "—" });
+              return;
+            }
+
+            const p = frame.position;
+            show({
+              imei,
+              name: nameMap.get(imei) ?? imei,
+              lat: p.lat,
+              lng: p.lng,
+              speed: Math.round(p.speed),
+              status: p.status,
+              lastSync: p.lastSync || "—",
+            });
           };
-        }
+
+          // A dropped stream is normal (sleep, network change) — reopen it,
+          // otherwise the map quietly freezes on the last position.
+          es.onerror = () => {
+            try { es.close(); } catch { /* already closed */ }
+            sseRefs.current.delete(imei);
+            if (cancelled) return;
+            const retry = setTimeout(() => {
+              retryTimers.current.delete(retry);
+              connect(imei);
+            }, STREAM_RETRY_MS);
+            retryTimers.current.add(retry);
+          };
+        };
+
+        for (const imei of attachedImeis) connect(imei);
       } catch (err) {
         console.error("[GeofencesPage] Failed to load device markers:", err);
       }
@@ -172,51 +214,50 @@ export function GeofencesPage() {
       cancelled = true;
       for (const es of sseRefs.current.values()) es.close();
       sseRefs.current.clear();
+      for (const timer of retryTimers.current) clearTimeout(timer);
+      retryTimers.current.clear();
     };
   }, [selectedUid, authState.accountRoot]);
 
-  // ── Drawing handlers ────────────────────────────────────────────────────
-  const handleStartDrawing = () => {
-    setDrawingMode(true);
-    setSelectedUid(null);
+  // ── Create handlers ─────────────────────────────────────────────────────
+  const handleEditClose = () => {
+    setEditDrawerOpen(false);
     setEditingUid(null);
+    setEditingGeozone(null);
+    setDraft(null);
   };
 
-  const handlePolygonComplete = (path: LatLng[]) => {
-    setDrawingMode(false);
-    setDrawnPath(path);
+  const handleStartDrawing = () => {
+    handleEditClose();
+    setSelectedUid(null);
+    setDraft(emptyDraft("polygon"));
     setCreateDrawerOpen(true);
   };
 
   const handleCancelDrawing = () => {
-    setDrawingMode(false);
-    setDrawnPath(null);
-  };
-
-  // Update drawnPath when user edits the creation polygon on the map
-  const handleCreatingPathEdited = (newPath: LatLng[]) => {
-    setDrawnPath(newPath);
+    setCreateDrawerOpen(false);
+    setDraft(null);
   };
 
   // ── Edit handlers ───────────────────────────────────────────────────────
   const handleEditClick = (gz: ParsedGeozone) => {
+    const start = draftFromZone(gz.geozone_shape, gz.geozone_shape_params, gz.path);
+    setCreateDrawerOpen(false);
     setEditingGeozone(gz);
     setEditingUid(gz.geozone_uid);
-    setEditedPath(null);
     setSelectedUid(gz.geozone_uid);
+    setDraft(start);
+    setEditBaseline(JSON.stringify(start));
     setEditDrawerOpen(true);
   };
 
-  const handlePolygonEdited = (_uid: string, newPath: LatLng[]) => {
-    setEditedPath(newPath);
-  };
-
-  const handleEditClose = () => {
-    setEditDrawerOpen(false);
-    setEditingUid(null);
-    setEditedPath(null);
-    setEditingGeozone(null);
-  };
+  // ── Map ↔ draft ─────────────────────────────────────────────────────────
+  const handleMapClick = (p: LatLng) => setDraft((d) => (d ? withMapPoint(d, p) : d));
+  const handlePointMoved = (index: number, p: LatLng) =>
+    setDraft((d) => d && { ...d, points: d.points.map((pt, k) => (k === index ? toDraftPoint(p) : pt)) });
+  const handleCenterMoved = (p: LatLng) => setDraft((d) => d && { ...d, center: toDraftPoint(p) });
+  const handleUndo = () => setDraft((d) => d && undoLast(d));
+  const handleClear = () => setDraft((d) => d && clearPoints(d));
 
   // ── Delete handler ──────────────────────────────────────────────────────
   const [deleteConfirm, setDeleteConfirm] = useState<ParsedGeozone | null>(null);
@@ -257,7 +298,7 @@ export function GeofencesPage() {
                 Draw, manage, and attach geofences to your devices
               </nav>
             </div>
-            {activeTab === "my-geofences" && !drawingMode && (
+            {activeTab === "my-geofences" && !createDrawerOpen && (
               <GuardedButton
                 permission="can_create_geofence"
                 fallback="disable"
@@ -267,13 +308,13 @@ export function GeofencesPage() {
                 + Mark Geofence
               </GuardedButton>
             )}
-            {activeTab === "my-geofences" && drawingMode && (
+            {activeTab === "my-geofences" && createDrawerOpen && (
               <button
                 type="button"
                 onClick={handleCancelDrawing}
                 className="shrink-0 h-8 px-4 rounded-lg border border-[#E9EDEF] bg-white text-[12px] font-extrabold text-[#667781] cursor-pointer"
               >
-                Cancel Drawing
+                Cancel
               </button>
             )}
           </div>
@@ -287,7 +328,8 @@ export function GeofencesPage() {
               type="button"
               onClick={() => {
                 setActiveTab(tab.key);
-                setDrawingMode(false);
+                handleCancelDrawing();
+                handleEditClose();
               }}
               className={[
                 "px-3 py-1.5 text-[12px] font-extrabold rounded-md cursor-pointer border-0 transition-colors",
@@ -301,15 +343,6 @@ export function GeofencesPage() {
           ))}
         </div>
 
-        {/* Drawing mode banner */}
-        {drawingMode && (
-          <div className="bg-[#E9F7F4] border border-[#C2E8E1] rounded-xl px-4 py-2 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-            <span className="text-[12px] font-extrabold text-[#075E54]">
-              Drawing mode active — click on the map to place polygon vertices, then close the shape
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ── Main content ────────────────────────────────────────────────── */}
@@ -319,27 +352,41 @@ export function GeofencesPage() {
             {/* Left panel — list OR create/edit panel */}
             <div className="w-[340px] shrink-0 flex flex-col gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {/* Inline create panel (replaces list when creating) */}
-              {createDrawerOpen ? (
+              {createDrawerOpen && draft ? (
                 <CreateGeofenceDrawer
                   open={createDrawerOpen}
-                  drawnPath={drawnPath}
-                  onClose={() => {
-                    setCreateDrawerOpen(false);
-                    setDrawnPath(null);
-                  }}
+                  draft={draft}
+                  onDraftChange={setDraft}
+                  onClose={handleCancelDrawing}
                   onCreated={fetchGeozones}
                 />
-              ) : editDrawerOpen && editingGeozone ? (
+              ) : editDrawerOpen && editingGeozone && draft ? (
                 <EditGeofenceDrawer
+                  key={editingGeozone.geozone_uid}
                   open={editDrawerOpen}
                   geozone={editingGeozone}
-                  editedPath={editedPath}
+                  draft={draft}
+                  onDraftChange={setDraft}
+                  shapeChanged={JSON.stringify(draft) !== editBaseline}
                   onClose={handleEditClose}
                   onUpdated={fetchGeozones}
                 />
               ) : loading ? (
                 <div className="flex items-center justify-center flex-1">
                   <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : loadError ? (
+                <div className="p-4">
+                  <div role="alert" className="text-[12px] text-[#B00020] bg-[#FFF5F5] border border-[#FFD6D6] rounded-lg px-3 py-2">
+                    {loadError}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchGeozones}
+                    className="mt-2 h-8 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] font-extrabold text-[#111B21] cursor-pointer hover:bg-[#F0F2F5]"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : (
                 <GeofenceList
@@ -361,13 +408,14 @@ export function GeofencesPage() {
                 geozones={geozones}
                 selectedUid={selectedUid}
                 onSelectGeozone={setSelectedUid}
-                drawingMode={drawingMode}
-                onPolygonComplete={handlePolygonComplete}
-                editingUid={editingUid}
-                onPolygonEdited={handlePolygonEdited}
                 deviceMarkers={deviceMarkers}
-                creatingPath={createDrawerOpen ? drawnPath : null}
-                onCreatingPathEdited={handleCreatingPathEdited}
+                preview={draft ? previewOf(draft) : null}
+                hiddenUid={editDrawerOpen ? editingUid : null}
+                onMapClick={handleMapClick}
+                onPointMoved={handlePointMoved}
+                onCenterMoved={handleCenterMoved}
+                onUndo={handleUndo}
+                onClear={handleClear}
               />
             </div>
           </div>
@@ -396,7 +444,7 @@ export function GeofencesPage() {
 
       {/* ── Delete confirmation ─────────────────────────────────────────── */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 grid place-items-center">
+        <div className="fixed inset-0 z-[150] grid place-items-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setDeleteConfirm(null)} />
           <div className="relative bg-white rounded-xl p-5 w-[380px] max-w-[calc(100vw-24px)] shadow-xl">
             <div className="font-black text-[15px] text-[#111B21] mb-2">

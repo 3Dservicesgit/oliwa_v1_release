@@ -11,6 +11,7 @@
  */
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "../../auth/AuthContext";
+import { usePermissions } from "../../auth/PermissionsContext";
 import { getRaw } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
 import { getUnreadCount, getNotifications, markNotificationRead, markAllNotificationsRead } from "../../api/services/notifications.service";
@@ -204,6 +205,15 @@ interface TopBarProps {
   searchPlaceholder?: string;
 }
 
+/** A client login's role in plain words (see features/team). */
+function customerRoleLabel(role: string): string {
+  switch (role.toLowerCase()) {
+    case "client_operator": return "Operator";
+    case "client_viewer": return "Viewer";
+    default: return "Administrator";   // client_admin and the account's original login
+  }
+}
+
 export function TopBar({
   brandName         = "3D SERVICES",
   pageTitle         = "TRACKING CONSOLE",
@@ -233,22 +243,40 @@ export function TopBar({
     fetchDetails();
   }, [authState.accountUid, authState.accountName]);
 
-  // Derive display values from fetched details → auth state → safe fallbacks
-  const displayName = userDetails?.account_name || authState.accountName || getCookie("_nvxs_account_name") || "User";
-  const displayRole = userDetails?.account_role || authState.role || "";
-  const avatarInitial = displayName.charAt(0).toUpperCase();
-  const whoLabel = displayRole
-    ? `${displayName} • ${displayRole.toUpperCase().replace(/_/g, " ")}`
-    : displayName;
+  // Who is signed in, from the server (PermissionsContext) first: for a client
+  // login that includes the client account (UID and name) it belongs to.
+  const { isCustomer, profile, role: serverRole } = usePermissions();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Build role pills from the actual user role
+  // Derive display values from the server profile → fetched details → auth state → fallbacks
+  const displayName = profile.displayName || userDetails?.account_name || authState.accountName || getCookie("_nvxs_account_name") || "User";
+  const displayRole = serverRole || userDetails?.account_role || authState.role || "";
+  const roleLabel = isCustomer
+    ? customerRoleLabel(displayRole)
+    : displayRole.toUpperCase().replace(/_/g, " ");
+  const clientName = isCustomer ? (profile.clientName || "Your company") : "";
+  const avatarInitial = (clientName || displayName).charAt(0).toUpperCase();
+  const whoLabel = roleLabel ? `${displayName} • ${roleLabel}` : displayName;
+
+  // Pills: a client sees their company's name; staff see their role.
   const rolePills: { label: string; variant: "teal" | "azure" | "green" }[] = [];
-  if (displayRole) {
+  if (isCustomer) {
+    rolePills.push({ label: clientName, variant: "teal" });
+  } else if (displayRole) {
     rolePills.push({
       label: displayRole.toUpperCase().replace(/_/g, " ").substring(0, 16),
       variant: "teal",
     });
   }
+
+  const copyClientId = async () => {
+    try {
+      await navigator.clipboard.writeText(profile.clientUid);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard blocked: the ID is still shown to select */ }
+  };
 
   return (
     <header className="
@@ -294,17 +322,59 @@ export function TopBar({
         {/* Notification Bell */}
         <NotificationBell />
 
-        {/* Avatar */}
-        <div className="
-          w-[30px] h-[30px] rounded-full bg-[#0B7B6E]
-          grid place-items-center font-bold text-sm shrink-0
-        ">
-          {avatarInitial}
-        </div>
+        {/* Avatar + profile */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setProfileOpen((v) => !v)}
+            aria-label="Your profile"
+            aria-expanded={profileOpen}
+            className="flex items-center gap-2 bg-transparent border-none text-white cursor-pointer p-0"
+          >
+            <span className="
+              w-[30px] h-[30px] rounded-full bg-[#0B7B6E]
+              grid place-items-center font-bold text-sm shrink-0
+            ">
+              {avatarInitial}
+            </span>
+            <span className="hidden sm:block text-xs opacity-90 whitespace-nowrap">
+              {whoLabel}
+            </span>
+          </button>
 
-        <span className="hidden sm:block text-xs opacity-90 whitespace-nowrap">
-          {whoLabel}
-        </span>
+          {profileOpen && (
+            <>
+              <div className="fixed inset-0 z-[140]" onClick={() => setProfileOpen(false)} />
+              <div role="dialog" aria-label="Your profile"
+                className="absolute right-0 top-[38px] z-[150] w-[280px] rounded-xl bg-white text-[#111B21] shadow-xl border border-[#E9EDEF] p-4">
+                {isCustomer && (
+                  <div className="pb-3 mb-3 border-b border-[#E9EDEF]">
+                    <div className="text-[10px] font-extrabold text-[#667781] uppercase tracking-wide">Company</div>
+                    <div className="text-[15px] font-black">{clientName}</div>
+                    {profile.clientUid && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span className="text-[10px] text-[#667781]">Client ID</span>
+                        <code className="text-[11px] font-mono text-[#111B21] truncate max-w-[150px]" title={profile.clientUid}>{profile.clientUid}</code>
+                        <button type="button" onClick={copyClientId}
+                          className="h-5 px-1.5 rounded border border-[#E9EDEF] bg-white text-[10px] font-extrabold text-[#128C7E] cursor-pointer">
+                          {copied ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="text-[10px] font-extrabold text-[#667781] uppercase tracking-wide">Signed in as</div>
+                <div className="text-[13px] font-extrabold">{displayName}</div>
+                {profile.username && <div className="text-[12px] text-[#667781]">{profile.username}</div>}
+                {roleLabel && <div className="mt-1 text-[12px] text-[#667781]">Role: <b className="text-[#111B21]">{roleLabel}</b></div>}
+                <button type="button" onClick={logout}
+                  className="mt-3 w-full h-8 rounded-lg border border-[#E9EDEF] bg-white text-[12px] font-extrabold text-[#111B21] cursor-pointer hover:bg-[#F0F2F5]">
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Logout button */}
         <button

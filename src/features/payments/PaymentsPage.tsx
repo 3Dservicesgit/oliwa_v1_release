@@ -8,6 +8,7 @@
  *   BLADE:  Top-up & Settlement (tabs: Token Top-up, VEBA Escrow, Refunds, Config)
  */
 import React, { useState } from "react";
+import { SampleDataNotice } from "../../components/ui";
 
 // ─── Colour helpers ──────────────────────────────────────────────────────────
 // const okBg    = "bg-[#25D366] text-[#053B33]";
@@ -105,6 +106,8 @@ export function PaymentsPage() {
     <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative">
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex flex-col gap-3 p-3">
+
+          <SampleDataNotice />
 
           {/* ── Page Header ────────────────────────────────────────────────────── */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">

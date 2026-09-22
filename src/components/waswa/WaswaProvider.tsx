@@ -73,13 +73,15 @@ export function WaswaProvider({ children }: { children: React.ReactNode }) {
     <WaswaContext.Provider value={api}>
       {children}
 
+      {/* z-40: below page modals and drawers (z-50), so it never covers their
+          buttons; it shows again when they close. */}
       {!isOpen && (
         <button
           onClick={() => open()}
           aria-label="Open Waswa AI"
           title={on ? "Ask Waswa" : "Waswa is off — open to switch it on"}
           className={`
-            fixed right-5 bottom-5 z-[280]
+            fixed right-5 bottom-5 z-40
             w-12 h-12 rounded-full border-none
             text-white font-black text-[20px]
             shadow-[0_12px_30px_rgba(0,0,0,0.18)]

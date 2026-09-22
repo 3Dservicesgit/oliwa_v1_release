@@ -14,7 +14,6 @@
 
 import type { ApiResponse, RequestOptions } from "./types";
 import { ApiError } from "./types";
-import { getCookie } from "../utils/cookies";
 
 // ── Base URL ─────────────────────────────────────────────────────────────────
 
@@ -44,11 +43,13 @@ export function hasAccessToken(): boolean {
   return accessToken !== null;
 }
 
-/** Get the current auth token. Prefers in-memory JWT, falls back to cookie. */
+/** Get the current auth token: the in-memory JWT only.
+ *  (The account UID used to be sent as a fallback "token". It is not a secret —
+ *  it appears in URLs — and the server only accepts signed JWTs, so it is no
+ *  longer sent. With no JWT the request goes without one; a 401 then triggers
+ *  the silent refresh from the HttpOnly refresh cookie.) */
 function getAuthToken(): string | null {
-  if (accessToken) return accessToken;
-  // Interim fallback: read account_uid from cookie
-  return getCookie("_nvxs_account_uid") ?? null;
+  return accessToken;
 }
 
 /**
