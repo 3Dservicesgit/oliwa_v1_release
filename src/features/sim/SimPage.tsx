@@ -12,10 +12,16 @@
  * SECURITY — Customer isolation:
  *   • ownerUid is ALWAYS the logged-in user's accountUid from AuthContext
  *     (or the _nvxs_account_uid cookie). Never from URL or user input.
- *   • Balance: GET /tokens/{ownerUid}/balance — only the customer's wallet.
- *   • Purchase: origin = ownerUid — purchase tagged to logged-in customer.
- *   • Devices: GET /devices/configured/{ownerUid}/client — only their devices.
- *   • Transactions: GET /payments/transactions/{ownerUid}/list — their history only.
+ *   • walletUid is the CLIENT account (accountRoot) that owns the tokens.
+ *     The wallet belongs to the company, not to whoever signed in: a team
+ *     member's accountUid has no row in dll_user_token_accounts, so asking
+ *     for the balance with it returned "Client not found" and this page
+ *     swallowed the error and showed an empty wallet. It falls back to
+ *     ownerUid, which is the same value for the account owner.
+ *   • Balance: GET /tokens/{walletUid}/balance — only the customer's wallet.
+ *   • Purchase: origin = ownerUid — purchase tagged to the login that paid.
+ *   • Devices: GET /devices/configured/{clientUid}/client — only their devices.
+ *   • Transactions: GET /payments/transactions/{walletUid}/list — their history only.
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../auth/AuthContext";
@@ -1281,6 +1287,11 @@ export function SimPage() {
 
   // Loading
   const [balanceLoading, setBalanceLoading] = useState(true);
+  // A failed balance call used to be swallowed, which left the page showing
+  // "No Tokens Yet" — the same screen a customer with an empty wallet sees.
+  // Telling them nothing loaded is not the same as telling them they own
+  // nothing, so the two states are now kept apart.
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [pkgLoading, setPkgLoading] = useState(true);
   const [devicesLoading, setDevicesLoading] = useState(true);
   const [txnLoading, setTxnLoading] = useState(true);
@@ -1434,13 +1445,19 @@ export function SimPage() {
   const clientUidRef = useRef(clientUid);
   if (clientUid) clientUidRef.current = clientUid;
 
+  // Tokens belong to the client too. Same value as ownerUid for the account
+  // owner, different for every other user of the same company.
+  const walletUid = clientUid || ownerUid;
+  const walletUidRef = useRef(walletUid);
+  if (walletUid) walletUidRef.current = walletUid;
+
   const showToast = useCallback((msg: string, type: "success" | "error") => {
     setToast({ msg, type });
   }, []);
 
   // ── Fetch balance ──────────────────────────────────────────────────────
   const fetchBalance = useCallback(async () => {
-    const uid = ownerUidRef.current;
+    const uid = walletUidRef.current;
     if (!uid) return;
     setBalanceLoading(true);
     try {
@@ -1454,8 +1471,10 @@ export function SimPage() {
       } else {
         setBalances([]);
       }
+      setBalanceError(null);
     } catch {
-      // Keep existing data on error
+      // Keep whatever was already on screen, but say it may be out of date.
+      setBalanceError("We couldn't load your token balance just now.");
     } finally {
       setBalanceLoading(false);
     }
@@ -1491,7 +1510,7 @@ export function SimPage() {
 
   // ── Fetch transactions ─────────────────────────────────────────────────
   const fetchTransactions = useCallback(async () => {
-    const uid = ownerUidRef.current;
+    const uid = walletUidRef.current;
     if (!uid) return;
     setTxnLoading(true);
     try {
@@ -1511,7 +1530,7 @@ export function SimPage() {
   const txnFetched = useRef(false);
 
   useEffect(() => {
-    if (!ownerUidRef.current) return;
+    if (!ownerUidRef.current && !walletUidRef.current) return;
     if (tab === "balance" && !balanceFetched.current) {
       balanceFetched.current = true;
       fetchBalance();
@@ -1528,15 +1547,15 @@ export function SimPage() {
       txnFetched.current = true;
       fetchTransactions();
     }
-  }, [tab, ownerUid, fetchBalance, fetchPackages, fetchDevices, fetchTransactions]);
+  }, [tab, ownerUid, walletUid, fetchBalance, fetchPackages, fetchDevices, fetchTransactions]);
 
   // Pre-fetch balance on mount (always useful)
   useEffect(() => {
-    if (ownerUidRef.current && !balanceFetched.current) {
+    if (walletUidRef.current && !balanceFetched.current) {
       balanceFetched.current = true;
       fetchBalance();
     }
-  }, [ownerUid, fetchBalance]);
+  }, [walletUid, fetchBalance]);
 
   // ── Pause / Restore handler ────────────────────────────────────────────
   const handleConfirmAction = async () => {
@@ -1661,6 +1680,18 @@ export function SimPage() {
                     <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
                     <span className="text-[12px] text-[#667781]">Loading balance...</span>
                   </div>
+                </div>
+              ) : balanceError && balances.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-[28px] mb-2">⚠️</div>
+                  <p className="text-[13px] font-black text-[#111B21] mb-1">Balance unavailable</p>
+                  <p className="text-[12px] text-[#667781]">{balanceError}</p>
+                  <button
+                    onClick={() => fetchBalance()}
+                    className="mt-3 h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+                  >
+                    Try Again
+                  </button>
                 </div>
               ) : balances.length === 0 ? (
                 <div className="text-center py-12">
