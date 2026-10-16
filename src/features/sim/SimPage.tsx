@@ -26,6 +26,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getCookie } from "../../utils/cookies";
+import { useSearchParams } from "react-router-dom";
 import {
   getAllTokens,
   getAllProducts,
@@ -1276,7 +1277,9 @@ function BudgetTab({
 
 export function SimPage() {
   const { state: authState } = useAuth();
-  const [tab, setTab] = useState<Tab>("balance");
+  // ?tab=buy (and the other tab keys) opens that tab — the dashboard's "+ Buy".
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (TABS.some((t) => t.key === params.get("tab")) ? params.get("tab") as Tab : "balance"));
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   // Data

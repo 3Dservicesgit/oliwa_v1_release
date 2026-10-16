@@ -14,7 +14,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { usePermissions } from "../../auth/PermissionsContext";
 import { getRaw } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
-import { getUnreadCount, getNotifications, markNotificationRead, markAllNotificationsRead } from "../../api/services/notifications.service";
+import { alertOwnerIds, getUnreadCountForOwners, getNotificationsForOwners, markNotificationRead, markAllNotificationsReadForOwners } from "../../api/services/notifications.service";
 import { getCookie } from "../../utils/cookies";
 import { EVENT_CONDITION_LABELS } from "../../api/types/events.types";
 import type { EventCondition, EventNotification } from "../../api/types";
@@ -36,24 +36,22 @@ function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const ownerUid =
-    authState.accountRoot || getCookie("_nvxs_account_root") ||
-    authState.accountUid || getCookie("_nvxs_account_uid") || "";
+  // Alerts are filed under the client (account_root) and under the user's
+  // own account_uid (the owner of the rules they created): ask for both.
+  const owners = alertOwnerIds(
+    authState.accountRoot || getCookie("_nvxs_account_root"),
+    authState.accountUid || getCookie("_nvxs_account_uid"),
+  ).join(",");
 
   // Fetch unread count periodically
   const fetchCount = useCallback(async () => {
-    if (!ownerUid) return;
+    if (!owners) return;
     try {
-      const res = await getUnreadCount(ownerUid);
-      setUnreadCount(
-        typeof res.data === "object" && res.data !== null
-          ? (res.data as { count: number }).count
-          : 0,
-      );
+      setUnreadCount(await getUnreadCountForOwners(owners.split(",")));
     } catch {
       /* silently ignore polling errors */
     }
-  }, [ownerUid]);
+  }, [owners]);
 
   useEffect(() => {
     fetchCount();
@@ -63,17 +61,17 @@ function NotificationBell() {
 
   // Load notifications when dropdown opens & mark all as read
   useEffect(() => {
-    if (!open || !ownerUid) return;
+    if (!open || !owners) return;
     let cancelled = false;
     setLoading(true);
-    getNotifications(ownerUid)
-      .then((res) => { if (!cancelled) setNotifications(res.data ?? []); })
+    getNotificationsForOwners(owners.split(","))
+      .then((rows) => { if (!cancelled) setNotifications(rows); })
       .catch(() => { if (!cancelled) setNotifications([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     // Mark all as read when the bell is opened — clears the badge
     if (unreadCount > 0) {
-      markAllNotificationsRead(ownerUid)
+      markAllNotificationsReadForOwners(owners.split(","))
         .then(() => {
           if (!cancelled) {
             setUnreadCount(0);
@@ -85,7 +83,7 @@ function NotificationBell() {
     }
 
     return () => { cancelled = true; };
-  }, [open, ownerUid]);
+  }, [open, owners]);
 
   // Close on outside click
   useEffect(() => {

@@ -1,286 +1,32 @@
 /**
  * AegisDashboard — Customer Dashboard
  *
- * Clean customer-facing overview showing:
- *   - KPI stat cards (devices, tokens, subscriptions)
- *   - Data fetched for the logged-in customer only
+ * One scrollable page with everything on it, in plain sections: Fleet
+ * status, Geofence presence, Alerts, Tokens (features/fleet-dashboard). The
+ * figures match the OLIWA mobile app's and refresh live.
  *
- * SECURITY: All stats use the logged-in customer's ownerUid from AuthContext.
+ * SECURITY: every figure is the signed-in customer's own (account root); the
+ * backend's access guard refuses any other client.
  */
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getCookie } from "../../utils/cookies";
-import { getClientDevices, getClientBalance } from "../../api/services/clients.service";
-import { getClientTransactions } from "../../api/services/billing.service";
-import { TokenTopupModal } from "../tokens/components/TokenTopupModal";
-import type { ClientDevice, ClientTokenBalance, ClientTransaction } from "../../api/types";
+import { FleetDashboard } from "../fleet-dashboard";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function AegisDashboard() {
-  const { state, login, verifyMfa, resendMfa } = useAuth();
-  const [topupOpen, setTopupOpen] = useState(false);
   const [airlockOpen, setAirlockOpen] = useState(() => !getCookie("_nvxs_account_uid"));
 
-  // Customer's ownerUid (individual user) and clientUid (the client they belong to)
-  const ownerUid = state.accountUid || getCookie("_nvxs_account_uid") || "";
-  const clientUid = state.accountRoot || getCookie("_nvxs_account_root") || "";
-  const customerName = getCookie("_nvxs_account_type") || "Customer";
-
-  // Stats state
-  const [devices, setDevices] = useState<ClientDevice[]>([]);
-  const [balances, setBalances] = useState<ClientTokenBalance[]>([]);
-  const [transactions, setTransactions] = useState<ClientTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Which figures the server didn't give us on the last load.
-  const [missing, setMissing] = useState<string[]>([]);
-  // Bumped by "Try again".
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // Fetch customer-specific stats
-  // Devices belong to the CLIENT (accountRoot), not the individual user.
-  useEffect(() => {
-    if (!ownerUid) { setLoading(false); return; }
-    // Must have a valid clientUid to fetch devices
-    if (!clientUid) { setLoading(false); return; }
-
-    let cancelled = false;
-
-    const fetchStats = async () => {
-      setLoading(true);
-      console.log("[Dashboard] Fetching stats — ownerUid:", ownerUid, "clientUid:", clientUid);
-
-      // Helper: call an API with a 10-second timeout.
-      // Returns data on success, null on any error (incl. 400 "no data" or timeout).
-      const failed: string[] = [];
-      const safeFetch = async <T,>(fn: () => Promise<{ data: T }>, label: string): Promise<T | null> => {
-        try {
-          const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("timeout")), 10000),
-          );
-          const res = await Promise.race([fn(), timeout]) as { data: T };
-          console.log(`[Dashboard] ${label} OK`);
-          return res.data;
-        } catch (err) {
-          console.warn(`[Dashboard] ${label} failed:`, err);
-          failed.push(label);
-          return null;
-        }
-      };
-
-      // Use allSettled so one hanging/slow call doesn't block the rest
-      const results = await Promise.allSettled([
-        safeFetch(() => getClientDevices(clientUid), "devices"),
-        safeFetch(() => getClientBalance(clientUid), "balance"),
-        safeFetch(() => getClientTransactions(clientUid), "transactions"),
-      ]);
-
-      if (cancelled) return;
-
-      const devData = results[0].status === "fulfilled" ? results[0].value : null;
-      const balData = results[1].status === "fulfilled" ? results[1].value : null;
-      const txnData = results[2].status === "fulfilled" ? results[2].value : null;
-
-      if (devData) setDevices(Array.isArray(devData) ? devData : []);
-      if (balData) {
-        if (Array.isArray(balData)) setBalances(balData);
-        else if (typeof balData === "object") setBalances([balData as ClientTokenBalance]);
-      }
-      if (txnData) setTransactions(Array.isArray(txnData) ? txnData : []);
-
-      // A tile showing 0 because the request failed is a lie — say which
-      // figures are missing instead.
-      setMissing(failed);
-
-      if (!cancelled) setLoading(false);
-    };
-
-    fetchStats();
-    return () => { cancelled = true; };
-  }, [ownerUid, clientUid, reloadKey]);
-
-  // Derived stats
-  const totalDevices = devices.length;
-  const activeDevices = devices.filter(
-    (d) => d.billing_status?.toLowerCase() === "running" || d.subscription_status?.toLowerCase() === "active",
-  ).length;
-  const pausedDevices = devices.filter(
-    (d) => d.subscription_status?.toLowerCase() === "paused",
-  ).length;
-
-  // Coerce to number — backend may store deprecated string placeholders in these columns
-  const safeNum = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-  const totalHoursLeft = balances.reduce((s, b) => s + safeNum(b.token_hours_left), 0);
-  const totalHoursUsed = balances.reduce((s, b) => s + safeNum(b.token_hours_used), 0);
-  const activeTokens = balances.filter((b) => safeNum(b.token_hours_left) > 0).length;
-  const expiredTokens = balances.filter((b) => safeNum(b.token_hours_left) <= 0 && safeNum(b.token_hours_used) > 0).length;
-
-  const totalTransactions = transactions.length;
-  const successfulTxns = transactions.filter((t) => t.payment_status?.toLowerCase() === "success").length;
-  const pendingTxns = transactions.filter((t) => t.payment_status?.toLowerCase() === "pending").length;
-
   return (
-    <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col gap-3 p-3 pb-14 md:pb-3 bg-[#F0F2F5]">
-
-      {/* Page heading */}
-      <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">
-        <div className="font-black text-[16px] text-[#111B21]">
-          Dashboard — Overview
-        </div>
-        <div className="text-[11px] text-[#667781] mt-0.5">
-          Your devices, tokens, and subscription summary at a glance.
-        </div>
+    <main className="flex-1 min-w-0 overflow-x-clip bg-[#F4F6F8]">
+      <div className="mx-auto max-w-[1200px] px-5 py-5 pb-16 md:pb-8">
+        <FleetDashboard />
       </div>
-
-      {/* Figures that didn't load. Showing a zero instead would read as
-          "you have none", which is a different thing entirely. */}
-      {!loading && missing.length > 0 && (
-        <div role="alert" className="bg-[#FFF5F5] border border-[#FFD6D6] rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
-          <span className="text-[12px] text-[#B00020]">
-            Some figures couldn't be loaded ({missing.join(", ")}). What you see below may be incomplete.
-          </span>
-          <button
-            type="button"
-            onClick={() => setReloadKey((n) => n + 1)}
-            className="h-7 px-3 rounded-lg border border-[#FFD6D6] bg-white text-[11px] font-extrabold text-[#B00020] cursor-pointer shrink-0"
-          >
-            Try again
-          </button>
-        </div>
-      )}
-
-      {/* ── Device Stats ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <BigKpiCard
-          label="Total Devices"
-          value={totalDevices.toLocaleString()}
-          sub="Configured units"
-          color="teal"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Active Devices"
-          value={activeDevices.toLocaleString()}
-          sub="Tracking & reporting"
-          color="green"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Paused Devices"
-          value={pausedDevices.toLocaleString()}
-          sub="Billing paused"
-          color="orange"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Inactive"
-          value={(totalDevices - activeDevices - pausedDevices).toLocaleString()}
-          sub="No active subscription"
-          color="muted"
-          isLoading={loading}
-        />
-      </div>
-
-      {/* ── Token Stats ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <BigKpiCard
-          label="Token Hours Left"
-          value={totalHoursLeft.toLocaleString()}
-          sub="Total across all tokens"
-          color="teal"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Token Hours Used"
-          value={totalHoursUsed.toLocaleString()}
-          sub="Consumed so far"
-          color="muted"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Active Tokens"
-          value={activeTokens.toLocaleString()}
-          sub="With hours remaining"
-          color="green"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Expired Tokens"
-          value={expiredTokens.toLocaleString()}
-          sub="Need renewal"
-          color="red"
-          isLoading={loading}
-        />
-      </div>
-
-      {/* ── Transaction Stats ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <BigKpiCard
-          label="Total Transactions"
-          value={totalTransactions.toLocaleString()}
-          sub="Payment records"
-          color="teal"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Successful Payments"
-          value={successfulTxns.toLocaleString()}
-          sub="Completed"
-          color="green"
-          isLoading={loading}
-        />
-        <BigKpiCard
-          label="Pending Payments"
-          value={pendingTxns.toLocaleString()}
-          sub="Awaiting confirmation"
-          color="orange"
-          isLoading={loading}
-        />
-      </div>
-
-      {/* Modals */}
-      <TokenTopupModal open={topupOpen} onClose={() => setTopupOpen(false)} />
       <AirlockModal open={airlockOpen} onClose={() => setAirlockOpen(false)} />
     </main>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BigKpiCard — stat card
-// ─────────────────────────────────────────────────────────────────────────────
-
-function BigKpiCard({
-  label, value, sub, color = "teal", isLoading = false,
-}: {
-  label: string; value: string; sub?: string;
-  color?: "teal" | "green" | "orange" | "red" | "muted";
-  isLoading?: boolean;
-}) {
-  const valueColor = {
-    teal:   "text-[#128C7E]",
-    green:  "text-[#25D366]",
-    orange: "text-[#F97316]",
-    red:    "text-[#EF4444]",
-    muted:  "text-[#667781]",
-  }[color];
-
-  return (
-    <div className="bg-white border border-[#E9EDEF] rounded-xl p-4 min-h-[90px] flex flex-col gap-1">
-      <div className="text-[11px] text-[#667781] font-black uppercase tracking-wide">{label}</div>
-      {isLoading ? (
-        <>
-          <div className="h-7 bg-gray-200 rounded-lg animate-pulse w-20" />
-          <div className="h-3 bg-gray-200 rounded-lg animate-pulse w-28" />
-        </>
-      ) : (
-        <>
-          <div className={`text-[24px] font-black leading-tight ${valueColor}`}>{value}</div>
-          {sub && <div className="text-[11px] text-[#667781]">{sub}</div>}
-        </>
-      )}
-    </div>
   );
 }
 

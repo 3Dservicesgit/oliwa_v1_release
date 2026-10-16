@@ -22,7 +22,7 @@ import {
 } from "../../api/services/events.service";
 import { getGeozones } from "../../api/services/geozones.service";
 import { getClientDevices } from "../../api/services/clients.service";
-import { getNotifications } from "../../api/services/notifications.service";
+import { alertOwnerIds, getNotificationsForOwners } from "../../api/services/notifications.service";
 import {
   EVENT_CONDITION_LABELS,
   EVENT_CONDITION_DESCRIPTIONS,
@@ -37,6 +37,7 @@ import type {
   ClientDevice,
 } from "../../api/types";
 import { getCookie } from "../../utils/cookies";
+import { useSearchParams } from "react-router-dom";
 
 // ── Alert channels ──────────────────────────────────────────────────────────
 // Stored as-is in the event's alert_channels list. SMS and WhatsApp both use
@@ -1180,19 +1181,20 @@ function EventCard({
 
 // ── Notification History Tab ────────────────────────────────────────────────
 
-function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
+/** `owners`: comma-separated ids the alerts are filed under (client root,
+ *  account uid) — see alertOwnerIds. */
+function NotificationHistoryTab({ owners }: { owners: string }) {
   const [notifications, setNotifications] = useState<EventNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filterCondition, setFilterCondition] = useState<string>("all");
 
   const fetchNotifications = useCallback(async () => {
-    if (!ownerUid) return;
+    if (!owners) return;
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getNotifications(ownerUid);
-      setNotifications(res.data ?? []);
+      setNotifications(await getNotificationsForOwners(owners.split(",")));
     } catch (err) {
       // "No alerts yet" and "we couldn't ask" are different things.
       const msg = err instanceof Error ? err.message : String(err);
@@ -1204,7 +1206,7 @@ function NotificationHistoryTab({ ownerUid }: { ownerUid: string }) {
     } finally {
       setLoading(false);
     }
-  }, [ownerUid]);
+  }, [owners]);
 
   useEffect(() => {
     fetchNotifications();
@@ -1337,7 +1339,9 @@ export function EventsPage() {
   const [editEvent, setEditEvent] = useState<DeviceEvent | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeviceEvent | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<EventsTab>("rules");
+  // ?tab=history opens Alert History (the dashboard's "View all").
+  const [params] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<EventsTab>(params.get("tab") === "history" ? "history" : "rules");
 
   const ownerUid =
     authState.accountUid || getCookie("_nvxs_account_uid") || "";
@@ -1544,7 +1548,7 @@ export function EventsPage() {
               )}
             </>
           ) : (
-            <NotificationHistoryTab ownerUid={accountRoot} />
+            <NotificationHistoryTab owners={alertOwnerIds(accountRoot, ownerUid).join(",")} />
           )}
         </div>
       </main>
