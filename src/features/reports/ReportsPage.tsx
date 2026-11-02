@@ -30,6 +30,7 @@ import {
   formatDateForApi,
 } from "../../api/services/reports.service";
 import {
+  FUEL_REPORT_TYPES,
   REPORT_TYPE_LABELS,
   REPORT_TYPE_ICONS,
 } from "../../api/types/reports.types";
@@ -53,6 +54,7 @@ const FALLBACK_REPORT_TYPES: AvailableReportType[] = [
   { key: "night_driving", label: "Night Driving",    icon: "🌙",  category: "safety" },
   { key: "IDILING",       label: "Idling",           icon: "⏸️",  category: "state" },
   { key: "PARKING",       label: "Parking",          icon: "🅿️",  category: "state" },
+  ...FUEL_REPORT_TYPES,
 ];
 
 // ── Date helpers ────────────────────────────────────────────────────────────
@@ -301,6 +303,8 @@ function ReportDetailsDrawer({
         TRIPS: "trips", OVERSPEEDING: "overspeeding", FUEL: "fuel",
         GEOZONE: "geozone", NIGHT_DRIVING: "night_driving",
         IDILING: "IDILING", PARKING: "PARKING",
+        FUEL_ISSUANCE: "fuel_issuance", FUEL_CONSUMPTION: "fuel_consumption",
+        FUEL_EXCEPTIONS: "fuel_exceptions",
       };
       const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
       const allImeis = devices.map((d) => d.device_imei);
@@ -577,7 +581,8 @@ function GenerateForm({
 
       await generateReport(reportType, format, payload);
 
-      const clientSideTypes = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone"];
+      const clientSideTypes = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone",
+        "fuel_issuance", "fuel_consumption", "fuel_exceptions"];
       if (format === "summary") {
         onToast(`${currentTypeLabel} summary report downloaded!`, "success");
       } else if (clientSideTypes.includes(reportType)) {
@@ -1060,6 +1065,8 @@ function ReportHistory({
         TRIPS: "trips", OVERSPEEDING: "overspeeding", FUEL: "fuel",
         GEOZONE: "geozone", NIGHT_DRIVING: "night_driving",
         IDILING: "IDILING", PARKING: "PARKING",
+        FUEL_ISSUANCE: "fuel_issuance", FUEL_CONSUMPTION: "fuel_consumption",
+        FUEL_EXCEPTIONS: "fuel_exceptions",
       };
       const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
 
@@ -1367,7 +1374,9 @@ export function ReportsPage() {
       try {
         const res = await getAvailableReportTypes();
         if (Array.isArray(res?.data) && res.data.length > 0) {
-          setReportTypes(res.data);
+          // The server's list does not include the FuelMath reports yet.
+          const keys = new Set(res.data.map((t) => t.key));
+          setReportTypes([...res.data, ...FUEL_REPORT_TYPES.filter((t) => !keys.has(t.key))]);
         }
       } catch {
         // Backend endpoint not available yet — keep fallback types

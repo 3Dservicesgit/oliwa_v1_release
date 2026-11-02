@@ -45,6 +45,8 @@ import { EventsPage }           from "../features/events";
 import { GeofencesPage } from "../features/geofences";
 import { ReportsPage }   from "../features/reports";
 import { SimPage }             from "../features/sim";
+import { DriversPage }         from "../features/drivers";
+import { FuelPage }            from "../features/fuel";
 
 import { AssetDigitalTwinPage }  from "../features/asset-digital-twin";
 
@@ -82,6 +84,8 @@ export default function App() {
           <Route path="/money"            element={<ProtectedRoute permission="money.view"><MoneyPage /></ProtectedRoute>} />
           <Route path="/protocol"         element={<ProtectedRoute permission="geofences.view"><GeofencesPage /></ProtectedRoute>} />
           <Route path="/events"           element={<ProtectedRoute permission="events.view"><EventsPage /></ProtectedRoute>} />
+          <Route path="/drivers"          element={<ProtectedRoute permission="drivers.view"><DriversPage /></ProtectedRoute>} />
+          <Route path="/fuel"             element={<ProtectedRoute permission="fuel.view"><FuelPage /></ProtectedRoute>} />
           <Route path="/reports"          element={<ProtectedRoute permission="reports.view"><ReportsPage /></ProtectedRoute>} />
           <Route path="/sim"             element={<ProtectedRoute permission="sim.view"><SimPage /></ProtectedRoute>} />
           <Route path="/asset-digital-twin" element={<ProtectedRoute permission="assets.view"><AssetDigitalTwinPage /></ProtectedRoute>} />

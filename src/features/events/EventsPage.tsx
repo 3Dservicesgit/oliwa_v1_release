@@ -23,10 +23,7 @@ import {
 import { getGeozones } from "../../api/services/geozones.service";
 import { getClientDevices } from "../../api/services/clients.service";
 import { alertOwnerIds, getNotificationsForOwners } from "../../api/services/notifications.service";
-import {
-  EVENT_CONDITION_LABELS,
-  EVENT_CONDITION_DESCRIPTIONS,
-} from "../../api/types/events.types";
+import { EVENT_CONDITION_LABELS } from "../../api/types/events.types";
 import type {
   DeviceEvent,
   EventCondition,
@@ -53,6 +50,11 @@ function channelLabel(ch: string): string {
     default: return ch;
   }
 }
+
+import { ConditionFields } from "./ConditionFields";
+import {
+  defaultValue, isAvailable, valueError, valueForForm, valueText, valueToSend,
+} from "./eventConditions";
 
 // ── Breach type for geofence_breach condition ──────────────────────────────
 
@@ -88,6 +90,8 @@ const CONDITION_ICONS: Record<EventCondition, string> = {
   ignition_change:  "🔑",
   low_battery:      "🔋",
   device_offline:   "📡",
+  fuel_issue_flagged:    "🧾",
+  high_fuel_consumption: "⛽",
 };
 
 const CONDITION_COLORS: Record<EventCondition, string> = {
@@ -96,6 +100,8 @@ const CONDITION_COLORS: Record<EventCondition, string> = {
   ignition_change:  "bg-[#34B7F1]/15 text-[#34B7F1] border-[#34B7F1]/30",
   low_battery:      "bg-[#EF4444]/15 text-[#EF4444] border-[#EF4444]/30",
   device_offline:   "bg-[#667781]/15 text-[#667781] border-[#667781]/30",
+  fuel_issue_flagged:    "bg-[#C0392B]/15 text-[#C0392B] border-[#C0392B]/30",
+  high_fuel_consumption: "bg-[#C0392B]/15 text-[#C0392B] border-[#C0392B]/30",
 };
 
 // ── Geofence Zone Selector ──────────────────────────────────────────────────
@@ -414,6 +420,13 @@ function CreateEventDrawer({
       setError("Please select at least one geofence zone.");
       return;
     }
+    // The server refuses a value its alert engine cannot read (and new
+    // low-battery rules); say so before sending.
+    const conditionProblem = condition === "geofence_breach" ? null : valueError(condition, conditionValue);
+    if (conditionProblem) {
+      setError(conditionProblem);
+      return;
+    }
     if (alertChannels.includes("whatsapp") && !alertPhone.trim()) {
       setError("Add at least one phone number for WhatsApp alerts.");
       return;
@@ -424,7 +437,7 @@ function CreateEventDrawer({
       const finalConditionValue =
         condition === "geofence_breach"
           ? serializeGeofenceConditionValue({ zones: selectedZones, breach_type: breachType })
-          : conditionValue.trim();
+          : valueToSend(condition, conditionValue);
 
       const payload: CreateEventRequest = {
         event_name: name.trim(),
@@ -522,77 +535,23 @@ function CreateEventDrawer({
             />
           </div>
 
-          {/* Condition Type */}
-          <div>
-            <label className="block text-[12px] font-black text-[#111B21] mb-2">Condition Type *</label>
-            <div className="flex flex-col gap-2">
-              {(Object.keys(EVENT_CONDITION_LABELS) as EventCondition[]).map((c) => (
-                <label
-                  key={c}
-                  className={`flex items-center gap-3 border rounded-lg px-3 py-2.5 cursor-pointer transition-all ${
-                    condition === c
-                      ? "border-[#128C7E] bg-[#128C7E]/5"
-                      : "border-[#E9EDEF] hover:border-[#128C7E]/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="condition"
-                    value={c}
-                    checked={condition === c}
-                    onChange={() => setCondition(c)}
-                    className="accent-[#128C7E]"
-                  />
-                  <span className="text-[16px]">{CONDITION_ICONS[c]}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-black text-[#111B21]">
-                      {EVENT_CONDITION_LABELS[c]}
-                    </div>
-                    <div className="text-[11px] text-[#667781]">
-                      {EVENT_CONDITION_DESCRIPTIONS[c]}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Condition Value — dynamic per condition type */}
-          {condition === "geofence_breach" ? (
-            <GeofenceZoneSelector
-              selectedZones={selectedZones}
-              onZonesChange={setSelectedZones}
-              breachType={breachType}
-              onBreachTypeChange={setBreachType}
-              ownerUid={accountRoot}
-            />
-          ) : (
-            <div>
-              <label className="block text-[12px] font-black text-[#111B21] mb-1">
-                Threshold Value
-              </label>
-              <input
-                value={conditionValue}
-                onChange={(e) => setConditionValue(e.target.value)}
-                placeholder={
-                  condition === "speed_threshold"
-                    ? "e.g. 120 (km/h)"
-                    : condition === "low_battery"
-                      ? "e.g. 20 (%)"
-                      : condition === "device_offline"
-                        ? "e.g. 30 (minutes)"
-                        : "Value"
-                }
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+          {/* Condition: grouped dropdown, then what that condition needs */}
+          <ConditionFields
+            condition={condition}
+            onCondition={(c) => { setCondition(c); setConditionValue(defaultValue(c)); }}
+            value={conditionValue}
+            onValue={setConditionValue}
+            icons={CONDITION_ICONS}
+            geofence={
+              <GeofenceZoneSelector
+                selectedZones={selectedZones}
+                onZonesChange={setSelectedZones}
+                breachType={breachType}
+                onBreachTypeChange={setBreachType}
+                ownerUid={accountRoot}
               />
-              <p className="text-[11px] text-[#667781] mt-1">
-                {condition === "speed_threshold" && "Speed in km/h. Alert fires when exceeded."}
-                {condition === "ignition_change" && "Enter 'on' or 'off' to trigger on that state."}
-                {condition === "low_battery" && "Battery percentage threshold (e.g. 20)."}
-                {condition === "device_offline" && "Minutes before triggering offline alert."}
-              </p>
-            </div>
-          )}
+            }
+          />
 
           {/* Alert Channels */}
           <div>
@@ -742,7 +701,7 @@ function EditEventDrawer({
         setBreachType(gfVal.breach_type);
         setConditionValue("");
       } else {
-        setConditionValue(event.condition_value);
+        setConditionValue(valueForForm(event.condition, event.condition_value));
         setSelectedZones([]);
         setBreachType("both");
       }
@@ -764,6 +723,13 @@ function EditEventDrawer({
       setError("Please select at least one geofence zone.");
       return;
     }
+    // The server refuses a value its alert engine cannot read (and new
+    // low-battery rules); say so before sending.
+    const conditionProblem = condition === "geofence_breach" ? null : valueError(condition, conditionValue);
+    if (conditionProblem) {
+      setError(conditionProblem);
+      return;
+    }
     if (alertChannels.includes("whatsapp") && !alertPhone.trim()) {
       setError("Add at least one phone number for WhatsApp alerts.");
       return;
@@ -773,7 +739,7 @@ function EditEventDrawer({
       const finalConditionValue =
         condition === "geofence_breach"
           ? serializeGeofenceConditionValue({ zones: selectedZones, breach_type: breachType })
-          : conditionValue.trim();
+          : valueToSend(condition, conditionValue);
 
       const payload: UpdateEventRequest = {
         event_name: name.trim(),
@@ -863,62 +829,28 @@ function EditEventDrawer({
             />
           </div>
 
-          {/* Condition Type */}
-          <div>
-            <label className="block text-[12px] font-black text-[#111B21] mb-2">Condition Type *</label>
-            <div className="flex flex-col gap-2">
-              {(Object.keys(EVENT_CONDITION_LABELS) as EventCondition[]).map((c) => (
-                <label
-                  key={c}
-                  className={`flex items-center gap-3 border rounded-lg px-3 py-2.5 cursor-pointer transition-all ${
-                    condition === c
-                      ? "border-[#128C7E] bg-[#128C7E]/5"
-                      : "border-[#E9EDEF] hover:border-[#128C7E]/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="edit-condition"
-                    value={c}
-                    checked={condition === c}
-                    onChange={() => setCondition(c)}
-                    className="accent-[#128C7E]"
-                  />
-                  <span className="text-[16px]">{CONDITION_ICONS[c]}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-black text-[#111B21]">
-                      {EVENT_CONDITION_LABELS[c]}
-                    </div>
-                    <div className="text-[11px] text-[#667781]">
-                      {EVENT_CONDITION_DESCRIPTIONS[c]}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Condition Value — dynamic per condition type */}
-          {condition === "geofence_breach" ? (
-            <GeofenceZoneSelector
-              selectedZones={selectedZones}
-              onZonesChange={setSelectedZones}
-              breachType={breachType}
-              onBreachTypeChange={setBreachType}
-              ownerUid={accountRoot}
-            />
-          ) : (
-            <div>
-              <label className="block text-[12px] font-black text-[#111B21] mb-1">
-                Threshold Value
-              </label>
-              <input
-                value={conditionValue}
-                onChange={(e) => setConditionValue(e.target.value)}
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+          {/* Condition: grouped dropdown, then what that condition needs */}
+          <ConditionFields
+            condition={condition}
+            onCondition={(c) => {
+              setCondition(c);
+              // Back to the rule's own condition: its saved value again.
+              setConditionValue(event && c === event.condition ? valueForForm(c, event.condition_value) : defaultValue(c));
+            }}
+            value={conditionValue}
+            onValue={setConditionValue}
+            icons={CONDITION_ICONS}
+            savedUnavailable={!!event && !isAvailable(event.condition)}
+            geofence={
+              <GeofenceZoneSelector
+                selectedZones={selectedZones}
+                onZonesChange={setSelectedZones}
+                breachType={breachType}
+                onBreachTypeChange={setBreachType}
+                ownerUid={accountRoot}
               />
-            </div>
-          )}
+            }
+          />
 
           {/* Alert Channels */}
           <div>
@@ -1139,7 +1071,7 @@ function EventCard({
           })()
         ) : (
           <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#111B21] border border-[#E9EDEF]">
-            Threshold: {event.condition_value}
+            {valueText(condKey, event.condition_value)}
           </span>
         )}
       </div>
@@ -1248,7 +1180,8 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
     <div className="flex flex-col gap-3">
       {/* Filter bar */}
       <div className="flex items-center gap-2 flex-wrap">
-        {["all", "speed_threshold", "geofence_breach", "ignition_change", "low_battery", "device_offline"].map(
+        {["all", "speed_threshold", "geofence_breach", "ignition_change", "device_offline",
+          "fuel_issue_flagged", "high_fuel_consumption", "low_battery"].map(
           (f) => (
             <button
               key={f}

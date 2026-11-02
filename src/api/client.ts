@@ -377,3 +377,17 @@ export function patch<T>(path: string, body: unknown, opts?: RequestOptions) {
 export function del<T>(path: string, body?: unknown, opts?: RequestOptions) {
   return request<T>("DELETE", path, body, opts);
 }
+
+/**
+ * Fetch an image (or any file) the server only serves to signed-in users —
+ * a driver photo, a fuel receipt — and return an object URL for <img src>.
+ * A plain <img src> cannot send the Authorization header. The caller revokes
+ * the URL (URL.revokeObjectURL) when it is done with it.
+ */
+export async function getBlobUrl(path: string): Promise<string> {
+  const response = await baseFetch("GET", path);
+  if (!response.ok) {
+    throw new ApiError(`GET ${path} failed`, response.status, response.statusText);
+  }
+  return URL.createObjectURL(await response.blob());
+}

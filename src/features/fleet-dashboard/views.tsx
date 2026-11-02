@@ -131,10 +131,10 @@ export function FleetStatusSection({ s }: { s: SummaryState }) {
   const units = k && k.total ? `${count(k.total)} ${k.total === 1 ? "unit" : "units"} · ` : "";
   return (
     <Section id="fleet-status" title="Fleet status"
-      subtitle={<LiveStamp at={s.updatedAt} stale={s.stale} connecting={s.loading} prefix={units} />}
+      subtitle={<LiveStamp at={s.updatedAt} stale={s.stale} connecting={s.loading} retrying={s.served} prefix={units} />}
       action={<div className="flex items-center gap-3">{k && <LivePill stale={s.stale} />}
         <button type="button" onClick={() => navigate(CONSOLE_LINKS.liveMap)} className={linkCls}>Live map →</button></div>}>
-      {s.loading && !k ? <Skeleton lines={4} /> : !k ? <Unavailable>The fleet breakdown could not be loaded. It retries every 30 seconds.</Unavailable>
+      {s.loading && !k ? <Skeleton lines={4} /> : !k ? <Unavailable>{s.served ? "The fleet breakdown could not be loaded. It retries every 30 seconds." : "The fleet summary isn't available on this server yet."}</Unavailable>
         : k.total === 0 ? <Unavailable>No units registered yet.</Unavailable>
         : (
           <>
@@ -225,7 +225,7 @@ export function GeofenceSection({ s }: { s: SummaryState }) {
       subtitle={k && k.zoneCount > 0 && active > 0 ? `${k.inside} of ${active} active units inside a zone` : undefined}
       action={<button type="button" onClick={() => navigate(CONSOLE_LINKS.geofences)} className={linkCls}>Geofences →</button>}>
       {s.loading && !k ? <Skeleton lines={4} />
-        : !k ? <Unavailable>Geofence presence could not be loaded. It retries every 30 seconds.</Unavailable>
+        : !k ? <Unavailable>{s.served ? "Geofence presence could not be loaded. It retries every 30 seconds." : "Geofence presence isn't available on this server yet."}</Unavailable>
         : k.zoneCount === 0 ? <Unavailable>No geofences yet. Draw one to see which vehicles are inside it.</Unavailable>
         : (
           <>

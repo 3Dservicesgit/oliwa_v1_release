@@ -21,6 +21,8 @@
 import { post, get, del } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
+import { ApiError } from "../types";
+import { isFuelReport } from "../types/reports.types";
 import type {
   ReportType,
   ReportFormat,
@@ -70,6 +72,9 @@ export async function generateReport(
   payload: GenerateReportRequest,
   opts?: RequestOptions,
 ): Promise<ApiResponse<GenerateReportResponse>> {
+  // ── FuelMath reports: their own route and generator ─────────────────────
+  if (isFuelReport(type)) return generateFuelReport(type, format, payload, opts);
+
   // ── Client-side report types ─────────────────────────────────────────────
   // These fetch data from lightweight JSON endpoints, then generate PDF/Excel
   // in the browser — no server-side WeasyPrint / GTK3 dependencies needed.
@@ -303,6 +308,80 @@ export async function generateReport(
   }
 
   return post<GenerateReportResponse>(url, body, opts);
+}
+
+// ── FuelMath reports ────────────────────────────────────────────────────────
+
+const FUEL_NO_DATA_HINTS: Record<string, string> = {
+  fuel_issuance: "No fuel was recorded in FuelMath for these vehicles in this period. Record receipts under FuelMath first.",
+  fuel_consumption: "Consumption is measured between two full tanks: these vehicles need at least two full-tank receipts in this period.",
+  fuel_exceptions: "The checks flagged nothing for these vehicles in this period.",
+};
+
+/**
+ * The three FuelMath reports (issuance, consumption, exceptions): rows from
+ * POST /data-stream/reports/fuel/{kind}/generate-data, made into a PDF,
+ * Excel or Summary workbook in the browser, then logged like the others.
+ */
+async function generateFuelReport(
+  type: "fuel_issuance" | "fuel_consumption" | "fuel_exceptions",
+  format: ReportFormat,
+  payload: GenerateReportRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<GenerateReportResponse>> {
+  const fuelGen = await import("../../utils/fuelReportGenerator");
+  const label = fuelGen.FUEL_REPORTS[type].title;
+  const noData = `NO_DATA::${label}::${FUEL_NO_DATA_HINTS[type]}`;
+
+  let rows: unknown;
+  try {
+    const resp = await post<unknown>(
+      `/data-stream/reports/fuel/${fuelGen.fuelReportKind(type)}/generate-data`,
+      { data: { report_devices: payload.report_devices, start_date: payload.start_date, end_date: payload.end_date } },
+      opts,
+    );
+    rows = resp?.data;
+  } catch (e) {
+    // A server without FuelMath answers 404 "No such endpoint", which must
+    // not read as "no data".
+    if (e instanceof ApiError && e.status === 404) {
+      throw new Error("Fuel reports are not available on the server yet.");
+    }
+    const msg = e instanceof Error ? e.message : `Failed to fetch the ${label} report.`;
+    if (msg.includes("No ") && msg.includes("Found")) throw new Error(noData);
+    throw new Error(msg);
+  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(noData);
+
+  try {
+    if (format === "summary") {
+      const reportGen = await import("../../utils/reportGenerator");
+      const config = payload.summary_config;
+      reportGen.generateSummaryExcel(
+        rows, payload.start_date, payload.end_date, type,
+        config?.sections ?? { cover: true, statistics: true, detail: true },
+        config?.columns ?? reportGen.getSummaryColumns(type).filter((c) => c.default).map((c) => c.key),
+        config?.groupName,
+      );
+    } else if (format === "pdf") {
+      fuelGen.generateFuelReportPDF(type, rows as never, payload.start_date, payload.end_date);
+    } else {
+      fuelGen.generateFuelReportExcel(type, rows as never, payload.start_date, payload.end_date);
+    }
+  } catch (genErr) {
+    console.error("[Reports] Fuel report generation failed:", genErr);
+    throw new Error("Failed to generate the report file. Please try again.");
+  }
+
+  // Logged so it appears in Previous Reports; never blocks the download.
+  try {
+    await post(ENDPOINTS.REPORTS.LOG_DOWNLOAD, {
+      data: { report_caller: payload.origin_user, report_type: type, format },
+    });
+  } catch (logErr) {
+    console.warn("[Reports] Failed to log fuel report download (non-blocking):", logErr);
+  }
+  return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
 }
 
 // ── List previous reports ───────────────────────────────────────────────────

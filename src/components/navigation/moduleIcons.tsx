@@ -89,6 +89,22 @@ const AuditIcon = ({ className }: IconProps) => (
   </svg>
 );
 
+const DriversIcon = ({ className }: IconProps) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="10" cy="10" r="7.5" />
+    <circle cx="10" cy="10" r="1.8" fill="currentColor" />
+    <path d="M2.8 8.5h4.6l1.2 1.5M17.2 8.5h-4.6l-1.2 1.5M10 11.8v5.6" />
+  </svg>
+);
+
+const FuelIcon = ({ className }: IconProps) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="3" width="9" height="14" rx="1.5" />
+    <path d="M5.5 6.5h4" />
+    <path d="M12 9h2a1.5 1.5 0 0 1 1.5 1.5v3.5a1.2 1.2 0 0 0 2.4 0V7l-2.4-2.4" />
+  </svg>
+);
+
 /** Map of module ID → icon component. Falls back to null for unknown modules. */
 export const MODULE_ICONS: Record<string, React.FC<IconProps>> = {
   aegis:       DashboardIcon,
@@ -97,6 +113,8 @@ export const MODULE_ICONS: Record<string, React.FC<IconProps>> = {
   reports:     ReportsIcon,
   protocol:    GeofencesIcon,
   events:      EventsIcon,
+  drivers:     DriversIcon,
+  fuel:        FuelIcon,
   sim:         TokenIcon,
   veba:        MarketplaceIcon,
   rbac:        UserMgmtIcon,

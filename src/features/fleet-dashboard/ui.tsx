@@ -169,8 +169,8 @@ export function LivePill({ stale = false }: { stale?: boolean }) {
 }
 
 /** "Live · updated 12 s ago", ticking every second. */
-export function LiveStamp({ at, stale = false, connecting = true, prefix = "" }: {
-  at: Date | null; stale?: boolean; connecting?: boolean; prefix?: string;
+export function LiveStamp({ at, stale = false, connecting = true, retrying = true, prefix = "" }: {
+  at: Date | null; stale?: boolean; connecting?: boolean; retrying?: boolean; prefix?: string;
 }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -178,7 +178,7 @@ export function LiveStamp({ at, stale = false, connecting = true, prefix = "" }:
     return () => window.clearInterval(t);
   }, []);
   const status = at === null
-    ? connecting ? "Connecting…" : "Unavailable · retrying"
+    ? connecting ? "Connecting…" : retrying ? "Unavailable · retrying" : "Unavailable"
     : `${stale ? "Reconnecting" : "Live"} · updated ${agoLabel(at, new Date())}`;
   return <span>{prefix}{status}</span>;
 }

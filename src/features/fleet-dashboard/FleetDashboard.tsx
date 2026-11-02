@@ -1,17 +1,18 @@
 /**
  * FleetDashboard.tsx — the console's dashboard: everything on one scrollable
  * page, in plain sections (no summary cards, no header banner): Fleet status,
- * Geofence presence, Alerts, Tokens. The figures and wording come from OLIWA
- * mobile; the data is the signed-in customer's own and refreshes live.
+ * Tokens, Alerts, Geofence presence — the phone dashboard's order. The figures
+ * and wording come from OLIWA mobile; the data is the signed-in customer's own
+ * and refreshes live.
  */
 import { useDashboardClient, useSummary, useTokens } from "./hooks";
 import { AlertsSection, FleetStatusSection, GeofenceSection, TokensSection } from "./views";
 
 const JUMPS = [
   { id: "fleet-status", label: "Fleet status" },
-  { id: "geofence-presence", label: "Geofence presence" },
-  { id: "alerts", label: "Alerts" },
   { id: "tokens", label: "Tokens" },
+  { id: "alerts", label: "Alerts" },
+  { id: "geofence-presence", label: "Geofence presence" },
 ];
 
 export function FleetDashboard() {
@@ -34,9 +35,9 @@ export function FleetDashboard() {
         </nav>
       </div>
       <FleetStatusSection s={s} />
-      <GeofenceSection s={s} />
-      <AlertsSection owners={alertOwners} />
       <TokensSection t={t} s={s} />
+      <AlertsSection owners={alertOwners} />
+      <GeofenceSection s={s} />
     </div>
   );
 }

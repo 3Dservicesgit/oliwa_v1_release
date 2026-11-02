@@ -11,6 +11,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { fuelStatsByKey, isFuelReportType } from "./fuelReportGenerator";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -1007,6 +1008,57 @@ export const SUMMARY_COLUMNS_BY_TYPE: Record<string, SummaryColumn[]> = {
     { key: "start_gps",      label: "Start GPS",      section: "detail", default: false },
     { key: "end_gps",        label: "End GPS",        section: "detail", default: false },
   ],
+
+  // -- FuelMath (rows from /data-stream/reports/fuel/<kind>/generate-data,
+  //    columns as the mobile app's summary_config.dart) --
+  fuel_issuance: [
+    { key: "issue_count",     label: "Fuel Issues",           section: "statistics", default: true },
+    { key: "total_litres",    label: "Total Litres",          section: "statistics", default: true },
+    { key: "total_cost_stat", label: "Total Cost (UGX)",      section: "statistics", default: true },
+    { key: "avg_price",       label: "Average Price/L (UGX)", section: "statistics", default: true },
+    { key: "date_logged",     label: "Date",          section: "detail", default: true },
+    { key: "time_logged",     label: "Time",          section: "detail", default: true },
+    { key: "driver",          label: "Driver",        section: "detail", default: true },
+    { key: "fuel_type",       label: "Fuel",          section: "detail", default: false },
+    { key: "litres",          label: "Litres",        section: "detail", default: true },
+    { key: "unit_price",      label: "Price/L (UGX)", section: "detail", default: true },
+    { key: "total_cost",      label: "Cost (UGX)",    section: "detail", default: true },
+    { key: "payment_method",  label: "Paid by",       section: "detail", default: true },
+    { key: "receipt_number",  label: "Receipt",       section: "detail", default: true },
+    { key: "station_name",    label: "Station",       section: "detail", default: true },
+    { key: "full_tank",       label: "Full tank",     section: "detail", default: false },
+    { key: "review",          label: "Review",        section: "detail", default: false },
+  ],
+  fuel_consumption: [
+    { key: "fills_measured",      label: "Full Tanks Measured", section: "statistics", default: true },
+    { key: "total_km",            label: "Total Distance (km)", section: "statistics", default: true },
+    { key: "total_litres_used",   label: "Total Litres",        section: "statistics", default: true },
+    { key: "avg_km_per_l",        label: "Average km/L",        section: "statistics", default: true },
+    { key: "total_excess_litres", label: "Excess Litres",       section: "statistics", default: true },
+    { key: "total_excess_cost",   label: "Excess Cost (UGX)",   section: "statistics", default: true },
+    { key: "date_logged",       label: "Full tank on",      section: "detail", default: true },
+    { key: "driver",            label: "Driver",            section: "detail", default: true },
+    { key: "km_since_full",     label: "Distance (km)",     section: "detail", default: true },
+    { key: "litres_since_full", label: "Litres",            section: "detail", default: true },
+    { key: "km_per_l",          label: "km/L",              section: "detail", default: true },
+    { key: "expected_km_per_l", label: "Expected km/L",     section: "detail", default: true },
+    { key: "excess_litres",     label: "Excess (L)",        section: "detail", default: true },
+    { key: "excess_cost",       label: "Excess cost (UGX)", section: "detail", default: true },
+    { key: "cost_per_km",       label: "UGX/km",            section: "detail", default: false },
+  ],
+  fuel_exceptions: [
+    { key: "exception_count", label: "Exceptions",       section: "statistics", default: true },
+    { key: "open_count",      label: "Needing Review",   section: "statistics", default: true },
+    { key: "loss_count",      label: "Confirmed Losses", section: "statistics", default: true },
+    { key: "date_logged",  label: "Date",           section: "detail", default: true },
+    { key: "time_logged",  label: "Time",           section: "detail", default: true },
+    { key: "driver",       label: "Driver",         section: "detail", default: true },
+    { key: "litres",       label: "Litres",         section: "detail", default: true },
+    { key: "total_cost",   label: "Cost (UGX)",     section: "detail", default: true },
+    { key: "problems",     label: "What was found", section: "detail", default: true },
+    { key: "review",       label: "Review",         section: "detail", default: true },
+    { key: "review_note",  label: "Review note",    section: "detail", default: false },
+  ],
 };
 // Idling shares the same columns as Parking
 SUMMARY_COLUMNS_BY_TYPE.IDILING = SUMMARY_COLUMNS_BY_TYPE.PARKING;
@@ -1024,12 +1076,16 @@ const DETAIL_SHEET_NAMES: Record<string, string> = {
   trips: "Trips", fuel: "Fuel Details", night_driving: "Night Driving",
   overspeeding: "Overspeeding", geozone: "Geozone Events",
   PARKING: "Parking", IDILING: "Idling",
+  fuel_issuance: "Fuel Issues", fuel_consumption: "Fuel Consumption",
+  fuel_exceptions: "Fuel Exceptions",
 };
 
 const REPORT_TITLE_LABELS: Record<string, string> = {
   trips: "Trip", fuel: "Fuel", night_driving: "Night Driving",
   overspeeding: "Overspeeding", geozone: "Geozone",
   PARKING: "Parking", IDILING: "Idling",
+  fuel_issuance: "Fuel Issuance", fuel_consumption: "Fuel Consumption",
+  fuel_exceptions: "Fuel Exceptions",
 };
 
 /**
@@ -1181,6 +1237,12 @@ export function generateSummaryExcel(
         }
       }
 
+      // ── FuelMath statistics (the same totals as the PDF/Excel reports) ──
+      else if (isFuelReportType(reportType)) {
+        const stats = fuelStatsByKey(reportType, records);
+        for (const col of statCols) row[col.label] = stats[col.key] ?? "";
+      }
+
       // ── Parking / Idling statistics ─────────────────────────────────────
       else if (reportType === "PARKING" || reportType === "IDILING") {
         const durations = records.map((r) => r.duration_minutes || 0);
@@ -1255,7 +1317,7 @@ export function generateSummaryExcel(
               row[col.label] = sf2 > 0 && ef2 > 0 ? Math.round((sf2 - ef2) * 100) / 100 : "";
               break;
             }
-            case "driver":     row[col.label] = rec.driver_id || ""; break;
+            case "driver":     row[col.label] = rec.driver_id || rec.driver || ""; break;
             case "start_gps":  row[col.label] = rec.start_gps_cords || rec.start_gps || ""; break;
             case "end_gps":    row[col.label] = rec.end_gps_cords || rec.end_gps || ""; break;
 
@@ -1267,6 +1329,9 @@ export function generateSummaryExcel(
             case "gps_coordinates": row[col.label] = rec.gps_coordinates || ""; break;
             case "moving_speed":    row[col.label] = rec.moving_speed || ""; break;
             case "geozone_name":    row[col.label] = rec.geozone_name || ""; break;
+
+            // ── Anything else (the FuelMath rows) is a field of its own name ─
+            default:                row[col.label] = rec[col.key] ?? ""; break;
           }
         }
         allRows.push(row);

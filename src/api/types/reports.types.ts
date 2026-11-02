@@ -17,7 +17,11 @@ export type ReportType =
   | "geozone"
   | "night_driving"
   | "IDILING"
-  | "PARKING";
+  | "PARKING"
+  // FuelMath (navas-core-apis fuel_report.py), as in the OLIWA mobile app.
+  | "fuel_issuance"
+  | "fuel_consumption"
+  | "fuel_exceptions";
 
 export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   trips:          "Trips",
@@ -27,6 +31,9 @@ export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   night_driving:  "Night Driving",
   IDILING:        "Idling",
   PARKING:        "Parking",
+  fuel_issuance:    "Fuel Issuance & Expenditure",
+  fuel_consumption: "Fuel Consumption & Performance",
+  fuel_exceptions:  "Fuel Exceptions",
 };
 
 export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
@@ -37,7 +44,23 @@ export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
   night_driving:  "🌙",
   IDILING:        "⏸️",
   PARKING:        "🅿️",
+  fuel_issuance:    "🧾",
+  fuel_consumption: "📈",
+  fuel_exceptions:  "⚠️",
 };
+
+/** The FuelMath reports. Built from fuel recorded in FuelMath, so they work
+ *  for vehicles without a fuel sensor; the server's report-type list does
+ *  not include them yet, so the console adds them itself. */
+export const FUEL_REPORT_TYPES: AvailableReportType[] = [
+  { key: "fuel_issuance",    label: "Fuel Issuance & Expenditure",    icon: "🧾", category: "fuel" },
+  { key: "fuel_consumption", label: "Fuel Consumption & Performance", icon: "📈", category: "fuel" },
+  { key: "fuel_exceptions",  label: "Fuel Exceptions",                icon: "⚠️", category: "fuel" },
+];
+
+export function isFuelReport(type: string): type is "fuel_issuance" | "fuel_consumption" | "fuel_exceptions" {
+  return type === "fuel_issuance" || type === "fuel_consumption" || type === "fuel_exceptions";
+}
 
 // ── Export format ───────────────────────────────────────────────────────────
 
