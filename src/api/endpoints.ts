@@ -244,6 +244,9 @@ export const ENDPOINTS = {
     TRIPS_HISTORY:  "/data-stream/trips/history",
     /** Trip replay (positions only): POST /data-stream/trips/history/replay */
     TRIPS_REPLAY:   "/data-stream/trips/history/replay",
+    /** Engine-on time at stops: POST /data-stream/trips/engine-time
+     *  {data:{device_imei, spans:[{from,to}]}} (waswa-ai; 404 until deployed) */
+    TRIPS_ENGINE_TIME: "/data-stream/trips/engine-time",
     /** Reverse geocode: POST /data-stream/location/geocoding */
     GEOCODE:        "/data-stream/location/geocoding",
   },

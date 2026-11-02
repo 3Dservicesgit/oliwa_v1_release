@@ -17,7 +17,9 @@
  * Security: scoped to customer's account_root from cookies.
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Link }               from "react-router-dom";
 import { getCookie }          from "../../utils/cookies";
+import { useCan }             from "../../auth/guards";
 import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
 import { getGeozones, getDeviceGeozones } from "../../api/services/geozones.service";
@@ -268,6 +270,7 @@ export default function NocBridgePage() {
   const [page, setPage]               = useState(1);
   const [statusFilter, setStatusFilter] = useState<MotionStatus | "">("");
   const [selectedImei, setSelectedImei] = useState<string | null>(null);
+  const canPlayback = useCan("track.playback.view");
 
   const mapDivRef    = useRef<HTMLDivElement>(null);
   const gMap         = useRef<unknown>(null);
@@ -1106,6 +1109,18 @@ export default function NocBridgePage() {
               <DetailRow icon="💳" label="Billing Status" value={selectedUnit.billing_status || "—"} />
               <DetailRow icon="📦" label="Subscription"
                 value={String(selectedUnit.subscription_status || "—").replace(/^\w/, (c) => c.toUpperCase())} />
+
+              {/* Today's trips and stops for this vehicle */}
+              {canPlayback && (
+                <Link
+                  to={`/gatehouse?imei=${encodeURIComponent(selectedUnit.imei)}`}
+                  className="flex items-center justify-center gap-2 mt-4 h-9 rounded-lg
+                    bg-white border border-[#128C7E] text-[#128C7E] text-[12px] font-extrabold no-underline
+                    hover:bg-[#E7F7EF] transition-all"
+                >
+                  Trip history
+                </Link>
+              )}
 
               {/* Google Maps link */}
               {selectedUnit.coords && (

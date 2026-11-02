@@ -34,7 +34,8 @@ import type {
   ClientDevice,
 } from "../../api/types";
 import { getCookie } from "../../utils/cookies";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useCan } from "../../auth/guards";
 
 // ── Alert channels ──────────────────────────────────────────────────────────
 // Stored as-is in the event's alert_channels list. SMS and WhatsApp both use
@@ -1120,6 +1121,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filterCondition, setFilterCondition] = useState<string>("all");
+  const canPlayback = useCan("track.playback.view");
 
   const fetchNotifications = useCallback(async () => {
     if (!owners) return;
@@ -1248,6 +1250,16 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${colorClass}`}>
                       {EVENT_CONDITION_LABELS[condKey]}
                     </span>
+                    {canPlayback && n.device_imei && (
+                      <Link
+                        to={`/gatehouse?imei=${encodeURIComponent(n.device_imei)}${
+                          /^\d{4}-\d{2}-\d{2}/.test(n.date_triggered ?? "") ? `&date=${n.date_triggered.slice(0, 10)}` : ""}`}
+                        className="font-black text-[#128C7E] no-underline hover:underline"
+                        title="This vehicle's trips and stops on the alert's day"
+                      >
+                        Trip history →
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

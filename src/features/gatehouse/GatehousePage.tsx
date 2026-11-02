@@ -1,29 +1,45 @@
 /**
  * GatehousePage.tsx  (/gatehouse)
- * Track Playback — Historical Trip Replay
+ * Track Playback — a vehicle's history day by day, as the OLIWA mobile app
+ * shows it, and replay of a trip, the whole day, or any time range.
  *
  * Layout:
- *   ┌─────────────────┬──────────────────────────────────┐
- *   │  Controls        │  Google Map                      │
- *   │  • Device picker │  • Route polyline                │
- *   │  • Date range    │  • Start/end markers             │
- *   │  • Load button   │  • Replay animation              │
- *   │                  │                                  │
- *   │  Trip List       │                                  │
- *   │  • trip cards    │                                  │
- *   │  • start/end     │                                  │
- *   │  • distance      │                                  │
- *   │  • duration      ├──────────────────────────────────┤
- *   │                  │  Position Detail (bottom strip)  │
- *   └─────────────────┴──────────────────────────────────┘
+ *   ┌──────────────────────┬──────────────────────────────────┐
+ *   │  Vehicle picker       │  Google Map                      │
+ *   │  Day chips · Time     │  • the day's route               │
+ *   │    range · calendar   │  • parkings (P), selected trip   │
+ *   │  Day totals           │  • replay                        │
+ *   │  Parked / trip        │                                  │
+ *   │    timeline           ├──────────────────────────────────┤
+ *   │                       │  Position detail (while playing) │
+ *   └──────────────────────┴──────────────────────────────────┘
+ *
+ * The rules for stops, trips, distance and speed are the app's, ported in
+ * ./trip (tests: tests/trip).
  *
  * Security: devices scoped to customer's account_root from cookies.
  */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSearchParams }    from "react-router-dom";
 import { getCookie }          from "../../utils/cookies";
 import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
-import type { TripSummary, PositionRecord } from "../../api";
+import { useAuth }            from "../../auth/AuthContext";
+import { getGeozones }        from "../../api/services/geozones.service";
+import { parseGeozonePoints } from "../../api/types/geozones.types";
+import { generateReport, formatDateForApi } from "../../api/services/reports.service";
+import { useCan }             from "../../auth/guards";
+import {
+  arrows, buildDayTimeline, cumulativeKm, dayLabel, distanceKm, endOfDay, headingAt, hhmm, isTrip,
+  loadEngineTimes, loadRange, MAX_ENGINE_SPANS, MAX_POINTS, maxSpeedKmh, PAGE_SIZE, placeOf, pointsOf, span, SPEED_BANDS, speedRuns,
+  startOfDay, stopCount, TripTimeline,
+  type ApiReply, type DayTimeline, type NamedZone, type TripData, type TripPoint,
+} from "./trip";
+import { PlaybackPanel } from "./components/Playback";
+import {
+  CarIcon, DayStrip, DayTotals, PlayIcon, SegmentRow,
+} from "./components/DayHistory";
+import { C, dayTitle, inputDate, parkingDetail } from "./components/historyStyle";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const FLEET_API = (import.meta.env.VITE_FLEET_API_URL as string) ?? "https://narvas.3dservices.co.ug";
@@ -31,12 +47,26 @@ const GMAPS_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || "AIzaS
 
 const DEFAULT_CENTER = { lat: 1.3733, lng: 32.2903 };
 
+/** The playback clock's tick. */
+const TICK_MS = 100;
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface DeviceOption {
   imei: string;
   name: string;
   car_make: string;
   car_model: string;
+}
+
+/** What is being replayed: one trip, the whole day, or a picked time range. */
+interface Playback {
+  title: string;
+  points: TripPoint[];
+  /** The points in time, as playback runs over them. */
+  timeline: TripTimeline;
+  notice: string | null;
+  /** The day's row being played, highlighted in the list. */
+  segment: number | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -52,166 +82,99 @@ async function fleetFetch(method: string, path: string, body?: unknown): Promise
   return res.json();
 }
 
-/** Format date as DD-MM-YYYY for backend. */
-function fmtDate(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${dd}-${mm}-${d.getFullYear()}`;
+/** The replay route, as the trip loader calls it. */
+const postReplay = (body: unknown) => fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, body) as Promise<ApiReply>;
+
+/** The engine-time route. Missing on a server without it (404): engine time
+ *  is extra, so the stops show without it. */
+const postEngineTime = (body: unknown) =>
+  fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_ENGINE_TIME, body).catch(() => ({ status: "error" })) as Promise<ApiReply>;
+
+/** "YYYY-MM-DD" + "HH:MM" → epoch ms, local time. */
+function inputStamp(date: string, time: string): number {
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh = 0, mi = 0] = (time || "00:00").split(":").map(Number);
+  return new Date(y, m - 1, d, hh, mi).getTime();
 }
 
-/** Format date as YYYY-MM-DD for <input type="date"> — in local time
- *  (toISOString is UTC, which shows yesterday before 03:00 in Kampala). */
-function toInputDate(d: Date): string {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-/** "YYYY-MM-DD" + "HH:MM" → sortable "YYYY-MM-DD HH:MM:SS". */
-function stamp(date: string, time: string, seconds: string): string {
-  return `${date} ${time}:${seconds}`;
-}
-
-/** A record's "DD-MM-YYYY" + "HH:MM:SS" → sortable "YYYY-MM-DD HH:MM:SS". */
-function recordStamp(ds: string, ts: string): string {
-  const [d, m, y] = (ds || "").split("-");
-  const [hh = "00", mi = "00", ss = "00"] = (ts || "").split(":");
-  return `${y}-${(m || "").padStart(2, "0")}-${(d || "").padStart(2, "0")} ${hh.padStart(2, "0")}:${mi.padStart(2, "0")}:${ss.padStart(2, "0")}`;
-}
-
-/** Parse YYYY-MM-DD from input. */
-function parseInputDate(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-/** Duration string from two time strings "HH:MM:SS". */
-function durationStr(start: string, end: string): string {
-  const toSec = (t: string) => {
-    const p = t.split(":").map(Number);
-    return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
-  };
-  let diff = toSec(end) - toSec(start);
-  if (diff < 0) diff += 86400;
-  const h = Math.floor(diff / 3600);
-  const m = Math.floor((diff % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function TripCard({ trip, index, selected, onClick }: {
-  trip: TripSummary; index: number; selected: boolean; onClick: () => void;
-}) {
-  const startLoc = trip.start_point_dta?.geocoded_location || "—";
-  const endLoc   = trip.end_point_dta?.geocoded_location   || "—";
-  const startTime = trip.start_point_dta?.local_system_timestamp || trip.start_time || "";
-  const endTime   = trip.end_point_dta?.local_system_timestamp   || trip.end_time || "";
-  const dur = startTime && endTime ? durationStr(startTime, endTime) : "—";
-
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        "w-full text-left px-3 py-3 border-b border-[#E9EDEF] transition-all cursor-pointer",
-        selected
-          ? "bg-[#E7F7EF] border-l-[3px] border-l-[#128C7E]"
-          : "bg-white hover:bg-[#F8F9FA] border-l-[3px] border-l-transparent",
-      ].join(" ")}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[12px] font-black text-[#128C7E]">Trip {index + 1}</span>
-        <span className="text-[10px] font-bold text-[#667781] bg-[#F0F2F5] px-1.5 py-0.5 rounded">
-          {trip.mileage_passed} km
-        </span>
-      </div>
-
-      {/* Timeline */}
-      <div className="flex gap-2">
-        {/* Dots + line */}
-        <div className="flex flex-col items-center pt-0.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] shrink-0" />
-          <span className="w-[2px] flex-1 bg-[#E9EDEF] my-0.5" />
-          <span className="w-2.5 h-2.5 rounded-full bg-[#C62828] shrink-0" />
-        </div>
-
-        {/* Locations */}
-        <div className="flex-1 min-w-0">
-          <div className="mb-2">
-            <div className="text-[10px] text-[#667781] font-bold">START · {startTime.slice(0, 5)}</div>
-            <div className="text-[11px] text-[#111B21] truncate" title={startLoc}>{startLoc}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-[#667781] font-bold">END · {endTime.slice(0, 5)}</div>
-            <div className="text-[11px] text-[#111B21] truncate" title={endLoc}>{endLoc}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer stats */}
-      <div className="flex items-center gap-3 mt-2 text-[10px] text-[#667781]">
-        <span>Duration: <b className="text-[#111B21]">{dur}</b></span>
-        <span>Distance: <b className="text-[#111B21]">{trip.mileage_passed} km</b></span>
-      </div>
-    </button>
-  );
-}
-
-// History is fetched a page at a time until the range is covered. Without this
-// a busy day stopped at the first 10,000 points — and since the server returns
-// the newest first, it was the START of the range that quietly went missing.
-const HISTORY_PAGE_SIZE = 5000;
-const HISTORY_MAX_POINTS = 50000;   // a hard stop, reported to the customer
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GMap = any;
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function GatehousePage() {
+  const { state: authState } = useAuth();
+  const canReport = useCan("reports.view");
+  // Opened from Live Monitoring or an alert: ?imei=…&date=YYYY-MM-DD.
+  const [params] = useSearchParams();
+  const wantedImei = params.get("imei") ?? "";
+  const wantedDay = (() => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(params.get("date") ?? "");
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : null;
+  })();
+
   // ── Device list ────────────────────────────────────────────────────────
   const [devices, setDevices]       = useState<DeviceOption[]>([]);
   const [devLoading, setDevLoading] = useState(true);
   const [selImei, setSelImei]       = useState("");
   const [deviceSearch, setDeviceSearch] = useState("");
 
-  // ── Date range ─────────────────────────────────────────────────────────
-  const today = new Date();
-  const [fromDate, setFromDate] = useState(toInputDate(today));
-  const [toDate, setToDate]     = useState(toInputDate(today));
-  const [fromTime, setFromTime] = useState("00:00");
-  const [toTime, setToTime]     = useState("23:59");
-
-  // ── Trip data ──────────────────────────────────────────────────────────
-  const [rawData, setRawData]         = useState<PositionRecord[]>([]);
-  const [trips, setTrips]             = useState<TripSummary[]>([]);
-  const [tripLoading, setTripLoading] = useState(false);
-  const [tripError, setTripError]     = useState<string | null>(null);
-  const [selTripIdx, setSelTripIdx]   = useState<number | null>(null);
-  // True when the range holds more points than we are willing to draw.
-  const [truncated, setTruncated]     = useState(false);
+  // ── The day ────────────────────────────────────────────────────────────
+  // Today, read when the page opens and again on each load (not during
+  // render), so a page left open past midnight moves on.
+  const [today, setToday]             = useState(() => startOfDay(Date.now()));
+  const [day, setDay]                 = useState(() => (wantedDay != null && wantedDay <= today ? wantedDay : today));
+  const [dayTrip, setDayTrip]         = useState<TripData | null>(null);
+  const [timeline, setTimeline]       = useState<DayTimeline | null>(null);
+  const [dayLoading, setDayLoading]   = useState(false);
   const [loadedPages, setLoadedPages] = useState(0);
-  // Bumped on every new search, so a slow load can't overwrite a newer one.
+  const [selected, setSelected]       = useState<number | null>(null);
+  /** Engine-on time at each parking, by row; empty when the unit has no
+   *  ignition input or the server can't say. */
+  const [engine, setEngine]           = useState<Record<number, number | null>>({});
+  // Bumped on every new load, so a slow one can't overwrite a newer one.
   const loadToken = useRef(0);
 
+  // ── Geofences, to name where the vehicle was parked ────────────────────
+  const [zones, setZones] = useState<NamedZone[]>([]);
+
+  // ── Time range ─────────────────────────────────────────────────────────
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [fromDate, setFromDate] = useState(() => inputDate(today));
+  const [toDate, setToDate]     = useState(() => inputDate(today));
+  const [fromTime, setFromTime] = useState("00:00");
+  const [toTime, setToTime]     = useState("23:59");
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError]     = useState<string | null>(null);
+
+  // ── Trips report download ──────────────────────────────────────────────
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportMsg, setReportMsg]   = useState<{ text: string; ok: boolean } | null>(null);
+
   // ── Replay ─────────────────────────────────────────────────────────────
-  const [playing, setPlaying]           = useState(false);
-  const [replayIdx, setReplayIdx]       = useState(0);
-  const [replaySpeed, setReplaySpeed]   = useState(1);    // 1x, 2x, 4x
+  // Playback runs in time (TripTimeline): `t` is the moment shown. The clock
+  // reads the refs, so a rate change applies on the next tick.
+  const [playback, setPlayback] = useState<Playback | null>(null);
+  const [playing, setPlaying]   = useState(false);
+  const [t, setT]               = useState(0);
+  const tRef                    = useRef(0);
+  const [rate, setRate]         = useState(TripTimeline.defaultRate);
+  const rateRef                 = useRef(TripTimeline.defaultRate);
+  // The map follows the vehicle while playing, until the customer moves it;
+  // the Follow button brings it back.
+  const [follow, setFollow]     = useState(true);
+  const followRef               = useRef(true);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Map refs ───────────────────────────────────────────────────────────
-  const mapDivRef   = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const gMap        = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const polyRef     = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const startMarker = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const endMarker   = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const carMarker   = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const infoWin     = useRef<any>(null);
+  const mapDivRef  = useRef<HTMLDivElement>(null);
+  const gMap       = useRef<GMap>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const dayLayer   = useRef<GMap[]>([]);   // the day's line and parkings
+  const selLayer   = useRef<GMap[]>([]);   // the selected trip
+  const playLayer  = useRef<GMap[]>([]);   // the replayed route and arrows
+  const vehicle    = useRef<GMap>(null);   // the vehicle, facing its way
+  const infoWin    = useRef<GMap>(null);
 
   // ── Derived ────────────────────────────────────────────────────────────
   const filteredDevices = devices.filter((d) => {
@@ -219,24 +182,20 @@ export default function GatehousePage() {
     const q = deviceSearch.toLowerCase();
     return d.name.toLowerCase().includes(q) || d.imei.toLowerCase().includes(q);
   });
+  const selectedDevice = devices.find((d) => d.imei === selImei);
 
-  // Points for the current view (selected trip or all data)
-  const activePoints: PositionRecord[] = (() => {
-    if (selTripIdx !== null && trips[selTripIdx]) {
-      const t = trips[selTripIdx];
-      const startIdx = t.start_point_dta?.data_idx;
-      const endIdx   = t.end_point_dta?.data_idx;
-      if (startIdx != null && endIdx != null) {
-        return rawData.filter((r) => r.data_idx <= startIdx && r.data_idx >= endIdx);
-      }
-    }
-    return rawData;
-  })();
+  /** Where each parking was, by row; recomputed when the zones arrive. */
+  const places = useMemo(() => {
+    if (!timeline) return [] as (string | null)[];
+    return timeline.segments.map((s) => (isTrip(s) ? null : placeOf(timeline.points[s.from], zones)));
+  }, [timeline, zones]);
 
-  // The points in the order they happened. The server returns newest first;
-  // everything the customer sees — the drawn route, the replay, the readout —
-  // works from this one oldest-first list.
-  const orderedPoints: PositionRecord[] = [...activePoints].reverse();
+  const playTimeline = playback?.timeline ?? null;
+  const soFar = useMemo(() => (playTimeline ? cumulativeKm(playTimeline.points) : []), [playTimeline]);
+  const playStats = useMemo(() => {
+    const pts = playTimeline?.points ?? [];
+    return { distanceKm: distanceKm(pts), maxSpeedKmh: maxSpeedKmh(pts), stops: stopCount(pts) };
+  }, [playTimeline]);
 
   // ── Stop replay helper ─────────────────────────────────────────────────
   const stopReplay = useCallback(() => {
@@ -257,6 +216,8 @@ export default function GatehousePage() {
         streetViewControl: false, mapTypeControl: true,
       });
       infoWin.current = new G.InfoWindow({ maxWidth: 280 });
+      gMap.current.addListener("dragstart", () => { followRef.current = false; setFollow(false); });
+      setMapReady(true);
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -287,20 +248,18 @@ export default function GatehousePage() {
       const dataLevel   = (cookieType === "customer" || cookieType === "client") ? "client" : cookieType;
       const accountUid  = (dataLevel === "client" || dataLevel === "inhouse")
         ? (getCookie("_nvxs_account_root") ?? rawUid) : rawUid;
-      console.log("[TrackPlayback] loadDevices — dataLevel:", dataLevel, "accountUid:", accountUid);
       try {
         // 15-second timeout so a hanging backend doesn't freeze the UI
         const timeout = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Device fetch timed out after 15 seconds")), 15000),
         );
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const resp = await Promise.race([
           fleetFetch("POST", ENDPOINTS.FLEET.LIST_UNITS, {
             data: { data_level: dataLevel, account_uid: accountUid },
           }),
           timeout,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ]) as any;
-        console.log("[TrackPlayback] fleetFetch response status:", resp?.status, "data count:", Array.isArray(resp?.data) ? resp.data.length : "not-array");
         if (resp?.status === "success" && Array.isArray(resp.data)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const devs: DeviceOption[] = resp.data.map((u: any) => ({
@@ -310,510 +269,529 @@ export default function GatehousePage() {
             car_model: u.car_model || "",
           })).filter((d: DeviceOption) => d.imei);
           setDevices(devs);
-          if (devs.length === 1) setSelImei(devs[0].imei);
+          if (wantedImei && devs.some((d) => d.imei === wantedImei)) setSelImei(wantedImei);
+          else if (devs.length === 1) setSelImei(devs[0].imei);
         }
       } catch (err) { console.error("[TrackPlayback] device fetch failed:", err); }
       setDevLoading(false);
     })();
+  // The link's vehicle is read once, when the list arrives.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Draw route on map ──────────────────────────────────────────────────
-  const drawRoute = useCallback((points: PositionRecord[]) => {
+  // ── Load geofences (naming is best-effort) ─────────────────────────────
+  useEffect(() => {
+    const owner = authState.accountRoot || getCookie("_nvxs_account_root") || getCookie("_nvxs_account_uid") || "";
+    if (!owner) return;
+    let cancelled = false;
+    getGeozones(owner, "client")
+      .then((res) => {
+        if (cancelled) return;
+        setZones((res.data ?? []).map((z) => ({ name: z.geozone_name, path: parseGeozonePoints(z.geozone_points) })));
+      })
+      .catch(() => { /* stops are named by place instead */ });
+    return () => { cancelled = true; };
+  }, [authState.accountRoot]);
+
+  // ── Map helpers ────────────────────────────────────────────────────────
+  const clearLayer = (layer: React.MutableRefObject<GMap[]>) => {
+    layer.current.forEach((o) => o.setMap(null));
+    layer.current = [];
+  };
+
+  /** Frame `points`; a parked vehicle's fixes fall on one spot, so zoom to it. */
+  const fit = useCallback((points: TripPoint[]) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google?.maps;
     const map = gMap.current;
-    if (!G || !map) return;
-
-    // Clear previous
-    if (polyRef.current) polyRef.current.setMap(null);
-    if (startMarker.current) startMarker.current.setMap(null);
-    if (endMarker.current) endMarker.current.setMap(null);
-    if (carMarker.current) carMarker.current.setMap(null);
-
-    if (!points.length) return;
-
-    // Build path (reversed since backend returns newest first)
-    const path = [...points].reverse().map((p) => ({
-      lat: parseFloat(p.data_latitude),
-      lng: parseFloat(p.data_longitude),
-    })).filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
-
-    if (!path.length) return;
-
-    // Polyline
-    polyRef.current = new G.Polyline({
-      path,
-      geodesic: true,
-      strokeColor: "#128C7E",
-      strokeOpacity: 0.9,
-      strokeWeight: 4,
-      map,
-    });
-
-    // Start marker (green)
-    startMarker.current = new G.Marker({
-      position: path[0],
-      map,
-      title: "Start",
-      icon: {
-        path: G.SymbolPath.CIRCLE,
-        fillColor: "#25D366",
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 2,
-        scale: 8,
-      },
-    });
-
-    // End marker (red)
-    if (path.length > 1) {
-      endMarker.current = new G.Marker({
-        position: path[path.length - 1],
-        map,
-        title: "End",
-        icon: {
-          path: G.SymbolPath.CIRCLE,
-          fillColor: "#C62828",
-          fillOpacity: 1,
-          strokeColor: "#fff",
-          strokeWeight: 2,
-          scale: 8,
-        },
-      });
+    if (!G || !map || !points.length) return;
+    let minLat = points[0].lat, maxLat = minLat, minLng = points[0].lng, maxLng = minLng;
+    for (const p of points) {
+      minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat);
+      minLng = Math.min(minLng, p.lng); maxLng = Math.max(maxLng, p.lng);
     }
-
-    // Fit bounds
-    const bounds = new G.LatLngBounds();
-    path.forEach((p) => bounds.extend(p));
-    map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+    if (points.length === 1 || (maxLat - minLat < 0.002 && maxLng - minLng < 0.002)) {
+      map.setCenter({ lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 });
+      map.setZoom(points.length === 1 ? 15 : 16);
+      return;
+    }
+    map.fitBounds(new G.LatLngBounds({ lat: minLat, lng: minLng }, { lat: maxLat, lng: maxLng }),
+      { top: 50, right: 50, bottom: 50, left: 50 });
   }, []);
 
-  // Redraw when active points change
+  const line = (G: GMap, points: TripPoint[], color: string, weight: number, zIndex: number) =>
+    new G.Polyline({
+      path: points.map((p) => ({ lat: p.lat, lng: p.lng })),
+      geodesic: true, strokeColor: color, strokeOpacity: 0.9, strokeWeight: weight, zIndex,
+      map: gMap.current,
+    });
+
+  // ── Load the day ───────────────────────────────────────────────────────
   useEffect(() => {
-    drawRoute(activePoints);
-    setReplayIdx(0);
-    stopReplay();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selTripIdx, rawData]);
-
-  // ── Load trips ─────────────────────────────────────────────────────────
-  async function loadTrips() {
     if (!selImei) return;
-    const start = stamp(fromDate, fromTime || "00:00", "00");
-    const end   = stamp(toDate, toTime || "23:59", "59");
-    if (!fromDate || !toDate) {
-      setTripError("Choose a start and an end date.");
-      return;
-    }
-    if (start > end) {
-      setTripError("The end date and time must be after the start.");
-      return;
-    }
-    setTripLoading(true);
-    setTripError(null);
-    setTrips([]);
-    setRawData([]);
-    setSelTripIdx(null);
-    setTruncated(false);
-    setLoadedPages(0);
-    stopReplay();
-
     const token = ++loadToken.current;
     const mine = () => token === loadToken.current;
-
-    try {
-      const from = parseInputDate(fromDate);
-      const to   = parseInputDate(toDate);
-
-      const collected: PositionRecord[] = [];
-      const seen = new Set<number>();
-      let offset = 0;
-      let pages = 0;
-      let hitCap = false;
-      let lastMessage = "";
-
-      // Ask for one page at a time until the range runs out (a short page) or
-      // we reach the cap. Pages can overlap, so points are matched on data_idx.
-      for (;;) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const resp = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, {
-          data: {
-            device_imei:  selImei,
-            from_date:    fmtDate(from),
-            to_date:      fmtDate(to),
-            from_time:    fromTime || "00:00",
-            to_time:      toTime || "23:59",
-            offset_log:   offset,
-            record_count: HISTORY_PAGE_SIZE,
-          },
-        }) as any;
-        if (!mine()) return;               // a newer search replaced this one
-
-        lastMessage = resp?.message || lastMessage;
-        const batch = resp?.status === "success" && Array.isArray(resp.data) ? resp.data : [];
-        pages += 1;
-        setLoadedPages(pages);
-
-        for (const p of batch) {
-          const idx = Number(p.data_idx);
-          if (Number.isFinite(idx)) {
-            if (seen.has(idx)) continue;
-            seen.add(idx);
-          }
-          collected.push({
-            data_longitude:          p.data_longitude,
-            data_latitude:           p.data_latitude,
-            speed_log:               p.speed_log,
-            data_hdop:               p.data_hdop,
-            local_system_datestamp:   p.local_system_datestamp,
-            record_io_events_uid:    p.record_io_events_uid,
-            geocoded_location:       p.geocoded_location,
-            local_system_timestamp:  p.local_system_timestamp,
-            data_connected_satelites: p.data_connected_satelites,
-            batch_uid:               p.batch_uid,
-            data_idx:                p.data_idx,
-            data_index:              p.data_index,
-            io_events_data:          p.io_events_data ?? "no-data",
-            enduser_data:            p.enduser_data,
-          });
+    stopReplay();
+    setPlayback(null);
+    setSelected(null);
+    setEngine({});
+    setDayTrip(null);
+    setTimeline(null);
+    setLoadedPages(0);
+    setDayLoading(true);
+    setToday(startOfDay(Date.now()));
+    const lastMinute = new Date(day + 23 * 3_600_000 + 59 * 60_000).getTime();
+    loadRange(postReplay, selImei, day, lastMinute, (pages) => { if (mine()) setLoadedPages(pages); })
+      .then((trip) => {
+        if (!mine()) return;
+        setDayTrip(trip);
+        const tl = buildDayTimeline(trip.points, { dayStart: day, dayEnd: endOfDay(day), now: Date.now() });
+        setTimeline(tl);
+        // Engine-on time for the day's stops, asked for once they are known.
+        const stops = tl.segments.map((s, i) => (isTrip(s) ? -1 : i)).filter((i) => i >= 0).slice(0, MAX_ENGINE_SPANS);
+        if (stops.length) {
+          loadEngineTimes(postEngineTime, selImei, stops.map((i) => ({ from: tl.segments[i].start, to: tl.segments[i].end })))
+            .then((times) => {
+              if (!mine() || !times) return;
+              setEngine(Object.fromEntries(stops.map((i, k) => [i, times[k]])));
+            });
         }
+      })
+      .finally(() => { if (mine()) setDayLoading(false); });
+  }, [selImei, day, stopReplay]);
 
-        if (batch.length < HISTORY_PAGE_SIZE) break;     // end of the range
-        if (collected.length >= HISTORY_MAX_POINTS) { hitCap = true; break; }
-        offset += HISTORY_PAGE_SIZE;
-      }
-
-      // Keep only the chosen time window. The server filters too; this also
-      // covers an API that doesn't know about times yet.
-      const rd = collected.filter((p) => {
-        const t = recordStamp(p.local_system_datestamp, p.local_system_timestamp);
-        return t >= start && t <= end;
-      });
-
-      if (!mine()) return;
-      setRawData(rd);
-      setTrips([]);  // replay endpoint doesn't return grouped trips
-      setTruncated(hitCap);
-      drawRoute(rd);
-      if (rd.length === 0) {
-        setTripError(lastMessage || "No trips found for this date and time range.");
-      }
-    } catch {
-      if (mine()) setTripError("Failed to load trip data. Please try again.");
-    }
-    if (mine()) setTripLoading(false);
-  }
-
-  // ── Replay controls ────────────────────────────────────────────────────
-  // `from` is passed in rather than read from state: pressing Replay after a
-  // run had finished used to read the old index (React had not applied the
-  // reset yet), so the vehicle sat at the end and nothing moved.
-  function startReplay(from: number) {
-    const points = orderedPoints;
-    if (points.length < 2) return;
+  // ── Draw the day: its route and parkings ───────────────────────────────
+  useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google?.maps;
+    clearLayer(dayLayer);
+    if (!G || !mapReady || !timeline || playback) return;
     const map = gMap.current;
-    if (!G || !map) return;
-
-    setPlaying(true);
-    let idx = Math.min(Math.max(from, 0), points.length - 1);
-    if (idx >= points.length - 1) idx = 0;      // finished — start again
-    setReplayIdx(idx);
-
-    // Create or reposition car marker
-    const pos = {
-      lat: parseFloat(points[idx]?.data_latitude),
-      lng: parseFloat(points[idx]?.data_longitude),
-    };
-
-    if (!carMarker.current) {
-      carMarker.current = new G.Marker({
-        position: pos,
+    if (timeline.points.length >= 2) dayLayer.current.push(line(G, timeline.points, C.primary, 4, 1));
+    timeline.segments.forEach((s, i) => {
+      if (isTrip(s)) return;
+      const p = timeline.points[s.from];
+      const on = i === selected;
+      const marker = new G.Marker({
+        position: { lat: p.lat, lng: p.lng },
         map,
-        title: "Vehicle",
-        icon: { url: "https://santripe.com/static/moving.png", scaledSize: new G.Size(36, 36), anchor: new G.Point(18, 18) },
-        zIndex: 999,
+        title: `Parked ${span(s.end - s.start)}`,
+        label: { text: "P", color: "#fff", fontSize: "11px", fontWeight: "800" },
+        icon: {
+          path: G.SymbolPath.CIRCLE, scale: on ? 11 : 9,
+          fillColor: on ? C.warning : C.parked, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2,
+        },
+        zIndex: on ? 20 : 10,
       });
-    } else {
-      carMarker.current.setPosition(pos);
-      carMarker.current.setMap(map);
-    }
+      marker.addListener("click", () => {
+        setSelected(i);
+        const name = parkingDetail(places[i], timeline, s);
+        const when = s.openStart ? `until ${hhmm(s.end)}` : `${hhmm(s.start)} → ${s.ongoing ? "now" : hhmm(s.end)}`;
+        const box = document.createElement("div");
+        box.style.cssText = "font:12px system-ui;color:#111B21;padding:2px";
+        const head = document.createElement("b");
+        head.textContent = `Parked ${span(s.end - s.start)}`;
+        const body = document.createElement("div");
+        body.textContent = `${when} · ${name}`;
+        box.append(head, body);
+        infoWin.current?.setContent(box);
+        infoWin.current?.open({ map, anchor: marker });
+      });
+      dayLayer.current.push(marker);
+    });
+  }, [timeline, selected, playback, places, mapReady]);
 
-    const interval = Math.max(50, 300 / replaySpeed);
+  // Frame the whole day when it arrives.
+  useEffect(() => {
+    if (mapReady && timeline && !playback) fit(timeline.points);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline, mapReady]);
+
+  // The selected trip, drawn over the day's line.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps;
+    clearLayer(selLayer);
+    if (!G || !mapReady || !timeline || playback || selected == null) return;
+    const s = timeline.segments[selected];
+    if (s && isTrip(s)) selLayer.current.push(line(G, pointsOf(timeline, s), C.moving, 7, 5));
+  }, [timeline, selected, playback, mapReady]);
+
+  /** A row clicked: frame its trip, or zoom to where it was parked. */
+  function selectRow(i: number) {
+    if (!timeline) return;
+    const s = timeline.segments[i];
+    setSelected(i);
+    infoWin.current?.close();
+    if (isTrip(s)) fit(pointsOf(timeline, s));
+    else fit([timeline.points[s.from]]);
+  }
+
+  // ── Replay ─────────────────────────────────────────────────────────────
+
+  /** Draw what is being replayed, once per trip: the route coloured by speed
+   *  over a dark edge (so pale slow stretches show), direction arrows, start
+   *  and end, and the vehicle. */
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps;
+    clearLayer(playLayer);
+    if (vehicle.current) { vehicle.current.setMap(null); vehicle.current = null; }
+    if (!G || !mapReady || !playback) return;
+    const map = gMap.current;
+    const pts = playback.timeline.points;
+    if (pts.length >= 2) {
+      playLayer.current.push(new G.Polyline({
+        path: pts.map((p) => ({ lat: p.lat, lng: p.lng })),
+        strokeColor: "#111B21", strokeOpacity: 0.35, strokeWeight: 8, zIndex: 1, map,
+      }));
+      for (const run of speedRuns(pts)) {
+        playLayer.current.push(line(G, pts.slice(run.from, run.to + 1), SPEED_BANDS[run.band].color, 5, 2));
+      }
+      for (const a of arrows(pts)) {
+        playLayer.current.push(new G.Marker({
+          position: { lat: pts[a.index].lat, lng: pts[a.index].lng }, map, clickable: false, zIndex: 3,
+          icon: { path: G.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, rotation: a.heading,
+            fillColor: "#111B21", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1 },
+        }));
+      }
+    }
+    const end = (p: TripPoint, color: string, label: string) => new G.Marker({
+      position: { lat: p.lat, lng: p.lng }, map, zIndex: 4,
+      title: [label, placeOf(p, zones)].filter(Boolean).join(" · "),
+      icon: { path: G.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2, scale: 8 },
+    });
+    if (pts.length) playLayer.current.push(end(pts[0], C.moving, `Start ${hhmm(pts[0].time)}`));
+    if (pts.length > 1) playLayer.current.push(end(pts[pts.length - 1], "#C62828", `End ${hhmm(pts[pts.length - 1].time)}`));
+    vehicle.current = new G.Marker({ map, zIndex: 10, title: "Vehicle" });
+    fit(pts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playback, mapReady]);
+
+  // The vehicle at the moment shown, facing the way it was going (a dot when
+  // it never moved far enough to have a heading); the camera follows it.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps;
+    const marker = vehicle.current;
+    if (!G || !marker || !playTimeline) return;
+    const p = playTimeline.positionAt(t);
+    const heading = headingAt(playTimeline.points, playTimeline.indexAt(t));
+    marker.setPosition({ lat: p.lat, lng: p.lng });
+    marker.setIcon(heading == null
+      ? { path: G.SymbolPath.CIRCLE, scale: 9, fillColor: C.primaryDark, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 }
+      : { path: G.SymbolPath.FORWARD_CLOSED_ARROW, scale: 7, rotation: heading, anchor: new G.Point(0, 2.6),
+          fillColor: C.primaryDark, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 });
+    if (playing && followRef.current) gMap.current?.panTo({ lat: p.lat, lng: p.lng });
+  }, [t, playTimeline, playing]);
+
+  /** Move playback to a moment. */
+  const setMoment = (v: number) => { tRef.current = v; setT(v); };
+
+  function startClock(tl: TripTimeline) {
+    if (replayTimer.current) clearInterval(replayTimer.current);
+    if (tRef.current >= tl.end || tRef.current < tl.start) setMoment(tl.start);   // finished — start again
+    setPlaying(true);
     replayTimer.current = setInterval(() => {
-      idx++;
-      if (idx >= points.length) {
-        stopReplay();
-        setReplayIdx(points.length - 1);
-        return;
-      }
-      setReplayIdx(idx);
-      const p = {
-        lat: parseFloat(points[idx].data_latitude),
-        lng: parseFloat(points[idx].data_longitude),
-      };
-      if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
-        carMarker.current.setPosition(p);
-        map.panTo(p);
-      }
-    }, interval);
+      const next = tl.advance(tRef.current, TICK_MS, rateRef.current);
+      setMoment(next);
+      if (next >= tl.end) stopReplay();
+    }, TICK_MS);
   }
 
-  function toggleReplay() {
-    if (playing) { stopReplay(); return; }
-    startReplay(replayIdx);
+  function togglePlay() {
+    if (!playTimeline) return;
+    if (playing) stopReplay();
+    else startClock(playTimeline);
   }
 
-  /** Jump the replay to a point (0 = start of the route, 1 = end). */
-  function seekReplay(fraction: number) {
-    const points = orderedPoints;
-    if (points.length < 2) return;
-    const idx = Math.round(Math.min(Math.max(fraction, 0), 1) * (points.length - 1));
-    const wasPlaying = playing;
-    stopReplay();
-    setReplayIdx(idx);
-    const p = {
-      lat: parseFloat(points[idx].data_latitude),
-      lng: parseFloat(points[idx].data_longitude),
-    };
-    if (carMarker.current && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
-      carMarker.current.setPosition(p);
-      gMap.current?.panTo(p);
+  /** The next or previous stop, playing on if it was playing. */
+  function skip(forward: boolean) {
+    if (!playTimeline) return;
+    const next = forward ? playTimeline.nextStop(tRef.current) : playTimeline.previousStop(tRef.current);
+    setMoment(next);
+    if (followRef.current) {
+      const p = playTimeline.positionAt(next);
+      gMap.current?.panTo({ lat: p.lat, lng: p.lng });
     }
-    if (wasPlaying) startReplay(idx);
+  }
+
+  /** The speed chart dragged: pause there. */
+  function scrub(fraction: number) {
+    if (!playTimeline) return;
+    stopReplay();
+    const next = playTimeline.timeAt(fraction);
+    setMoment(next);
+    if (followRef.current) {
+      const p = playTimeline.positionAt(next);
+      gMap.current?.panTo({ lat: p.lat, lng: p.lng });
+    }
+  }
+
+  function changeRate(r: number) { rateRef.current = r; setRate(r); }
+
+  /** The Trips report for this vehicle over the dates shown (the day, or the
+   *  playback's), as Reports builds it: PDF or Excel, download logged. */
+  async function downloadTrips(format: "pdf" | "excel") {
+    setReportOpen(false);
+    if (!selImei) return;
+    const from = playTimeline ? playTimeline.start : day;
+    const to = playTimeline ? playTimeline.end : day;
+    setReportBusy(true);
+    setReportMsg(null);
+    try {
+      await generateReport("trips", format, {
+        report_devices: [selImei],
+        start_date: formatDateForApi(new Date(from)),
+        end_date: formatDateForApi(new Date(to)),
+        origin_user: authState.accountUid || getCookie("_nvxs_account_uid") || "",
+      });
+      setReportMsg({ text: `Trips report downloaded (${format === "pdf" ? "PDF" : "Excel"}).`, ok: true });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      setReportMsg({
+        text: msg.startsWith("NO_DATA::") ? "No trips recorded for these dates." : "Could not build the trips report. Try again.",
+        ok: false,
+      });
+    }
+    setReportBusy(false);
+  }
+
+  function followVehicle() {
+    followRef.current = true;
+    setFollow(true);
+    if (playTimeline) {
+      const p = playTimeline.positionAt(tRef.current);
+      gMap.current?.panTo({ lat: p.lat, lng: p.lng });
+    }
+  }
+
+  function fitRoute() {
+    followRef.current = false;
+    setFollow(false);
+    if (playTimeline) fit(playTimeline.points);
+  }
+
+  /** Open a trip, the day or a range for playback, and start it. */
+  function play(next: Omit<Playback, "timeline">) {
+    stopReplay();
+    infoWin.current?.close();
+    if (next.segment == null) setSelected(null);
+    const tl = new TripTimeline(next.points);
+    followRef.current = true;
+    setFollow(true);
+    setMoment(tl.start);
+    setPlayback({ ...next, timeline: tl });
+    if (tl.points.length >= 2) startClock(tl);
+  }
+
+  function playSegment(i: number) {
+    if (!timeline) return;
+    const s = timeline.segments[i];
+    // The trip's own window, as the app plays it: its row's points begin at
+    // the parking's last fix, which would open the trip parked.
+    const points = timeline.points.filter((p) => p.time >= s.start && p.time <= s.end);
+    play({ title: `Trip ${hhmm(s.start)} → ${hhmm(s.end)} · ${dayLabel(day)}`, points, notice: null, segment: i });
+  }
+
+  function playDay() {
+    if (!timeline || timeline.points.length < 2) return;
+    play({ title: `Whole day · ${dayLabel(day)}`, points: timeline.points, notice: dayTrip?.notice ?? null, segment: null });
+  }
+
+  function backToDay() {
+    stopReplay();
+    setPlayback(null);
+    if (timeline) fit(timeline.points);
+  }
+
+  async function playRange() {
+    if (!selImei) return;
+    if (!fromDate || !toDate) { setRangeError("Choose a start and an end date."); return; }
+    const from = inputStamp(fromDate, fromTime);
+    const to = inputStamp(toDate, toTime || "23:59");
+    if (from > to) { setRangeError("The end date and time must be after the start."); return; }
+    setRangeLoading(true);
+    setRangeError(null);
+    const trip = await loadRange(postReplay, selImei, from, to);
+    setRangeLoading(false);
+    if (trip.unavailable) { setRangeError(trip.unavailable); return; }
+    if (trip.points.length < 2) { setRangeError("Nothing recorded in this time range."); return; }
+    const sameDay = fromDate === toDate;
+    play({
+      title: sameDay ? `${dayLabel(from)} · ${fromTime}–${toTime}` : `${dayLabel(from)} ${fromTime} → ${dayLabel(to)} ${toTime}`,
+      points: trip.points, notice: trip.notice, segment: null,
+    });
   }
 
   // Cleanup on unmount
   useEffect(() => () => stopReplay(), [stopReplay]);
 
-  // Current replay point info
-  const replayPoints = orderedPoints;
-  const currentPoint = replayPoints[replayIdx] || null;
-
-  // ── Quick stats for loaded data ────────────────────────────────────────
-  /** "06:12 → 18:40" — the span the loaded points actually cover. */
-  const coveredRange = (() => {
-    const first = orderedPoints[0];
-    const last = orderedPoints[orderedPoints.length - 1];
-    if (!first || !last) return "—";
-    const hhmm = (t: string) => (t || "").slice(0, 5) || "—";
-    return first.local_system_datestamp === last.local_system_datestamp
-      ? `${hhmm(first.local_system_timestamp)} → ${hhmm(last.local_system_timestamp)}`
-      : `${first.local_system_datestamp} → ${last.local_system_datestamp}`;
-  })();
-  const totalDistance = trips.reduce((s, t) => s + (t.mileage_passed || 0), 0);
-  const totalPoints  = rawData.length;
-  const selectedDevice = devices.find((d) => d.imei === selImei);
+  const hasDay = !!timeline && timeline.segments.length > 0;
+  const truncatedPages = loadedPages * PAGE_SIZE >= MAX_POINTS;
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F0F2F5]">
+    <div className="flex-1 min-w-0 min-h-0 xl:h-full flex flex-col overflow-hidden bg-[#F0F2F5]">
 
       {/* Header */}
       <div className="shrink-0 px-5 pt-4 pb-3">
         <div className="text-[10px] text-[#667781] mb-0.5">Home &rsaquo; Track Report</div>
         <h1 className="text-[20px] font-black text-[#111B21] m-0 leading-tight">Track Playback</h1>
         <p className="text-[12px] text-[#667781] m-0 mt-0.5">
-          View historical routes, replay trips, and analyze past journeys for any device.
+          Trips and stops by day, ready to replay — or replay any time range.
         </p>
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0 grid xl:grid-cols-[340px_1fr] gap-3 px-5 pb-5 overflow-hidden">
+      <div className="flex-1 min-h-0 grid xl:grid-rows-[minmax(0,1fr)] xl:grid-cols-[400px_1fr] gap-3 px-5 pb-5 overflow-hidden">
 
-        {/* ══ Left: Controls + Trip List ══════════════════════════════════ */}
+        {/* ══ Left: vehicle, day, timeline ════════════════════════════════ */}
         <div className="min-h-0 flex flex-col gap-3 overflow-hidden">
 
-          {/* Controls card */}
-          <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
-            <div className="px-4 py-2.5 border-b border-[#E9EDEF]">
-              <div className="font-black text-[14px] text-[#111B21]">Select Device, Date & Time</div>
-            </div>
-            <div className="p-4 flex flex-col gap-3">
-              {/* Device picker */}
-              <div>
-                <label className="text-[11px] font-bold text-[#667781] block mb-1">Device</label>
-                {devLoading ? (
-                  <div className="h-9 rounded-lg border border-[#E9EDEF] bg-[#F8F9FA] flex items-center px-3 text-[12px] text-[#667781]">Loading devices…</div>
-                ) : (
-                  <>
-                    {devices.length > 5 && (
-                      <input
-                        type="search"
-                        value={deviceSearch}
-                        onChange={(e) => setDeviceSearch(e.target.value)}
-                        placeholder="Filter devices…"
-                        className="w-full h-8 rounded-lg border border-[#E9EDEF] px-3 text-[11px] text-[#111B21]
-                          placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors mb-1.5"
-                      />
-                    )}
-                    <select
-                      value={selImei}
-                      onChange={(e) => setSelImei(e.target.value)}
-                      className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA] cursor-pointer"
-                    >
-                      <option value="">— Select a device —</option>
-                      {filteredDevices.map((d) => (
-                        <option key={d.imei} value={d.imei}>
-                          {d.name} ({d.imei.slice(-6)})
-                        </option>
-                      ))}
-                    </select>
-                  </>
+          {/* Vehicle */}
+          <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl shadow-sm p-3">
+            <label className="text-[11px] font-bold text-[#667781] block mb-1" htmlFor="tp-device">Vehicle</label>
+            {devLoading ? (
+              <div className="h-9 rounded-lg border border-[#E9EDEF] bg-[#F8F9FA] flex items-center px-3 text-[12px] text-[#667781]">Loading vehicles…</div>
+            ) : (
+              <>
+                {devices.length > 5 && (
+                  <input
+                    type="search"
+                    value={deviceSearch}
+                    onChange={(e) => setDeviceSearch(e.target.value)}
+                    placeholder="Filter vehicles…"
+                    aria-label="Filter vehicles"
+                    className="w-full h-8 rounded-lg border border-[#E9EDEF] px-3 text-[11px] text-[#111B21]
+                      placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors mb-1.5"
+                  />
                 )}
-              </div>
-
-              {/* Date and time range */}
-              <div className="flex flex-col gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-[#667781] block mb-1">Start</label>
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <input type="date" aria-label="Start date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
-                    <input type="time" aria-label="Start time" value={fromTime} onChange={(e) => setFromTime(e.target.value)}
-                      className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px]
-                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-[#667781] block mb-1">End</label>
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <input type="date" aria-label="End date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                      className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
-                    <input type="time" aria-label="End time" value={toTime} onChange={(e) => setToTime(e.target.value)}
-                      className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px]
-                        text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
-                  </div>
-                </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[
-                    { label: "Whole day", apply: () => { setFromTime("00:00"); setToTime("23:59"); } },
-                    { label: "Last hour", apply: () => {
-                      const now = new Date(); const back = new Date(now.getTime() - 3600_000);
-                      const hm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                      setFromDate(toInputDate(back)); setFromTime(hm(back));
-                      setToDate(toInputDate(now)); setToTime(hm(now));
-                    } },
-                    { label: "Working hours", apply: () => { setFromTime("08:00"); setToTime("17:00"); } },
-                  ].map((p) => (
-                    <button key={p.label} type="button" onClick={p.apply}
-                      className="h-6 px-2.5 rounded-full border border-[#E9EDEF] bg-white text-[10px] font-extrabold
-                        text-[#667781] cursor-pointer hover:bg-[#F0F2F5]">
-                      {p.label}
-                    </button>
+                <select
+                  id="tp-device"
+                  value={selImei}
+                  onChange={(e) => setSelImei(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
+                    text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA] cursor-pointer"
+                >
+                  <option value="">— Select a vehicle —</option>
+                  {filteredDevices.map((d) => (
+                    <option key={d.imei} value={d.imei}>
+                      {d.name} ({d.imei.slice(-6)})
+                    </option>
                   ))}
-                </div>
-              </div>
-
-              {/* Load button */}
-              <button
-                onClick={loadTrips}
-                disabled={!selImei || tripLoading}
-                className="h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-extrabold
-                  border-none cursor-pointer hover:brightness-110 active:opacity-85
-                  disabled:opacity-50 disabled:cursor-not-allowed transition-all
-                  flex items-center justify-center gap-2"
-              >
-                {tripLoading ? (
-                  <>
-                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Loading…
-                  </>
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                    Load Track History
-                  </>
-                )}
-              </button>
-            </div>
+                </select>
+              </>
+            )}
           </div>
 
-          {/* How much of the range we are showing */}
-          {tripLoading && loadedPages > 0 && (
-            <div className="shrink-0 text-[11px] text-[#667781] px-1">
-              Loading history… {loadedPages * HISTORY_PAGE_SIZE >= HISTORY_MAX_POINTS
-                ? `${HISTORY_MAX_POINTS.toLocaleString()} points`
-                : `page ${loadedPages}`}
-            </div>
-          )}
-          {truncated && !tripLoading && (
-            <div className="shrink-0 text-[11px] text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-3 py-2">
-              This range has more than {HISTORY_MAX_POINTS.toLocaleString()} points. Showing the
-              most recent {HISTORY_MAX_POINTS.toLocaleString()} — choose a shorter period to see the rest.
-            </div>
-          )}
+          {/* Day history */}
+          <div className="flex-1 min-h-0 bg-white border border-[#E9EDEF] rounded-xl shadow-sm flex flex-col overflow-hidden">
+            {/* Fixed at the top: the days and the Time range button. */}
+            <div className="shrink-0 p-3 border-b border-[#E9EDEF]">
+              <DayStrip
+                day={day}
+                today={today}
+                onDay={(d) => { setRangeOpen(false); setDay(d); }}
+                rangeOpen={rangeOpen}
+                onRange={() => setRangeOpen((o) => !o)}
+              />
 
-          {/* Quick stats strip. Trips and distance only appear when the server
-              actually grouped the range into trips — showing "0 trips, 0 km"
-              beside 7,000 positions reads as "nothing happened". */}
-          {rawData.length > 0 && (
-            <div className={`shrink-0 grid gap-2 ${trips.length > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
-              {[
-                ...(trips.length > 0
-                  ? [{ label: "Trips", value: String(trips.length) },
-                     { label: "Distance", value: `${totalDistance} km` }]
-                  : [{ label: "Covered", value: coveredRange }]),
-                { label: "Points", value: totalPoints.toLocaleString() },
-              ].map((s) => (
-                <div key={s.label} className="bg-white border border-[#E9EDEF] rounded-lg px-3 py-2 text-center">
-                  <div className="text-[14px] font-black text-[#128C7E]">{s.value}</div>
-                  <div className="text-[10px] text-[#667781] font-bold">{s.label}</div>
+              {rangeOpen && (
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="text-[12px] font-black text-[#111B21]">Play a time range</div>
+                  {(["Start", "End"] as const).map((which) => {
+                    const start = which === "Start";
+                    return (
+                      <div key={which}>
+                        <label className="text-[11px] font-bold text-[#667781] block mb-1">{which}</label>
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                          <input type="date" aria-label={`${which} date`} value={start ? fromDate : toDate}
+                            max={inputDate(today)}
+                            onChange={(e) => (start ? setFromDate : setToDate)(e.target.value)}
+                            className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                          <input type="time" aria-label={`${which} time`} value={start ? fromTime : toTime}
+                            onChange={(e) => (start ? setFromTime : setToTime)(e.target.value)}
+                            className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { label: "Whole day", apply: () => { setFromTime("00:00"); setToTime("23:59"); } },
+                      { label: "Last hour", apply: () => {
+                        const now = new Date(); const back = new Date(now.getTime() - 3600_000);
+                        const hm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                        setFromDate(inputDate(back.getTime())); setFromTime(hm(back));
+                        setToDate(inputDate(now.getTime())); setToTime(hm(now));
+                      } },
+                      { label: "Working hours", apply: () => { setFromTime("08:00"); setToTime("17:00"); } },
+                    ].map((p) => (
+                      <button key={p.label} type="button" onClick={p.apply}
+                        className="h-6 px-2.5 rounded-full border border-[#E9EDEF] bg-white text-[10px] font-extrabold
+                          text-[#667781] cursor-pointer hover:bg-[#F0F2F5]">
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  {rangeError && <div className="text-[11px] text-[#B45309]">{rangeError}</div>}
+                  <button type="button" onClick={playRange} disabled={!selImei || rangeLoading}
+                    className="h-9 rounded-lg bg-[#128C7E] text-white text-[12px] font-extrabold border-none cursor-pointer
+                      hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    {rangeLoading
+                      ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Loading…</>
+                      : <><PlayIcon size={12} /> Play this range</>}
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Trip list */}
-          <div className="flex-1 min-h-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm flex flex-col">
-            <div className="shrink-0 px-4 py-2.5 border-b border-[#E9EDEF] flex items-center justify-between">
-              <div className="font-black text-[13px] text-[#111B21]">
-                Trips {trips.length > 0 && <span className="text-[#667781] font-normal">({trips.length})</span>}
-              </div>
-              {selTripIdx !== null && (
-                <button onClick={() => setSelTripIdx(null)}
-                  className="text-[10px] font-bold text-[#128C7E] bg-[#E7F7EF] px-2 py-0.5 rounded cursor-pointer border-none hover:bg-[#D0F0E0] transition-colors">
-                  Show All
-                </button>
               )}
             </div>
+
+            {/* The day: totals, then parked / trip rows. */}
             <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-              {tripLoading && (
+              {!selImei && (
+                <div className="px-4 py-8 text-center text-[12px] text-[#667781]">
+                  Select a vehicle to see where it was parked and the trips it made each day.
+                </div>
+              )}
+              {selImei && dayLoading && (
                 <div className="px-4 py-8 text-center">
                   <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[#128C7E] rounded-full animate-spin" />
-                  <div className="text-[12px] text-[#667781] mt-2">Loading trip data…</div>
+                  <div className="text-[12px] text-[#667781] mt-2">
+                    Loading {dayTitle(day, today)}…{loadedPages > 1 ? ` page ${loadedPages}` : ""}
+                    {truncatedPages ? ` (${MAX_POINTS.toLocaleString()} points)` : ""}
+                  </div>
                 </div>
               )}
-              {tripError && !tripLoading && (
-                <div className="px-4 py-6 text-center text-[12px] text-[#667781]">{tripError}</div>
-              )}
-              {!tripLoading && !tripError && trips.length === 0 && rawData.length === 0 && (
-                <div className="px-4 py-8 text-center text-[12px] text-[#667781]">
-                  Select a device, a start and an end date and time, then click <b>Load Track History</b>.
+              {selImei && !dayLoading && dayTrip && !hasDay && (
+                <div className="flex items-start gap-3 px-4 py-6">
+                  <span className="shrink-0 w-10 h-10 rounded-xl bg-[#E7F3F1] text-[#075E54] flex items-center justify-center"><CarIcon size={18} /></span>
+                  <p className="m-0 text-[13px] text-[#667781]">
+                    {dayTrip.unavailable ?? `Nothing recorded on ${dayLabel(day)}. The unit sent no positions that day.`}
+                  </p>
                 </div>
               )}
-              {!tripLoading && trips.length === 0 && rawData.length > 0 && (
-                <div className="px-4 py-6 text-center text-[12px] text-[#667781]">
-                  {rawData.length} position records found but no distinct trips detected.
-                  The route is shown on the map.
+              {selImei && !dayLoading && hasDay && timeline && (
+                <div className="pb-3">
+                  <div className="p-3 pb-1"><DayTotals timeline={timeline} /></div>
+                  {dayTrip?.notice && <p className="mx-4 my-1 text-[12px] text-[#B45309]">{dayTrip.notice}</p>}
+                  <div className="mt-1">
+                    {timeline.segments.map((s, i) => (
+                      <SegmentRow
+                        key={`${s.from}-${s.kind}`}
+                        segment={s}
+                        first={i === 0}
+                        last={i === timeline.segments.length - 1}
+                        selected={i === selected || (playback?.segment === i)}
+                        place={isTrip(s) ? null : parkingDetail(places[i], timeline, s)}
+                        engineMs={engine[i]}
+                        onSelect={() => { if (playback) backToDay(); selectRow(i); }}
+                        onPlay={() => playSegment(i)}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
-              {trips.map((t, i) => (
-                <TripCard
-                  key={t.trip_number}
-                  trip={t}
-                  index={i}
-                  selected={selTripIdx === i}
-                  onClick={() => setSelTripIdx(selTripIdx === i ? null : i)}
-                />
-              ))}
             </div>
           </div>
         </div>
@@ -823,99 +801,102 @@ export default function GatehousePage() {
 
           {/* Map */}
           <div className="flex-1 min-h-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm flex flex-col">
-            {/* Map header with replay controls */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-[#E9EDEF]">
-              <div className="flex items-center gap-2">
-                <span className="font-black text-[14px] text-[#111B21]">Route Map</span>
-                {selectedDevice && (
-                  <span className="text-[11px] text-[#667781]">{selectedDevice.name}</span>
+            <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[#E9EDEF] min-h-[52px]">
+              <div className="min-w-0">
+                <div className="font-black text-[14px] text-[#111B21] truncate">
+                  {selectedDevice ? selectedDevice.name : "Route Map"}
+                </div>
+                <div className="text-[11px] text-[#128C7E] font-bold truncate">
+                  {playback ? playback.title : selImei ? `Trip history · ${dayTitle(day, today)}` : ""}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {canReport && selImei && (hasDay || playback) && (
+                  <div className="relative">
+                    <button onClick={() => setReportOpen((o) => !o)} disabled={reportBusy} aria-haspopup="menu" aria-expanded={reportOpen}
+                      title="Download the Trips report for these dates"
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA] disabled:opacity-50 flex items-center gap-1.5">
+                      {reportBusy
+                        ? <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                        : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>}
+                      Trips report
+                    </button>
+                    {reportOpen && (
+                      <div role="menu" className="absolute right-0 top-9 z-20 w-36 bg-white border border-[#E9EDEF] rounded-lg shadow-lg py-1">
+                        {(["pdf", "excel"] as const).map((f) => (
+                          <button key={f} role="menuitem" onClick={() => downloadTrips(f)}
+                            className="w-full text-left px-3 py-2 text-[12px] font-semibold text-[#111B21] bg-transparent border-none cursor-pointer hover:bg-[#F0F2F5]">
+                            {f === "pdf" ? "PDF" : "Excel"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {playback ? (
+                  <>
+                    {playing && !follow && (
+                      <button onClick={followVehicle} title="Follow the vehicle again"
+                        className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-extrabold border-none cursor-pointer hover:brightness-110">
+                        Follow vehicle
+                      </button>
+                    )}
+                    <button onClick={fitRoute}
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA]">
+                      Fit route
+                    </button>
+                    <button onClick={backToDay}
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA]">
+                      Back to the day
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => { setSelected(null); if (timeline) fit(timeline.points); }}
+                      disabled={!hasDay}
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA] disabled:opacity-40 disabled:cursor-not-allowed">
+                      Show the whole day
+                    </button>
+                    <button onClick={playDay} disabled={!timeline || timeline.points.length < 2}
+                      className="h-8 px-3 rounded-lg bg-[#25D366] text-[#053B33] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                      <PlayIcon size={12} /> Play the whole day
+                    </button>
+                  </>
                 )}
               </div>
-
-              {/* Replay controls */}
-              {activePoints.length >= 2 && (
-                <div className="flex items-center gap-2">
-                  {/* Speed selector */}
-                  <div className="flex items-center gap-1 bg-[#F0F2F5] rounded-lg p-0.5">
-                    {[1, 2, 4].map((s) => (
-                      <button key={s} onClick={() => setReplaySpeed(s)}
-                        className={[
-                          "px-2 py-0.5 rounded text-[10px] font-extrabold border-none cursor-pointer transition-all",
-                          replaySpeed === s
-                            ? "bg-[#128C7E] text-white"
-                            : "bg-transparent text-[#667781] hover:text-[#111B21]",
-                        ].join(" ")}
-                      >{s}x</button>
-                    ))}
-                  </div>
-
-                  {/* Play/pause */}
-                  <button onClick={toggleReplay}
-                    className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-extrabold
-                      border-none cursor-pointer hover:brightness-110 transition-all flex items-center gap-1.5"
-                  >
-                    {playing ? (
-                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause</>
-                    ) : (
-                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Replay</>
-                    )}
-                  </button>
-                </div>
-              )}
             </div>
 
-            {/* Progress bar — click or drag anywhere on it to jump */}
-            {activePoints.length >= 2 && (
-              <div
-                role="slider"
-                aria-label="Replay position"
-                aria-valuemin={0}
-                aria-valuemax={Math.max(1, replayPoints.length - 1)}
-                aria-valuenow={replayIdx}
-                tabIndex={0}
-                className="shrink-0 h-3 bg-[#E9EDEF] cursor-pointer flex items-center"
-                onClick={(ev) => {
-                  const box = ev.currentTarget.getBoundingClientRect();
-                  seekReplay((ev.clientX - box.left) / Math.max(1, box.width));
-                }}
-                onKeyDown={(ev) => {
-                  const last = Math.max(1, replayPoints.length - 1);
-                  if (ev.key === "ArrowRight") seekReplay((replayIdx + 1) / last);
-                  else if (ev.key === "ArrowLeft") seekReplay((replayIdx - 1) / last);
-                  else if (ev.key === "Home") seekReplay(0);
-                  else if (ev.key === "End") seekReplay(1);
-                }}
-              >
-                <div className="h-1.5 w-full bg-transparent">
-                  <div className="h-full bg-[#128C7E] transition-all duration-200"
-                    style={{ width: `${(replayIdx / Math.max(1, replayPoints.length - 1)) * 100}%` }} />
-                </div>
+            {reportMsg && (
+              <div role="status" className={`shrink-0 px-4 py-1.5 text-[11px] border-b flex items-center justify-between gap-2 ${
+                reportMsg.ok ? "text-[#075E54] bg-[#E7F3F1] border-[#D8E8E4]" : "text-[#B45309] bg-[#FFFBEB] border-[#FDE68A]"}`}>
+                {reportMsg.text}
+                <button onClick={() => setReportMsg(null)} aria-label="Dismiss" className="bg-transparent border-none cursor-pointer text-current text-[14px] leading-none">×</button>
               </div>
+            )}
+            {playback?.notice && (
+              <div className="shrink-0 px-4 py-1.5 text-[11px] text-[#B45309] bg-[#FFFBEB] border-b border-[#FDE68A]">{playback.notice}</div>
             )}
 
             <div ref={mapDivRef} className="flex-1 min-h-[300px] w-full" />
           </div>
 
-          {/* Position detail strip */}
-          {currentPoint && activePoints.length > 0 && (
-            <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-px bg-[#E9EDEF]">
-                {[
-                  { label: "Speed", value: `${currentPoint.speed_log || 0} km/h` },
-                  { label: "Location", value: currentPoint.geocoded_location || "—" },
-                  { label: "Time", value: `${currentPoint.local_system_datestamp} ${currentPoint.local_system_timestamp}` },
-                  { label: "Coordinates", value: `${parseFloat(currentPoint.data_latitude).toFixed(5)}, ${parseFloat(currentPoint.data_longitude).toFixed(5)}` },
-                  { label: "Satellites", value: String(currentPoint.data_connected_satelites || "—") },
-                  { label: "HDOP", value: currentPoint.data_hdop || "—" },
-                ].map((item) => (
-                  <div key={item.label} className="bg-white px-3 py-2.5">
-                    <div className="text-[10px] text-[#667781] font-bold">{item.label}</div>
-                    <div className="text-[12px] text-[#111B21] font-semibold mt-0.5 truncate" title={item.value}>
-                      {item.value}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Playback: figures, speed chart, readout, controls */}
+          {playback && playTimeline && playTimeline.points.length >= 2 && (
+            <div className="shrink-0 bg-white border border-[#E9EDEF] rounded-xl shadow-sm">
+              <PlaybackPanel
+                timeline={playTimeline}
+                t={t}
+                playing={playing}
+                rate={rate}
+                soFar={soFar}
+                stats={playStats}
+                zones={zones}
+                onRate={changeRate}
+                onToggle={togglePlay}
+                onSkip={skip}
+                onScrub={scrub}
+              />
             </div>
           )}
         </div>
