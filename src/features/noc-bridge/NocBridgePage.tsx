@@ -27,8 +27,9 @@ import { getClientDevices }   from "../../api/services/clients.service";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
 import type { Geozone } from "../../api/types";
 import { checkGeozoneTransitions } from "../../utils/geofenceUtils";
-import { parseLiveFrame, liveStreamUrl } from "../../utils/livePosition";
-import type { MotionStatus } from "../../utils/livePosition";
+import { readPosition } from "../../utils/livePosition";
+import type { LiveFrame, LivePosition, MotionStatus } from "../../utils/livePosition";
+import { LiveFleet, limiter } from "../../utils/liveFleet";
 import type { Point }              from "../../utils/geofenceUtils";
 
 // ─── Fleet env config ─────────────────────────────────────────────────────────
@@ -122,9 +123,14 @@ async function fleetFetch(method: string, path: string, body?: unknown): Promise
   return res.json();
 }
 
-function sseUrl(imei: string): string {
-  return liveStreamUrl(FLEET_SSE, imei);
+/** dd-mm-yyyy, as the replay route takes dates. */
+function ddmmyyyy(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 }
+
+/** Per-unit API calls (subscription checks, last-known positions), a few at a
+ *  time so they don't hold up the rest of the console's requests. */
+const perUnit = limiter(4);
 
 function esc(s: unknown): string {
   return String(s ?? "")
@@ -276,13 +282,20 @@ export default function NocBridgePage() {
   const gMap         = useRef<unknown>(null);
   const infoWin      = useRef<unknown>(null);
   const markers      = useRef(new Map<string, unknown>());
-  const sseConns     = useRef(new Map<string, EventSource>());
+  // The live feed: the selected unit in real time, the rest read in turn.
+  const fleet        = useRef<LiveFleet | null>(null);
   const units        = useRef(new Map<string, VehicleUnit>());
+  /** Units the live feed has given a position this visit. */
+  const liveFix      = useRef(new Set<string>());
+  /** Units whose last known position has been asked for. */
+  const seeded       = useRef(new Set<string>());
   const pendingFocus = useRef<string | null>(null);
   const activePopup  = useRef<string | null>(null);
 
   // Geofence overlay state
   const [showGeofences, setShowGeofences] = useState(true);
+  const showGeoRef = useRef(showGeofences);
+  showGeoRef.current = showGeofences;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const geoPolygons = useRef<any[]>([]);
 
@@ -297,7 +310,8 @@ export default function NocBridgePage() {
   // Geofence-attached device markers (shown on map when geofences are ON)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const geoDeviceMarkers = useRef(new Map<string, any>());
-  const geoDeviceSse = useRef(new Map<string, EventSource>());
+  /** Geofence-attached units outside this fleet, read by the live feed too. */
+  const geoExtra = useRef(new Set<string>());
   const geoDeviceNames = useRef(new Map<string, string>());
 
   // RAF tick — batches SSE updates into one render frame
@@ -381,106 +395,174 @@ export default function NocBridgePage() {
     if (!fromMarker) { GM.panTo(u.coords); GM.setZoom(15); }
   }
 
-  // ── SSE ──────────────────────────────────────────────────────────────────
-  function stopAll() {
-    sseConns.current.forEach((es) => { try { es.close(); } catch { /**/ } });
-    sseConns.current.clear();
+  /** A geofence-attached unit outside this fleet, on the map. */
+  function showGeoDevice(imei: string, p: LivePosition) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps; const GM = gMap.current as any;
+    if (!G || !GM || !showGeoRef.current) return;
+    const { lat, lng, status } = p;
+    const iconKey = status === "Moving" ? "moving" : status === "Parked" ? "parked"
+                  : status === "Idling" ? "idling" : "unknown";
+    const icon = { url: ICONS[iconKey], scaledSize: new G.Size(28, 28), anchor: new G.Point(14, 14) };
+    const devName = geoDeviceNames.current.get(imei) ?? imei;
+
+    let m = geoDeviceMarkers.current.get(imei);
+    if (!m) {
+      m = new G.Marker({
+        position: { lat, lng },
+        map: GM,
+        title: `${devName} (geofence device)`,
+        icon,
+        zIndex: 1,
+      });
+      geoDeviceMarkers.current.set(imei, m);
+    } else {
+      m.setPosition({ lat, lng });
+      m.setIcon(icon);
+    }
+    // The popup reads the latest status, not the first one seen.
+    G.event.clearListeners(m, "click");
+    m.addListener("click", () => {
+      const iwDev = new G.InfoWindow({
+        content: `<div style="font-family:system-ui;padding:8px 12px;min-width:160px">
+          <div style="font-weight:800;font-size:13px;color:#111B21">${esc(devName)}</div>
+          <div style="font-size:11px;color:#667781;margin-top:2px">IMEI: ${esc(imei)}</div>
+          <div style="font-size:11px;color:#667781;margin-top:2px">Status: ${status}</div>
+          <div style="font-size:10px;color:#128C7E;margin-top:4px;font-weight:700">Geofence-attached device</div>
+        </div>`,
+      });
+      iwDev.open({ map: GM, anchor: m });
+    });
   }
 
-  function openStream(imei: string) {
-    let es: EventSource;
-    try { es = new EventSource(sseUrl(imei)); } catch { return; }
-    sseConns.current.set(imei, es);
+  // ── Live feed ────────────────────────────────────────────────────────────
+  /** Every unit the feed reads: the fleet, and geofence units outside it. */
+  function syncFeedUnits() {
+    fleet.current?.setUnits([...units.current.keys(), ...geoExtra.current]);
+  }
 
-    es.onmessage = (ev) => {
-      const u = units.current.get(imei);
-      if (!u) return;
-      const frame = parseLiveFrame(ev.data, imei);
-      if (frame.kind === "ignore") return;
+  function onFrame(imei: string, frame: Exclude<LiveFrame, { kind: "ignore" }>) {
+    const u = units.current.get(imei);
+    if (!u) {
+      if (frame.kind === "position" && geoExtra.current.has(imei)) showGeoDevice(imei, frame.position);
+      return;
+    }
 
-      if (frame.kind === "offline") {
-        u.status = "Offline";
-        tick();
-        const m = ensureMarker(u);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const IW = infoWin.current as any; const GM = gMap.current as any;
-        if (activePopup.current === imei && IW && GM) {
-          if (m) { IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m }); }
-          else   { IW.setContent(buildWaitingHtml(u.name || imei)); IW.open(GM); }
-        }
-        if (pendingFocus.current === imei && IW && GM) {
-          IW.setContent(buildWaitingHtml(u.name || imei));
-          IW.open(GM);
-          pendingFocus.current = null;
-        }
-        return;
-      }
-
-      const p = frame.position;
-      const { lat, lng } = p;
-
-      u.speed             = p.speed;
-      u.motion_state      = p.motionState;
-      u.status            = p.status;
-      u.coords            = { lat, lng };
-      u.geocoded_location = p.geocoded || u.geocoded_location || "";
-      u.last_sync         = p.lastSync;
-      u.satellites        = p.satellites;
-      u.hdop              = p.hdop;
-      u.ignition          = p.ignition;
-      u.mileage           = p.mileage;
-      u.fuel_level        = p.fuelLevel;
-
-      // ── Geofence entry/exit detection ──
-      if (geozonePathsRef.current.length > 0 && showGeofences) {
-        if (!deviceInsideRef.current.has(imei)) {
-          deviceInsideRef.current.set(imei, new Map());
-        }
-        const prevMap = deviceInsideRef.current.get(imei)!;
-        const events = checkGeozoneTransitions({ lat, lng }, geozonePathsRef.current, prevMap);
-        if (events.length > 0) {
-          const now = new Date().toLocaleTimeString();
-          const newAlerts: GeoAlert[] = events.map((e) => ({
-            id: ++alertIdRef.current,
-            type: e.type,
-            deviceName: u.name || imei,
-            zoneName: e.name,
-            time: now,
-          }));
-          setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
-          // Alerts themselves are sent by the server (endpoints/alert_engine.py):
-          // it remembers where each unit was between sessions, only alerts on
-          // units attached to the rule, and works whether or not this screen
-          // is open. What is shown here is this screen's own live view.
-        }
-      }
-
+    if (frame.kind === "offline") {
+      u.status = "Offline";
       tick();
       const m = ensureMarker(u);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const IW = infoWin.current as any; const GM = gMap.current as any;
-      if (activePopup.current === imei && IW && GM && m) {
-        IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m });
+      if (activePopup.current === imei && IW && GM) {
+        if (m) { IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m }); }
+        else   { IW.setContent(buildWaitingHtml(u.name || imei)); IW.open(GM); }
       }
+      if (pendingFocus.current === imei && IW && GM) {
+        IW.setContent(buildWaitingHtml(u.name || imei));
+        IW.open(GM);
+        pendingFocus.current = null;
+      }
+      // Nothing live: show where it was last seen, as the mobile app does.
+      seedLastKnown(imei);
+      return;
+    }
+
+    const p = frame.position;
+    const { lat, lng } = p;
+    liveFix.current.add(imei);
+
+    u.speed             = p.speed;
+    u.motion_state      = p.motionState;
+    u.status            = p.status;
+    u.coords            = { lat, lng };
+    u.geocoded_location = p.geocoded || u.geocoded_location || "";
+    u.last_sync         = p.lastSync;
+    u.satellites        = p.satellites;
+    u.hdop              = p.hdop;
+    u.ignition          = p.ignition;
+    u.mileage           = p.mileage;
+    u.fuel_level        = p.fuelLevel;
+
+    // ── Geofence entry/exit detection ──
+    if (geozonePathsRef.current.length > 0 && showGeoRef.current) {
+      if (!deviceInsideRef.current.has(imei)) {
+        deviceInsideRef.current.set(imei, new Map());
+      }
+      const prevMap = deviceInsideRef.current.get(imei)!;
+      const events = checkGeozoneTransitions({ lat, lng }, geozonePathsRef.current, prevMap);
+      if (events.length > 0) {
+        const now = new Date().toLocaleTimeString();
+        const newAlerts: GeoAlert[] = events.map((e) => ({
+          id: ++alertIdRef.current,
+          type: e.type,
+          deviceName: u.name || imei,
+          zoneName: e.name,
+          time: now,
+        }));
+        setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
+        // Alerts themselves are sent by the server (endpoints/alert_engine.py):
+        // it remembers where each unit was between sessions, only alerts on
+        // units attached to the rule, and works whether or not this screen
+        // is open. What is shown here is this screen's own live view.
+      }
+    }
+
+    tick();
+    const m = ensureMarker(u);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const IW = infoWin.current as any; const GM = gMap.current as any;
+    if (activePopup.current === imei && IW && GM && m) {
+      IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m });
+    }
+    if (pendingFocus.current === imei) {
+      pendingFocus.current = null;
+      openPopup(imei, false);
+    }
+  }
+
+  /**
+   * The unit's last reported position, from trip history: today, else the
+   * last 30 days. The live feed has nothing for a unit that isn't reporting,
+   * which used to leave it off the map entirely. Asked once per unit; a live
+   * position always wins.
+   */
+  function seedLastKnown(imei: string) {
+    const u = units.current.get(imei);
+    if (!u || u.coords || seeded.current.has(imei) || liveFix.current.has(imei)) return;
+    seeded.current.add(imei);
+    const now = new Date();
+    const ask = (from: Date) => perUnit(async () => {
+      const res = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, {
+        data: { device_imei: imei, from_date: ddmmyyyy(from), to_date: ddmmyyyy(now), offset_log: "0", record_count: "1" },
+      }) as { status?: string; data?: unknown } | null;
+      const row = res?.status === "success" && Array.isArray(res.data) ? res.data[0] : null;
+      return row && typeof row === "object" ? readPosition(row as Record<string, unknown>, imei) : null;
+    }).catch(() => null);
+    (async () => {
+      const p: LivePosition | null = (await ask(now)) ?? (await ask(new Date(now.getTime() - 30 * 86_400_000)));
+      const unit = units.current.get(imei);
+      if (!p || !unit || liveFix.current.has(imei) || unit.coords) return;
+      unit.coords            = { lat: p.lat, lng: p.lng };
+      unit.status            = "Offline";
+      unit.motion_state      = "Not reporting · last known position";
+      unit.speed             = 0;
+      unit.last_sync         = p.lastSync;
+      unit.geocoded_location = p.geocoded || unit.geocoded_location;
+      unit.ignition          = p.ignition || unit.ignition;
+      tick();
+      ensureMarker(unit);
       if (pendingFocus.current === imei) {
         pendingFocus.current = null;
         openPopup(imei, false);
       }
-    };
-
-    es.onerror = () => {
-      try { es.close(); } catch { /**/ }
-      sseConns.current.delete(imei);
-      setTimeout(() => openStream(imei), 4000);
-    };
+    })();
   }
-
-  function startAll() { stopAll(); units.current.forEach((_, i) => openStream(i)); }
 
   // ── Subscription enrichment ──────────────────────────────────────────────
   async function enrichSubs() {
     await Promise.all(
-      Array.from(units.current.entries()).map(async ([imei, u]) => {
+      Array.from(units.current.entries()).map(([imei, u]) => perUnit(async () => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const j = await fleetFetch("GET", `${ENDPOINTS.FLEET.CHECK_IMEI}/${encodeURIComponent(imei)}`) as any;
@@ -490,8 +572,9 @@ export default function NocBridgePage() {
           const valid   = d.is_valid   === true || String(d.is_valid).toLowerCase()   === "true" || String(d.is_valid)   === "1";
           u.subscription_status = expired ? "expired" : valid ? "running"
             : String(d.validity_status || d.subscription_status || "unknown").toLowerCase();
+          if (u.subscription_status === "expired") ensureMarker(u);
         } catch { /**/ }
-      })
+      }))
     );
   }
 
@@ -525,6 +608,8 @@ export default function NocBridgePage() {
         return;
       }
       units.current.clear();
+      liveFix.current.clear();
+      seeded.current.clear();
       setPage(1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       resp.data.forEach((u: any) => {
@@ -557,8 +642,11 @@ export default function NocBridgePage() {
       });
       tick();
       setLoading(false);
-      try { await enrichSubs(); tick(); } catch { /**/ }
-      startAll();
+      // The live feed starts now; the subscription checks run beside it (they
+      // used to hold it up until every one had answered).
+      syncFeedUnits();
+      fleet.current?.start();
+      enrichSubs().then(tick, () => {});
     } catch (err) {
       console.error("[LiveMonitoring] loadUnits error:", err);
       setListError("Failed to load devices. Please try again.");
@@ -566,8 +654,24 @@ export default function NocBridgePage() {
     }
   }
 
+  // The feed is made once; it calls the latest render's handlers.
+  const onFrameRef = useRef(onFrame);
+  const seedLastKnownRef = useRef(seedLastKnown);
+  useEffect(() => {
+    onFrameRef.current = onFrame;
+    seedLastKnownRef.current = seedLastKnown;
+  });
+
   // ── Bootstrap ────────────────────────────────────────────────────────────
   useEffect(() => {
+    const feed = new LiveFleet({
+      base: FLEET_SSE,
+      onFrame: (imei, frame) => onFrameRef.current(imei, frame),
+      onSilent: (imei) => seedLastKnownRef.current(imei),
+      skip: (imei) => String(units.current.get(imei)?.subscription_status).toLowerCase() === "expired",
+    });
+    fleet.current = feed;
+
     const initMap = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const G = (window as any).google?.maps;
@@ -617,20 +721,23 @@ export default function NocBridgePage() {
     })();
 
     return () => {
-      stopAll();
+      feed.stop();
+      if (fleet.current === feed) fleet.current = null;
       if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The unit being looked at keeps its own stream, so it moves in real time.
+  useEffect(() => { fleet.current?.follow(selectedImei); }, [selectedImei]);
 
   // ── Geofence overlays + attached device markers (merged) ─────────────────
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google?.maps;
 
-    // Helper: clear all geofence device markers & SSE connections
+    // Helper: clear all geofence device markers, and stop reading their units
     const clearGeoDevices = () => {
-      for (const es of geoDeviceSse.current.values()) { try { es.close(); } catch { /**/ } }
-      geoDeviceSse.current.clear();
+      if (geoExtra.current.size) { geoExtra.current.clear(); syncFeedUnits(); }
       for (const m of geoDeviceMarkers.current.values()) { try { m.setMap(null); } catch { /**/ } }
       geoDeviceMarkers.current.clear();
       geoDeviceNames.current.clear();
@@ -777,52 +884,11 @@ export default function NocBridgePage() {
         }
         geozonePathsRef.current = alertPaths;
 
-        // 5. Open SSE for attached devices NOT already tracked by the fleet
-        for (const imei of allAttachedImeis) {
-          // Fleet devices already have SSE via startAll() — only open extra SSE for non-fleet devices
-          if (sseConns.current.has(imei)) continue;
-
-          const es = new EventSource(sseUrl(imei));
-          geoDeviceSse.current.set(imei, es);
-
-          es.onmessage = (ev) => {
-            if (cancelled) return;
-            const frame = parseLiveFrame(ev.data, imei);
-            if (frame.kind !== "position") return;
-
-            const { lat, lng, status } = frame.position;
-            const iconKey = status === "Moving" ? "moving" : status === "Parked" ? "parked"
-                          : status === "Idling" ? "idling" : "unknown";
-            const icon = { url: ICONS[iconKey], scaledSize: new G.Size(28, 28), anchor: new G.Point(14, 14) };
-            const devName = geoDeviceNames.current.get(imei) ?? imei;
-
-            let m = geoDeviceMarkers.current.get(imei);
-            if (!m) {
-              m = new G.Marker({
-                position: { lat, lng },
-                map: GM,
-                title: `${devName} (geofence device)`,
-                icon,
-                zIndex: 1,
-              });
-              m.addListener("click", () => {
-                const iwDev = new G.InfoWindow({
-                  content: `<div style="font-family:system-ui;padding:8px 12px;min-width:160px">
-                    <div style="font-weight:800;font-size:13px;color:#111B21">${esc(devName)}</div>
-                    <div style="font-size:11px;color:#667781;margin-top:2px">IMEI: ${esc(imei)}</div>
-                    <div style="font-size:11px;color:#667781;margin-top:2px">Status: ${status}</div>
-                    <div style="font-size:10px;color:#128C7E;margin-top:4px;font-weight:700">Geofence-attached device</div>
-                  </div>`,
-                });
-                iwDev.open({ map: GM, anchor: m });
-              });
-              geoDeviceMarkers.current.set(imei, m);
-            } else {
-              m.setPosition({ lat, lng });
-              m.setIcon(icon);
-            }
-          };
-        }
+        // 5. Attached units outside this fleet are read by the live feed too.
+        //    (Each used to get a stream of its own, on top of the fleet's,
+        //    which the browser's 6-connection limit left waiting.)
+        geoExtra.current = new Set([...allAttachedImeis].filter((imei) => !units.current.has(imei)));
+        syncFeedUnits();
       } catch (err) {
         console.error("[LiveMonitoring] Failed to load geofences:", err);
       }

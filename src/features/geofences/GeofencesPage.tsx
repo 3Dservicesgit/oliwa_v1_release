@@ -27,7 +27,7 @@ import {
   type ShapeDraft,
 } from "../../utils/geofenceShapes";
 
-import { parseLiveFrame, liveStreamUrl } from "../../utils/livePosition";
+import { LiveFleet } from "../../utils/liveFleet";
 
 import { GeofenceMap } from "./components/GeofenceMap";
 import type { DeviceMarkerData } from "./components/GeofenceMap";
@@ -47,9 +47,6 @@ const TABS: { key: GeofenceTab; label: string }[] = [
 ];
 
 const FLEET_SSE = (import.meta.env.VITE_FLEET_SSE_URL as string) ?? "https://narvasocket.3dservices.co.ug";
-
-/** Wait this long before reopening a stream that dropped. */
-const STREAM_RETRY_MS = 4000;
 
 export function GeofencesPage() {
   const { state: authState } = useAuth();
@@ -107,23 +104,17 @@ export function GeofencesPage() {
 
   // ── Live device markers on geofence map ────────────────────────────────
   const [deviceMarkers, setDeviceMarkers] = useState<DeviceMarkerData[]>([]);
-  const sseRefs = useRef<Map<string, EventSource>>(new Map());
   const deviceDataRef = useRef<Map<string, DeviceMarkerData>>(new Map());
-  const retryTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // Fetch attached devices when a geofence is selected
   useEffect(() => {
-    // Close existing SSE connections
-    for (const es of sseRefs.current.values()) es.close();
-    sseRefs.current.clear();
-    for (const timer of retryTimers.current) clearTimeout(timer);
-    retryTimers.current.clear();
     deviceDataRef.current.clear();
     setDeviceMarkers([]);
 
     if (!selectedUid || !authState.accountRoot) return;
 
     let cancelled = false;
+    let stopFeed = () => {};
 
     (async () => {
       try {
@@ -154,21 +145,12 @@ export function GeofencesPage() {
           setDeviceMarkers(Array.from(deviceDataRef.current.values()));
         };
 
-        // 3. Follow each attached unit's live position
-        const connect = (imei: string) => {
-          if (cancelled) return;
-          let es: EventSource;
-          try {
-            es = new EventSource(liveStreamUrl(FLEET_SSE, imei));
-          } catch {
-            return;
-          }
-          sseRefs.current.set(imei, es);
-
-          es.onmessage = (ev) => {
-            const frame = parseLiveFrame(ev.data, imei);
-            if (frame.kind === "ignore") return;
-
+        // 3. Follow the attached units' live positions, read in turn a few
+        //    at a time. A stream each used to stop at 6 units: the browser's
+        //    limit per server, which the stream server's HTTP/1.1 imposes.
+        const feed = new LiveFleet({
+          base: FLEET_SSE,
+          onFrame: (imei, frame) => {
             if (frame.kind === "offline") {
               const known = deviceDataRef.current.get(imei);
               show(known
@@ -177,7 +159,6 @@ export function GeofencesPage() {
                     speed: 0, status: "Offline", lastSync: "—" });
               return;
             }
-
             const p = frame.position;
             show({
               imei,
@@ -188,23 +169,12 @@ export function GeofencesPage() {
               status: p.status,
               lastSync: p.lastSync || "—",
             });
-          };
-
-          // A dropped stream is normal (sleep, network change) — reopen it,
-          // otherwise the map quietly freezes on the last position.
-          es.onerror = () => {
-            try { es.close(); } catch { /* already closed */ }
-            sseRefs.current.delete(imei);
-            if (cancelled) return;
-            const retry = setTimeout(() => {
-              retryTimers.current.delete(retry);
-              connect(imei);
-            }, STREAM_RETRY_MS);
-            retryTimers.current.add(retry);
-          };
-        };
-
-        for (const imei of attachedImeis) connect(imei);
+          },
+        });
+        if (cancelled) return;
+        stopFeed = () => feed.stop();
+        feed.setUnits(attachedImeis);
+        feed.start();
       } catch (err) {
         console.error("[GeofencesPage] Failed to load device markers:", err);
       }
@@ -212,10 +182,7 @@ export function GeofencesPage() {
 
     return () => {
       cancelled = true;
-      for (const es of sseRefs.current.values()) es.close();
-      sseRefs.current.clear();
-      for (const timer of retryTimers.current) clearTimeout(timer);
-      retryTimers.current.clear();
+      stopFeed();
     };
   }, [selectedUid, authState.accountRoot]);
 

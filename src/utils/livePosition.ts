@@ -39,9 +39,16 @@ export type LiveFrame =
   | { kind: "offline" }      // the unit has no data — show it as offline
   | { kind: "ignore" };      // heartbeat, or a frame we can't use
 
+/** The unit's motion state as people read it. The tracking server spells
+ *  idling "Idiling"; shown as it is, and matched as it is, an idling vehicle
+ *  read "Idiling" and, at 0 km/h, counted as Offline. */
+export function motionLabel(motionState: string): string {
+  return (motionState ?? "").replace(/idiling/gi, "Idling");
+}
+
 /** Moving / Idling / Parked / Offline from what the unit reports. */
 export function normalizeStatus(motionState: string, speed: number): MotionStatus {
-  const s = (motionState ?? "").toLowerCase();
+  const s = motionLabel(motionState).toLowerCase();
   if (s.includes("park") || s.includes("stop")) return "Parked";
   if (s.includes("idl") || s === "idle")        return "Idling";
   if (s.includes("mov") || s.includes("driv"))  return "Moving";
@@ -99,36 +106,43 @@ export function parseLiveFrame(raw: string, imei: string): LiveFrame {
     ? message.data
     : message) as Record<string, unknown>;
 
+  const position = readPosition(body, imei);
+  return position ? { kind: "position", position } : { kind: "ignore" };
+}
+
+/**
+ * One position record — a live frame's `data`, or a trip-history row (the
+ * same location-registry fields) — or null without a usable fix.
+ */
+export function readPosition(body: Record<string, unknown>, imei: string): LivePosition | null {
   const lat = num(body.data_latitude, body.latitude, body.lat);
   const lng = num(body.data_longitude, body.longitude, body.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { kind: "ignore" };
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   // 0,0 is in the Atlantic — the server sends it when it has no fix.
-  if (lat === 0 && lng === 0) return { kind: "ignore" };
+  if (lat === 0 && lng === 0) return null;
 
   const speedValue = num(body.speed_log, body.speed);
   const speed = Number.isFinite(speedValue) ? speedValue : 0;
-  const motionState = text(body.motion_state, body.status);
+  const motionState = motionLabel(text(body.motion_state, body.status));
   const geocodedRaw = text(body.geocoded_location, body.location);
   const date = text(body.local_system_datestamp, body.device_date);
   const time = text(body.local_system_timestamp, body.device_time, body.timestamp);
 
   return {
-    kind: "position",
-    position: {
-      imei,
-      lat,
-      lng,
-      speed,
-      motionState,
-      status: normalizeStatus(motionState, speed),
-      lastSync: `${date} ${time}`.trim(),
-      // the geocoder reports its own failures in the address field
-      geocoded: geocodedRaw.toLowerCase().includes("failure") ? "" : geocodedRaw,
-      ignition: text(body.ignition_status, body.iginition, body.ignition),
-      satellites: num(body.data_connected_satelites, body.satellites) || 0,
-      hdop: text(body.data_hdop, body.hdop),
-      mileage: text(body.mileage),
-      fuelLevel: text(body.fuel_level),
-    },
+    imei,
+    lat,
+    lng,
+    speed,
+    motionState,
+    status: normalizeStatus(motionState, speed),
+    lastSync: `${date} ${time}`.trim(),
+    // the geocoder reports its own failures in the address field
+    geocoded: geocodedRaw.toLowerCase().includes("failure") ? "" : geocodedRaw,
+    // The live feed sends ignition_state ("ON"/"OFF"); the others are older names.
+    ignition: text(body.ignition_state, body.ignition_status, body.iginition, body.ignition),
+    satellites: num(body.data_connected_satelites, body.satellites) || 0,
+    hdop: text(body.data_hdop, body.hdop),
+    mileage: text(body.mileage),
+    fuelLevel: text(body.fuel_level),
   };
 }
