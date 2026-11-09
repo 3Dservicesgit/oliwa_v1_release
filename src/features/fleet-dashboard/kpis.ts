@@ -46,16 +46,17 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 
 // ── A · Fleet status ─────────────────────────────────────────────────────────
 
-export type UnitState = "moving" | "idling" | "parked" | "silent" | "noPosition" | "unread";
+export type UnitState = "moving" | "idling" | "parked" | "silent" | "noData" | "noPosition" | "unread";
 
 /** Display order from the KPI spec: Moving → Parked → Idling → Offline. */
-export const UNIT_STATE_ORDER: UnitState[] = ["moving", "parked", "idling", "silent", "noPosition", "unread"];
+export const UNIT_STATE_ORDER: UnitState[] = ["moving", "parked", "idling", "silent", "noData", "noPosition", "unread"];
 
 export const UNIT_STATE_META: Record<UnitState, { label: string; colour: string }> = {
   moving:     { label: "Moving",      colour: "#25D366" },
   parked:     { label: "Parked",      colour: "#E53935" },
   idling:     { label: "Idling",      colour: "#F59E0B" },
   silent:     { label: "Offline",     colour: "#667781" },
+  noData:     { label: "No data",     colour: "#C9D1D6" },
   noPosition: { label: "No position", colour: "#F59E0B" },
   unread:     { label: "Not checked", colour: "#8696A0" },
 };
@@ -68,33 +69,42 @@ export interface FleetStatusKpis {
   total: number;
 }
 
-export const reportingNow = (k: FleetStatusKpis) => k.total - k.counts.silent - k.counts.unread;
+/** Units reporting now, as the server counts them (reporting_now). A unit
+ *  that has never reported is not one: the summary's never_reported units
+ *  were read as online, and 14 of them made "23 of 35 online" out of 9. */
+export const reportingNow = (k: FleetStatusKpis) =>
+  k.counts.moving + k.counts.idling + k.counts.parked + k.counts.noPosition;
 
 /** Units silent for over a day — a device fault more than a parked van. */
 export const staleOverDay = (k: FleetStatusKpis) => k.silentAges.upToWeek + k.silentAges.overWeek;
 
+/** Units with a device flag: weak GPS, silent over a day, or never reported
+ *  (as the mobile app counts device health). */
+export const flaggedUnits = (k: FleetStatusKpis) => k.weakGps + staleOverDay(k) + k.counts.noData;
+
 /** Share of the fleet with no device flag, 0..1; null for an empty fleet. */
 export const healthyFraction = (k: FleetStatusKpis): number | null =>
-  k.total <= 0 ? null : Math.min(1, Math.max(0, (k.total - k.weakGps - staleOverDay(k)) / k.total));
+  k.total <= 0 ? null : Math.min(1, Math.max(0, (k.total - flaggedUnits(k)) / k.total));
 
 /** A state is listed when a unit is in it, or it is one of the first four. */
 export const stateListed = (s: UnitState, k: FleetStatusKpis) =>
   k.counts[s] > 0 || UNIT_STATE_ORDER.indexOf(s) < 4;
 
-/** From the `fleet` object of the summary. A unit that never reported counts
- *  as silent for over a week. */
+/** From the `fleet` object of the summary. A unit that never reported is
+ *  "No data", as the app shows it, and not counted online. */
 export function fleetFromServer(m: Obj): FleetStatusKpis {
   const c = obj(m.counts);
   const a = obj(m.silent_ages);
   return {
     counts: {
       moving: int(c.moving), idling: int(c.idling), parked: int(c.parked),
-      silent: int(c.silent), noPosition: int(c.no_position), unread: int(c.unread),
+      silent: int(c.silent), noData: int(c.never_reported), noPosition: int(c.no_position),
+      unread: int(c.unread),
     },
     silentAges: {
       underDay: int(a.under_day),
       upToWeek: int(a.up_to_week),
-      overWeek: int(a.over_week) + int(a.never),
+      overWeek: int(a.over_week),
     },
     weakGps: int(m.weak_gps),
     total: int(m.total),

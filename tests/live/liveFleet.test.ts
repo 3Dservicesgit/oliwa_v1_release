@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { limiter, LiveFleet, type StreamLike } from "../../src/utils/liveFleet.ts";
-import { parseLiveFrame, readPosition } from "../../src/utils/livePosition.ts";
+import { fixTime, motionText, parseLiveFrame, readPosition } from "../../src/utils/livePosition.ts";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Until [ok] holds, or 3 s (timers are coarse on Windows, so no fixed waits). */
@@ -38,10 +39,17 @@ function server(answer: (imei: string) => string | null = () => JSON.stringify({
   };
 }
 
-const position = (lat: number) => JSON.stringify({
-  status: "success",
-  data: { data_latitude: String(lat), data_longitude: "32.58", speed_log: "0", motion_state: "Idiling", ignition_state: "ON" },
-});
+/** A report made just now. */
+const position = (lat: number) => {
+  const t = new Date();
+  const two = (v: number) => String(v).padStart(2, "0");
+  return JSON.stringify({
+    status: "success",
+    data: { data_latitude: String(lat), data_longitude: "32.58", speed_log: "0", motion_state: "Idiling", ignition_state: "ON",
+      local_system_datestamp: `${two(t.getDate())}-${two(t.getMonth() + 1)}-${t.getFullYear()}`,
+      local_system_timestamp: `${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}` },
+  });
+};
 
 test("reads every unit, a few at a time, never more connections than allowed", async () => {
   const s = server();
@@ -151,4 +159,90 @@ test("a trip-history row reads as a position; no fix reads as none", () => {
     local_system_datestamp: "01-11-2026", local_system_timestamp: "23:57:02" }, "u1");
   assert.equal(p?.lastSync, "01-11-2026 23:57:02");
   assert.equal(readPosition({ data_latitude: "0", data_longitude: "0" }, "u1"), null);
+});
+
+// MOROTO GENSET, 3 Nov 2026 20:34: the feed still sent its 7 Oct report.
+const now = new Date(2026, 10, 3, 20, 34).getTime();
+const report = (date: string, time: string, extra: Record<string, unknown> = {}) => JSON.stringify({
+  status: "success",
+  data: { data_latitude: "2.53", data_longitude: "34.66", speed_log: 0, motion_state: "Idiling", ignition_state: "ON",
+    local_system_datestamp: date, local_system_timestamp: time, ...extra },
+});
+const read = (raw: string) => {
+  const f = parseLiveFrame(raw, "u1", now);
+  assert.equal(f.kind, "position");
+  return f.kind === "position" ? f.position : null!;
+};
+
+test("a report weeks old is Offline, with what it was doing then", () => {
+  const p = read(report("07-10-2026", "12:45:38PM", { device_state: "Offline" }));
+  assert.equal(p.status, "Offline");
+  assert.equal(p.reporting, false);
+  assert.equal(motionText(p), "Not reporting · last seen idling");
+  // Old by its date alone, whatever device_state says.
+  assert.equal(read(report("07-10-2026", "12:45:38PM")).status, "Offline");
+});
+
+test("a fresh report keeps its state, whatever device_state says", () => {
+  const p = read(report("03-11-2026", "08:22:52PM", { device_state: "Online" }));
+  assert.equal(p.status, "Idling");
+  assert.equal(motionText(p), "Idling");
+  assert.equal(read(report("03-11-2026", "08:22:52PM", { device_state: "Offline" })).status, "Idling");
+});
+
+test("parked is held while the tracker sleeps: flagged after a day, Offline after 7", () => {
+  const parked = (date: string, time: string) => read(report(date, time,
+    { motion_state: "Parked", ignition_state: "OFF", device_state: "Offline" }));
+  // UAJ 378X(Mpigi), 3 Nov: parked at 12:44, tracker asleep since.
+  assert.equal(parked("03-11-2026", "12:44:43PM").status, "Parked");
+  assert.equal(motionText(parked("03-11-2026", "12:44:43PM")), "Parked");
+  const quiet = parked("01-11-2026", "11:57:02PM");
+  assert.equal(quiet.status, "Parked");
+  assert.equal(quiet.quiet, true);
+  assert.equal(motionText(quiet), "Parked · tracker quiet since 1 Nov");
+  assert.equal(parked("25-10-2026", "11:44:36PM").status, "Offline");
+  assert.equal(motionText(parked("25-10-2026", "11:44:36PM")), "Not reporting · last seen parked");
+});
+
+test("the hour is the line", () => {
+  assert.equal(read(report("03-11-2026", "07:33:00PM")).status, "Offline");
+  assert.equal(read(report("03-11-2026", "07:35:00PM")).status, "Idling");
+});
+
+test("report times: record_timestamp (UTC) first, else the local date and time", () => {
+  assert.equal(fixTime({ record_timestamp: "2026-10-07T09:45:38.000Z" }), Date.UTC(2026, 9, 7, 9, 45, 38));
+  assert.equal(fixTime({ local_system_datestamp: "07-10-2026", local_system_timestamp: "12:45:38PM" }),
+    new Date(2026, 9, 7, 12, 45, 38).getTime());
+  assert.equal(fixTime({ local_system_datestamp: "07-10-2026", local_system_timestamp: "12:05:00AM" }),
+    new Date(2026, 9, 7, 0, 5, 0).getTime());
+  assert.equal(fixTime({}), null);
+});
+
+// The fleet status cases shared by the backend and the mobile app
+// (navas-core-apis/tests/fixtures/fleet_status_cases.json, copied to
+// oliwa-mobile/test/fixtures/): the console reads a unit the same way.
+const sharedCases = ["../navas-core-apis/tests/fixtures/fleet_status_cases.json",
+  "../oliwa-mobile/test/fixtures/fleet_status_cases.json"].find((f) => existsSync(f));
+const asShown: Record<string, string> = { moving: "Moving", idling: "Idling", parked: "Parked", silent: "Offline" };
+
+test("the shared fleet status cases", { skip: sharedCases ? false : "fleet_status_cases.json not checked out beside this repo" }, () => {
+  const data = JSON.parse(readFileSync(sharedCases!, "utf8"));
+  const now = new Date(data.now).getTime();
+  const two = (v: number) => String(v).padStart(2, "0");
+  let checked = 0;
+  for (const c of data.cases) {
+    for (const u of c.units) {
+      // Units with no report, or not checked, never reach this reader.
+      if (!u.frame || !(u.expect in asShown)) continue;
+      const t = new Date(now - u.minutes_ago * 60_000);
+      const body = { ...u.frame,
+        local_system_datestamp: `${two(t.getDate())}-${two(t.getMonth() + 1)}-${t.getFullYear()}`,
+        local_system_timestamp: `${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}` };
+      const p = readPosition(body, u.id, now);
+      if (!p) continue; // no fix (0,0): no position on the map either
+      assert.equal(p.status, asShown[u.expect], `${c.name}: ${u.id}`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 25, `checked ${checked}`);
 });

@@ -14,7 +14,7 @@ import { getGeozones, deleteGeozone, getGeozoneAttachedDevices } from "../../api
 import { getClientDevices } from "../../api/services/clients.service";
 import { useAuth } from "../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../auth/guards";
-import { parseGeozonePoints } from "../../api/types/geozones.types";
+import { parseGeozoneGeometry } from "../../api/types/geozones.types";
 import type { ParsedGeozone, LatLng, Geozone } from "../../api/types";
 import {
   emptyDraft,
@@ -65,10 +65,17 @@ export function GeofencesPage() {
     getGeozones(authState.accountRoot, "client")
       .then((res) => {
         if (res.status === "success" && Array.isArray(res.data)) {
-          const parsed: ParsedGeozone[] = (res.data as Geozone[]).map((gz) => ({
-            ...gz,
-            path: parseGeozonePoints(gz.geozone_points),
-          }));
+          const parsed: ParsedGeozone[] = (res.data as Geozone[]).map((gz) => {
+            const geo = parseGeozoneGeometry(gz.geozone_points);
+            // Zones drawn in the mobile app keep their circle or line in
+            // geozone_points, with no shape details: read the shape from there.
+            const legacy = !gz.geozone_shape_params && geo.params;
+            return {
+              ...gz,
+              ...(legacy ? { geozone_shape: geo.shape, geozone_shape_params: geo.params } : {}),
+              path: geo.outline,
+            };
+          });
           setGeozones(parsed);
         } else {
           setGeozones([]);

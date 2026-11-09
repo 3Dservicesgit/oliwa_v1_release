@@ -7,7 +7,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ALERT_CATEGORIES, ALERT_CATEGORY_LABEL, count, dailyIn, dayLabel, deriveAlerts, healthyFraction,
+  ALERT_CATEGORIES, ALERT_CATEGORY_LABEL, count, dailyIn, dayLabel, deriveAlerts, flaggedUnits, healthyFraction,
   isAcknowledged, primaryUnit, reportingNow, runwayLevel, runwayOf, runwayText, runwayTotal, SEVERITIES, SEVERITY_META,
   staleOverDay, usageAmount, usedFraction, waitLabel, yesterdayIn, zoneAllocation, agoLabel,
   type Alert, type AlertKpis, type FleetStatusKpis, type ZoneKpis,
@@ -109,7 +109,7 @@ function Ageing({ k }: { k: FleetStatusKpis }) {
 
 function Hardware({ k }: { k: FleetStatusKpis }) {
   const healthy = healthyFraction(k) ?? 0;
-  const flagged = k.weakGps + staleOverDay(k);
+  const flagged = flaggedUnits(k);
   return (
     <Panel title="Hardware & sensor health"
       subtitle={`${Math.round(healthy * 100)}% of fleet fully healthy (${k.total - flagged} / ${k.total})`}>

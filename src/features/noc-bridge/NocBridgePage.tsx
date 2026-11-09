@@ -27,7 +27,7 @@ import { getClientDevices }   from "../../api/services/clients.service";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
 import type { Geozone } from "../../api/types";
 import { checkGeozoneTransitions } from "../../utils/geofenceUtils";
-import { readPosition } from "../../utils/livePosition";
+import { motionText, readPosition } from "../../utils/livePosition";
 import type { LiveFrame, LivePosition, MotionStatus } from "../../utils/livePosition";
 import { LiveFleet, limiter } from "../../utils/liveFleet";
 import type { Point }              from "../../utils/geofenceUtils";
@@ -46,6 +46,13 @@ const ICONS: Record<string, string> = {
 };
 
 const DEFAULT_CENTER = { lat: 1.3733, lng: 32.2903 };
+
+/** A unit's status here: its motion, or, with nothing live, Offline (it has
+ *  reported before) or No data (it never has), as the Dashboard counts them. */
+type UnitStatus = MotionStatus | "No data";
+
+/** How often the server is asked which quiet units have never reported. */
+const UNIT_STATES_EVERY_MS = 120_000;
 
 // InfoWindow CSS — strips Google's default padding/background
 const IW_CSS = `
@@ -78,7 +85,7 @@ interface VehicleUnit {
   imei:                string;
   name:                string;
   subscription_status: string;
-  status:              MotionStatus;
+  status:              UnitStatus;
   speed:               number;
   motion_state:        string;
   geocoded_location:   string;
@@ -103,11 +110,12 @@ interface VehicleUnit {
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
-const STATUS_META: Record<MotionStatus, { bg: string; dim: string; text: string; dot: string; badge: string; badgeText: string }> = {
+const STATUS_META: Record<UnitStatus, { bg: string; dim: string; text: string; dot: string; badge: string; badgeText: string }> = {
   Moving:  { bg: "#2E7D32", dim: "rgba(46,125,50,0.88)",   text: "Moving",  dot: "#2E7D32", badge: "#E8F5E9", badgeText: "#2E7D32" },
   Parked:  { bg: "#C62828", dim: "rgba(198,40,40,0.88)",   text: "Parked",  dot: "#C62828", badge: "#FFEBEE", badgeText: "#C62828" },
   Idling:  { bg: "#1565C0", dim: "rgba(21,101,192,0.88)",  text: "Idling",  dot: "#1565C0", badge: "#E3F2FD", badgeText: "#1565C0" },
   Offline: { bg: "#455A64", dim: "rgba(69,90,100,0.85)",   text: "Offline", dot: "#607D8B", badge: "#F1F3F4", badgeText: "#607D8B" },
+  "No data": { bg: "#78909C", dim: "rgba(120,144,156,0.85)", text: "No data", dot: "#B0BEC5", badge: "#F5F7F8", badgeText: "#8696A0" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -223,7 +231,7 @@ function buildWaitingHtml(name: string): string {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: MotionStatus }) {
+function StatusBadge({ status }: { status: UnitStatus }) {
   const c = STATUS_META[status] ?? STATUS_META.Offline;
   return (
     <span className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded"
@@ -274,7 +282,7 @@ export default function NocBridgePage() {
   const [listError, setListError]     = useState<string | null>(null);
   const [searchQ, setSearchQ]         = useState("");
   const [page, setPage]               = useState(1);
-  const [statusFilter, setStatusFilter] = useState<MotionStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<UnitStatus | "">("");
   const [selectedImei, setSelectedImei] = useState<string | null>(null);
   const canPlayback = useCan("track.playback.view");
 
@@ -289,6 +297,9 @@ export default function NocBridgePage() {
   const liveFix      = useRef(new Set<string>());
   /** Units whose last known position has been asked for. */
   const seeded       = useRef(new Set<string>());
+  /** Units the server says have never reported (no position, no heartbeat).
+   *  The live feed alone cannot tell them from units that went quiet. */
+  const neverReported = useRef(new Set<string>());
   const pendingFocus = useRef<string | null>(null);
   const activePopup  = useRef<string | null>(null);
 
@@ -449,7 +460,7 @@ export default function NocBridgePage() {
     }
 
     if (frame.kind === "offline") {
-      u.status = "Offline";
+      u.status = quietStatus(imei);
       tick();
       const m = ensureMarker(u);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -472,8 +483,11 @@ export default function NocBridgePage() {
     const { lat, lng } = p;
     liveFix.current.add(imei);
 
-    u.speed             = p.speed;
-    u.motion_state      = p.motionState;
+    // p.status follows the fleet status rule (liveStatus): a quiet unit is
+    // Offline, or Parked while its tracker sleeps; the text says which, and
+    // since when. A speed from an old report is not current.
+    u.speed             = p.reporting ? p.speed : 0;
+    u.motion_state      = motionText(p);
     u.status            = p.status;
     u.coords            = { lat, lng };
     u.geocoded_location = p.geocoded || u.geocoded_location || "";
@@ -654,12 +668,41 @@ export default function NocBridgePage() {
     }
   }
 
+  /** A unit with nothing live: No data if it has never reported, else Offline. */
+  function quietStatus(imei: string): UnitStatus {
+    return neverReported.current.has(imei) ? "No data" : "Offline";
+  }
+
+  /** Which units have never reported, from the fleet summary (the Dashboard's
+   *  counts): the feed says only "no data" for them and for quiet ones alike.
+   *  A server without the summary, or without unit_states, leaves all of
+   *  them Offline, as before. */
+  async function loadUnitStates(clientUid: string) {
+    try {
+      const res = await fleetFetch("GET", `/fleet/${encodeURIComponent(clientUid)}/summary`) as
+        { status?: string; data?: { unit_states?: Record<string, string> } } | null;
+      const states = res?.status === "success" ? res.data?.unit_states : undefined;
+      if (!states || typeof states !== "object") return;
+      neverReported.current = new Set(
+        Object.entries(states).filter(([, state]) => state === "never_reported").map(([imei]) => imei));
+      let changed = false;
+      units.current.forEach((u, imei) => {
+        if (u.status !== "Offline" && u.status !== "No data") return;
+        const next = quietStatus(imei);
+        if (u.status !== next) { u.status = next; changed = true; }
+      });
+      if (changed) tick();
+    } catch { /* the summary is extra: units stay Offline */ }
+  }
+
   // The feed is made once; it calls the latest render's handlers.
   const onFrameRef = useRef(onFrame);
   const seedLastKnownRef = useRef(seedLastKnown);
+  const loadUnitStatesRef = useRef(loadUnitStates);
   useEffect(() => {
     onFrameRef.current = onFrame;
     seedLastKnownRef.current = seedLastKnown;
+    loadUnitStatesRef.current = loadUnitStates;
   });
 
   // ── Bootstrap ────────────────────────────────────────────────────────────
@@ -671,6 +714,8 @@ export default function NocBridgePage() {
       skip: (imei) => String(units.current.get(imei)?.subscription_status).toLowerCase() === "expired",
     });
     fleet.current = feed;
+    let stopped = false;
+    let statesTimer: number | undefined;
 
     const initMap = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -718,9 +763,22 @@ export default function NocBridgePage() {
       const accountUid  = (dataLevel === "client" || dataLevel === "inhouse")
         ? (getCookie("_nvxs_account_root") ?? rawUid) : rawUid;
       await loadUnits(dataLevel, accountUid);
+      // A customer's own fleet: the server says which quiet units never reported.
+      if (dataLevel === "client" && !stopped) {
+        let busy = false;
+        const ask = () => {
+          if (busy || stopped) return;
+          busy = true;
+          loadUnitStatesRef.current(accountUid).finally(() => { busy = false; });
+        };
+        ask();
+        statesTimer = window.setInterval(ask, UNIT_STATES_EVERY_MS);
+      }
     })();
 
     return () => {
+      stopped = true;
+      window.clearInterval(statesTimer);
       feed.stop();
       if (fleet.current === feed) fleet.current = null;
       if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
@@ -948,11 +1006,13 @@ export default function NocBridgePage() {
         <div className="min-h-0 flex flex-col bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
 
           {/* KPI strip */}
-          <div className="shrink-0 grid grid-cols-4 gap-1.5 p-3 border-b border-[#E9EDEF]">
+          <div className="shrink-0 grid grid-cols-3 gap-1.5 p-3 border-b border-[#E9EDEF]">
             <KpiChip label="All"     value={allUnits.length}           active={statusFilter === ""} onClick={() => { setStatusFilter(""); setPage(1); }} />
             <KpiChip label="Moving"  value={statusCounts["Moving"]  ?? 0} active={statusFilter === "Moving"}  onClick={() => { setStatusFilter("Moving"); setPage(1); }} />
             <KpiChip label="Parked"  value={statusCounts["Parked"]  ?? 0} active={statusFilter === "Parked"}  onClick={() => { setStatusFilter("Parked"); setPage(1); }} />
             <KpiChip label="Idle"    value={statusCounts["Idling"]  ?? 0} active={statusFilter === "Idling"}  onClick={() => { setStatusFilter("Idling"); setPage(1); }} />
+            <KpiChip label="Offline" value={statusCounts["Offline"] ?? 0} active={statusFilter === "Offline"} onClick={() => { setStatusFilter("Offline"); setPage(1); }} />
+            <KpiChip label="No data" value={statusCounts["No data"] ?? 0} active={statusFilter === "No data"} onClick={() => { setStatusFilter("No data"); setPage(1); }} />
           </div>
 
           {/* Search */}
@@ -1066,7 +1126,7 @@ export default function NocBridgePage() {
             </button>
             {/* Status legend */}
             <div className="hidden sm:flex items-center gap-3">
-              {(["Moving", "Parked", "Idling", "Offline"] as MotionStatus[]).map((s) => (
+              {(["Moving", "Parked", "Idling", "Offline", "No data"] as UnitStatus[]).map((s) => (
                 <div key={s} className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: STATUS_META[s].dot }} />
                   <span className="text-[10px] text-[#667781]">{s}</span>
