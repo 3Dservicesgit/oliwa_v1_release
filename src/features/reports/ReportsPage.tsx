@@ -157,7 +157,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
   return (
     <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl shadow-lg border text-[13px] font-black flex items-center gap-3 ${
       type === "success"
-        ? "bg-[#25D366]/10 border-[#25D366]/30 text-[#128C7E]"
+        ? "bg-[#25D366]/10 border-[#25D366]/30 text-[var(--brand)]"
         : "bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]"
     }`}>
       <span>{message}</span>
@@ -200,7 +200,7 @@ function ConfirmDialog({
             className={`h-9 px-4 rounded-lg border text-[12px] font-black cursor-pointer transition-all ${
               isDestructive
                 ? "bg-[#EF4444] border-[#EF4444] text-white hover:bg-[#DC2626]"
-                : "bg-[#128C7E] border-[#128C7E] text-white hover:bg-[#0E7A6E]"
+                : "bg-[var(--brand)] border-[var(--brand)] text-white hover:bg-[var(--brand-dark)]"
             }`}
           >
             {confirmLabel}
@@ -394,7 +394,7 @@ function ReportDetailsDrawer({
               <button
                 onClick={handleDrawerRegenerate}
                 disabled={drawerRegenerating}
-                className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[#0E7A6E] disabled:opacity-50 transition-all"
+                className="w-full h-10 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[var(--brand-dark)] disabled:opacity-50 transition-all"
               >
                 {drawerRegenerating ? (
                   <>
@@ -411,7 +411,7 @@ function ReportDetailsDrawer({
             {!isClientDownload && isCompleted && report.file_link && report.file_link !== "NO_DIR_PATH" && (
               <button
                 onClick={handleDownload}
-                className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[#0E7A6E] transition-all"
+                className="w-full h-10 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black flex items-center justify-center gap-2 border-none cursor-pointer hover:bg-[var(--brand-dark)] transition-all"
               >
                 &#11015; Download Report
               </button>
@@ -635,7 +635,7 @@ function GenerateForm({
         <select
           value={reportType}
           onChange={(e) => setReportType(e.target.value as ReportType)}
-          className="w-full h-11 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all cursor-pointer"
+          className="w-full h-11 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all cursor-pointer"
         >
           {reportTypes.map((t) => (
             <option key={t.key} value={t.key}>
@@ -653,7 +653,7 @@ function GenerateForm({
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
           />
         </div>
         <div>
@@ -662,7 +662,7 @@ function GenerateForm({
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
           />
         </div>
       </div>
@@ -676,7 +676,7 @@ function GenerateForm({
           <button
             type="button"
             onClick={selectAll}
-            className="text-[11px] font-black text-[#128C7E] cursor-pointer border-none bg-transparent"
+            className="text-[11px] font-black text-[var(--brand)] cursor-pointer border-none bg-transparent"
           >
             {selectedDevices.length === filteredDevices.length && filteredDevices.length > 0
               ? "Deselect All"
@@ -689,7 +689,7 @@ function GenerateForm({
             value={searchDevice}
             onChange={(e) => setSearchDevice(e.target.value)}
             placeholder="Search devices..."
-            className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 pr-8 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+            className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 pr-8 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)]"
           />
           {searchDevice && (
             <button
@@ -704,7 +704,7 @@ function GenerateForm({
         <div className="border border-[#E9EDEF] rounded-lg max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {devicesLoading ? (
             <div className="flex items-center justify-center py-6 text-[12px] text-[#667781]">
-              <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin mr-2" />
+              <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin mr-2" />
               Loading devices...
             </div>
           ) : filteredDevices.length === 0 ? (
@@ -718,14 +718,14 @@ function GenerateForm({
                 <label
                   key={d.device_imei}
                   className={`flex items-center gap-2.5 px-3 py-2 border-b border-[#E9EDEF] last:border-0 cursor-pointer hover:bg-[#F0F2F5] transition-colors ${
-                    checked ? "bg-[#128C7E]/5" : ""
+                    checked ? "bg-[var(--brand)]/5" : ""
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleDevice(d.device_imei)}
-                    className="accent-[#128C7E] shrink-0"
+                    className="accent-[var(--brand)] shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-black text-[#111B21] truncate">
@@ -894,11 +894,11 @@ function GenerateForm({
       <button
         onClick={handleGenerate}
         disabled={generating || selectedDevices.length === 0}
-        className="w-full h-11 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="w-full h-11 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         {generating ? (
           <span className="flex items-center justify-center gap-2">
-            <span className="w-4 h-4 border-2 border-[#075E54] border-t-transparent rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-[var(--brand-dark)] border-t-transparent rounded-full animate-spin" />
             Generating...
           </span>
         ) : (
@@ -1164,7 +1164,7 @@ function ReportHistory({
             onClick={() => setFilterType("all")}
             className={`h-7 px-3 rounded-full text-[11px] font-black border cursor-pointer transition-all ${
               filterType === "all"
-                ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                 : "bg-white border-[#E9EDEF] text-[#667781]"
             }`}
           >
@@ -1181,7 +1181,7 @@ function ReportHistory({
                 onClick={() => setFilterType(t)}
                 className={`h-7 px-3 rounded-full text-[11px] font-black border cursor-pointer transition-all ${
                   filterType === t
-                    ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                    ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                     : "bg-white border-[#E9EDEF] text-[#667781]"
                 }`}
               >
@@ -1196,7 +1196,7 @@ function ReportHistory({
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
             <span className="text-[12px] text-[#667781]">Loading reports...</span>
           </div>
         </div>
@@ -1268,10 +1268,10 @@ function ReportHistory({
                             onClick={() => handleRegenerate(r)}
                             disabled={regenerating === r.file_request_uid}
                             title="Re-download report"
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[12px] cursor-pointer hover:bg-[#128C7E]/20 disabled:opacity-50 transition-all"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/30 text-[var(--brand)] text-[12px] cursor-pointer hover:bg-[var(--brand)]/20 disabled:opacity-50 transition-all"
                           >
                             {regenerating === r.file_request_uid ? (
-                              <span className="w-3 h-3 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                              <span className="w-3 h-3 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                             ) : (
                               <>&#11015;</>
                             )}
@@ -1280,7 +1280,7 @@ function ReportHistory({
                           <button
                             onClick={() => handleDownload(r)}
                             title="Download report"
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[12px] cursor-pointer hover:bg-[#128C7E]/20 transition-all"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/30 text-[var(--brand)] text-[12px] cursor-pointer hover:bg-[var(--brand)]/20 transition-all"
                           >
                             &#11015;
                           </button>
@@ -1495,8 +1495,8 @@ export function ReportsPage() {
 
             {/* LEFT: Generate Form */}
             <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden flex flex-col">
-              <div className="px-4 py-3 border-b border-[#E9EDEF] bg-[#128C7E]/5">
-                <h3 className="font-black text-[14px] text-[#128C7E]">Generate Report</h3>
+              <div className="px-4 py-3 border-b border-[#E9EDEF] bg-[var(--brand)]/5">
+                <h3 className="font-black text-[14px] text-[var(--brand)]">Generate Report</h3>
                 <p className="text-[11px] text-[#667781] mt-0.5">
                   Select type, devices, and date range to generate a report.
                 </p>

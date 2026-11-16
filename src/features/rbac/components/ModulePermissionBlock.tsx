@@ -123,7 +123,7 @@ export function ModulePermissionBlock({
             <span className="text-[11px] text-[#667781]">
               <span
                 className={
-                  selectedCount > 0 ? "font-extrabold text-[#128C7E]" : ""
+                  selectedCount > 0 ? "font-extrabold text-[var(--brand)]" : ""
                 }
               >
                 {selectedCount}
@@ -247,7 +247,7 @@ function PermissionTile({
     >
       <input
         type="checkbox"
-        className="accent-[#128C7E] w-3.5 h-3.5 shrink-0"
+        className="accent-[var(--brand)] w-3.5 h-3.5 shrink-0"
         checked={isSelected}
         disabled={disabled}
         onChange={(e) => onToggle(e.target.checked)}

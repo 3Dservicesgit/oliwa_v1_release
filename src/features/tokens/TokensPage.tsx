@@ -17,7 +17,7 @@ const okBg  = "bg-[#25D366] text-[#053B33]";
 const warnBg = "bg-[#F59E0B] text-white";
 const alarmBg = "bg-[#F97316] text-white";
 const critBg = "bg-[#EF4444] text-white";
-const darkBg = "bg-[#075E54] text-white";
+const darkBg = "bg-[var(--brand-dark)] text-white";
 const azureBg = "bg-[#34B7F1] text-white";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
@@ -872,7 +872,7 @@ const MODAL_PARAMS = [
 
 // ─── Token type → icon/colour metadata (Explorer-style file icons) ───────────
 const TOKEN_TYPE_META: Record<string, { icon: string; tint: string; text: string }> = {
-  time:        { icon: "⏱",  tint: "bg-[#128C7E]/10", text: "text-[#0E7A6D]" },
+  time:        { icon: "⏱",  tint: "bg-[var(--brand)]/10", text: "text-[var(--brand-dark)]" },
   parameter:   { icon: "⚙",  tint: "bg-[#34B7F1]/10", text: "text-[#1E88B5]" },
   event:       { icon: "⚡", tint: "bg-[#F97316]/10", text: "text-[#C2570B]" },
   volume:      { icon: "🛢", tint: "bg-[#3B82F6]/10", text: "text-[#2563EB]" },
@@ -1212,8 +1212,8 @@ export function TokensPage() {
     const iconEl = (
       <div className={`${sz.box} rounded-xl ${meta.tint} ${meta.text} grid place-items-center ${sz.text} shrink-0`}>{meta.icon}</div>
     );
-    const rowSel = isSel ? "bg-[#128C7E]/10 ring-1 ring-inset ring-[#128C7E]/30" : "hover:bg-[#F8FAFC]";
-    const cardSel = isSel ? "border-[#128C7E] bg-[#128C7E]/5 ring-1 ring-[#128C7E]/30" : "border-[#E9EDEF] bg-white hover:border-[#128C7E]/40 hover:shadow-sm";
+    const rowSel = isSel ? "bg-[var(--brand)]/10 ring-1 ring-inset ring-[var(--brand)]/30" : "hover:bg-[#F8FAFC]";
+    const cardSel = isSel ? "border-[var(--brand)] bg-[var(--brand)]/5 ring-1 ring-[var(--brand)]/30" : "border-[#E9EDEF] bg-white hover:border-[var(--brand)]/40 hover:shadow-sm";
     const actionFade = `transition-opacity ${isSel ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`;
     const common = {
       key: token.token_id || i,
@@ -1259,7 +1259,7 @@ export function TokensPage() {
             <div className="text-[10px] text-[#667781] truncate capitalize">
               {token.token_type || "—"}{token.product?.product_name ? ` · ${String(token.product.product_name).toUpperCase()}` : ""}
             </div>
-            <div className="text-[12px] font-black text-[#128C7E] mt-1 truncate">{fmtAmount(token)}</div>
+            <div className="text-[12px] font-black text-[var(--brand)] mt-1 truncate">{fmtAmount(token)}</div>
           </div>
           <div className={`shrink-0 ${actionFade}`}>{renderTokenActions(token)}</div>
         </div>
@@ -1325,7 +1325,7 @@ export function TokensPage() {
               </>
             ) : (
               [
-                { label: "Running Tokens", value: stats.runningTokens.toString(), pct: Math.min(stats.runningTokens / 100 * 100, 100), tone: "bg-[#128C7E]" },
+                { label: "Running Tokens", value: stats.runningTokens.toString(), pct: Math.min(stats.runningTokens / 100 * 100, 100), tone: "bg-[var(--brand)]" },
                 { label: "Expired Tokens", value: stats.expiredTokens.toString(), pct: Math.min(stats.expiredTokens / 100 * 100, 100), tone: "bg-[#F97316]" },
                 { label: "Active VEBA Tokens", value: stats.activeVebaTokens.toString(), pct: Math.min(stats.activeVebaTokens / 100 * 100, 100), tone: "bg-[#F97316]" },
                 { label: "Expired VEBA Tokens", value: stats.expiredVebaTokens.toString(), pct: Math.min(stats.expiredVebaTokens / 100 * 100, 100), tone: "bg-[#25D366]" },
@@ -1359,7 +1359,7 @@ export function TokensPage() {
                   value={tokenSearch}
                   onChange={(e) => setTokenSearch(e.target.value)}
                   placeholder="Search tokens…"
-                  className="h-8 w-[200px] max-w-[42vw] pl-7 pr-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+                  className="h-8 w-[200px] max-w-[42vw] pl-7 pr-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all"
                 />
               </div>
 
@@ -1368,7 +1368,7 @@ export function TokensPage() {
                 <button
                   onClick={() => setViewMenuOpen((o) => !o)}
                   title="Change view"
-                  className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${viewMenuOpen ? "bg-[#128C7E] text-white border-[#128C7E]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                  className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${viewMenuOpen ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
                 >
                   <span className="text-[13px] leading-none">{TOKEN_VIEW_OPTIONS.find((o) => o.key === tokenView)?.glyph}</span>
                   View
@@ -1384,7 +1384,7 @@ export function TokensPage() {
                           onClick={() => { setTokenView(o.key); setViewMenuOpen(false); }}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
                         >
-                          <span className="w-3 text-[#128C7E] text-[10px]">{tokenView === o.key ? "●" : ""}</span>
+                          <span className="w-3 text-[var(--brand)] text-[10px]">{tokenView === o.key ? "●" : ""}</span>
                           <span className="w-4 text-[14px] text-[#667781] text-center">{o.glyph}</span>
                           <span className={tokenView === o.key ? "font-black text-[#111B21]" : "text-[#111B21]"}>{o.label}</span>
                         </button>
@@ -1397,7 +1397,7 @@ export function TokensPage() {
               <PermissionGate permission="tokens.create">
                 <button
                   onClick={() => setCreateBladeOpen(true)}
-                  className="h-8 px-3 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105 flex items-center gap-1"
+                  className="h-8 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-black border-none cursor-pointer hover:brightness-105 flex items-center gap-1"
                 >
                   <span className="text-[15px] leading-none">+</span> New Token
                 </button>
@@ -1449,8 +1449,8 @@ export function TokensPage() {
                       { key: "amount", label: "Amount" },
                       { key: "date_created", label: "Created" },
                     ].map((c) => (
-                      <button key={c.key} onClick={() => toggleSort(c.key)} className="text-left flex items-center gap-1 text-[10px] font-black text-[#667781] uppercase tracking-wide bg-transparent border-none cursor-pointer hover:text-[#128C7E] transition-colors">
-                        {c.label}<span className="text-[8px] text-[#128C7E]">{sortArrow(c.key)}</span>
+                      <button key={c.key} onClick={() => toggleSort(c.key)} className="text-left flex items-center gap-1 text-[10px] font-black text-[#667781] uppercase tracking-wide bg-transparent border-none cursor-pointer hover:text-[var(--brand)] transition-colors">
+                        {c.label}<span className="text-[8px] text-[var(--brand)]">{sortArrow(c.key)}</span>
                       </button>
                     ))}
                     <span className="text-[10px] font-black text-[#667781] uppercase tracking-wide text-right pr-1">Actions</span>
@@ -1460,7 +1460,7 @@ export function TokensPage() {
                       const meta = tokenMeta(token.token_type);
                       const isSel = selectedTokenId === token.token_id;
                       return (
-                        <div key={token.token_id || i} onClick={() => setSelectedTokenId(token.token_id)} onDoubleClick={() => handleViewToken(token.token_id)} className={`group grid grid-cols-[minmax(0,2.4fr)_0.9fr_1.1fr_1.1fr_0.9fr_auto] items-center gap-2 px-3 py-2 rounded-lg cursor-default transition-colors ${isSel ? "bg-[#128C7E]/10 ring-1 ring-inset ring-[#128C7E]/30" : "hover:bg-[#F8FAFC]"}`}>
+                        <div key={token.token_id || i} onClick={() => setSelectedTokenId(token.token_id)} onDoubleClick={() => handleViewToken(token.token_id)} className={`group grid grid-cols-[minmax(0,2.4fr)_0.9fr_1.1fr_1.1fr_0.9fr_auto] items-center gap-2 px-3 py-2 rounded-lg cursor-default transition-colors ${isSel ? "bg-[var(--brand)]/10 ring-1 ring-inset ring-[var(--brand)]/30" : "hover:bg-[#F8FAFC]"}`}>
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className={`w-8 h-8 rounded-lg ${meta.tint} ${meta.text} grid place-items-center text-[15px] shrink-0`}>{meta.icon}</div>
                             <div className="min-w-0">
@@ -1506,7 +1506,7 @@ export function TokensPage() {
           <div className="bg-white w-full max-w-[500px] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
 
             {/* Blade header */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-[#075E54] shrink-0">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-[var(--brand-dark)] shrink-0">
               <span className="font-black text-[15px] text-white">New Token</span>
               <button onClick={() => setCreateBladeOpen(false)} className="w-8 h-8 rounded-lg bg-white/10 border border-white/25 text-white font-black text-[14px] cursor-pointer grid place-items-center">✕</button>
             </div>
@@ -1522,7 +1522,7 @@ export function TokensPage() {
                     value={createForm.token_name}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, token_name: e.target.value }))}
                     placeholder="Enter Name"
-                    className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[#128C7E]"
+                    className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[var(--brand)]"
                   />
                 </div>
                 <div>
@@ -1530,7 +1530,7 @@ export function TokensPage() {
                   <select
                     value={createForm.token_type}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, token_type: e.target.value }))}
-                    className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[#128C7E]"
+                    className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[var(--brand)]"
                   >
                     <option value="">Select Type</option>
                     <option value="dynamic">Dynamic</option>
@@ -1546,7 +1546,7 @@ export function TokensPage() {
                       value={createForm.token_amount}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, token_amount: e.target.value }))}
                       placeholder="Enter Amount"
-                      className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[#128C7E]"
+                      className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[var(--brand)]"
                     />
                   </div>
                   <div>
@@ -1554,7 +1554,7 @@ export function TokensPage() {
                     <select
                       value={createForm.token_currency}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, token_currency: e.target.value }))}
-                      className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[#128C7E]"
+                      className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[var(--brand)]"
                     >
                       <option value="">Select Currency</option>
                       <option value="ugx">UGX</option>
@@ -1569,7 +1569,7 @@ export function TokensPage() {
                     value={createForm.token_validity}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, token_validity: e.target.value }))}
                     placeholder="Enter Validity"
-                    className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[#128C7E]"
+                    className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[var(--brand)]"
                   />
                 </div>
                 {createForm.token_type === "parameter" && (
@@ -1582,7 +1582,7 @@ export function TokensPage() {
                         const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                         setCreateForm(prev => ({ ...prev, parameters: selectedOptions }));
                       }}
-                      className="w-full h-40 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[#128C7E] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      className="w-full h-40 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] outline-none focus:border-[var(--brand)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     >
                       <optgroup label="Xirgo Parameters">
                         {XIRGO_PARAMS.map(p => (
@@ -1621,7 +1621,7 @@ export function TokensPage() {
                         const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                         setCreateForm(prev => ({ ...prev, parameters: selectedOptions }));
                       }}
-                      className="w-full h-32 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      className="w-full h-32 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     >
                       <optgroup label="Xirgo Parameters">
                         {XIRGO_PARAMS.map(p => (
@@ -1673,7 +1673,7 @@ export function TokensPage() {
               <button
                 onClick={handleCreateToken}
                 disabled={createLoading}
-                className="h-9 px-5 rounded-lg bg-[#128C7E] border-none text-white text-[12px] font-black cursor-pointer hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-9 px-5 rounded-lg bg-[var(--brand)] border-none text-white text-[12px] font-black cursor-pointer hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {createLoading ? "Creating..." : "Create Token"}
               </button>
@@ -1688,7 +1688,7 @@ export function TokensPage() {
           <div className="bg-white w-full max-w-[500px] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
 
             {/* Side blade header */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-[#075E54] shrink-0">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-[var(--brand-dark)] shrink-0">
               <span className="font-black text-[15px] text-white">
                 {editMode ? 'Edit Token' : 'Token Details'}
               </span>
@@ -1719,7 +1719,7 @@ export function TokensPage() {
                           type="text"
                           value={editForm.token_name}
                           onChange={(e) => setEditForm(prev => ({ ...prev, token_name: e.target.value }))}
-                          className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                          className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
                         />
                       </div>
                       <div>
@@ -1727,7 +1727,7 @@ export function TokensPage() {
                         <select
                           value={editForm.token_type}
                           onChange={(e) => setEditForm(prev => ({ ...prev, token_type: e.target.value }))}
-                          className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                          className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
                         >
                           <option value="">Select Type</option>
                           <option value="dynamic">Dynamic</option>
@@ -1742,7 +1742,7 @@ export function TokensPage() {
                             type="number"
                             value={editForm.token_amount}
                             onChange={(e) => setEditForm(prev => ({ ...prev, token_amount: e.target.value }))}
-                            className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                            className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
                           />
                         </div>
                         <div>
@@ -1750,7 +1750,7 @@ export function TokensPage() {
                           <select
                             value={editForm.token_currency}
                             onChange={(e) => setEditForm(prev => ({ ...prev, token_currency: e.target.value }))}
-                            className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                            className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
                           >
                             <option value="ugx">UGX</option>
                             <option value="kes">KES</option>
@@ -1766,7 +1766,7 @@ export function TokensPage() {
                           type="number"
                           value={editForm.token_validity}
                           onChange={(e) => setEditForm(prev => ({ ...prev, token_validity: e.target.value }))}
-                          className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                          className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
                         />
                       </div>
                       {editForm.token_type === "parameter" && (
@@ -1779,7 +1779,7 @@ export function TokensPage() {
                               const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                               setEditForm(prev => ({ ...prev, parameters: selectedOptions }));
                             }}
-                            className="w-full h-32 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            className="w-full h-32 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                           >
                             <optgroup label="Xirgo Parameters">
                               {XIRGO_PARAMS.map(p => (
@@ -1873,7 +1873,7 @@ export function TokensPage() {
                 <button
                   onClick={handleUpdateToken}
                   disabled={editLoading}
-                  className="h-9 px-5 rounded-lg bg-[#128C7E] border-none text-white text-[12px] font-black cursor-pointer hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 px-5 rounded-lg bg-[var(--brand)] border-none text-white text-[12px] font-black cursor-pointer hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editLoading ? "Updating..." : "Update Token"}
                 </button>
@@ -1891,7 +1891,7 @@ export function TokensPage() {
 const pillStyles: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54]",
   azure: "bg-[#34B7F1] text-white",
-  teal:  "bg-[#128C7E] text-white",
+  teal:  "bg-[var(--brand)] text-white",
   ghost: "bg-white border border-[#E9EDEF] text-[#667781]",
 };
 

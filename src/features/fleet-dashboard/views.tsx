@@ -36,7 +36,7 @@ export function Section({ id, title, subtitle, action, children }: {
     <section id={id} aria-labelledby={`${id}-title`}
       className="scroll-mt-20 overflow-hidden rounded-2xl border border-[#E4E8EB] bg-white">
       <header className="flex flex-wrap items-center gap-3 border-b border-[#EEF1F3] bg-[#FAFBFC] px-5 py-3.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#E7F3F1] text-[#075E54]" aria-hidden="true">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand-dark)]" aria-hidden="true">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{ICONS[id]}</svg>
         </span>
         <div className="min-w-0 flex-1">
@@ -50,7 +50,7 @@ export function Section({ id, title, subtitle, action, children }: {
   );
 }
 
-const linkCls = "text-[14px] font-semibold text-[#075E54] hover:underline";
+const linkCls = "text-[14px] font-semibold text-[var(--brand-dark)] hover:underline";
 
 const minutes = (m: number) => (m < 1 ? "< 1m" : m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m / 60}h`);
 
@@ -187,7 +187,7 @@ function TopZones({ k }: { k: ZoneKpis }) {
             <div className="flex-1 min-w-0">
               <div className="truncate text-[15px] font-semibold text-[#111B21]">{z.name}</div>
               <div className="mt-2 h-[7px] rounded bg-[#F0F2F5] overflow-hidden">
-                <div className="h-full rounded bg-[#128C7E]" style={{ width: `${max ? (z.units / max) * 100 : 0}%` }} />
+                <div className="h-full rounded bg-[var(--brand)]" style={{ width: `${max ? (z.units / max) * 100 : 0}%` }} />
               </div>
             </div>
             <span className="w-10 text-right text-[16px] font-semibold tabular-nums">{z.units}</span>
@@ -274,7 +274,7 @@ function SosRow({ a, busy, onAck }: { a: Alert; busy: boolean; onAck: () => void
         <div className="truncate text-[12.5px] text-[#667781]">{["Critical", a.geozone, agoLabel(a.time, new Date())].filter(Boolean).join(" · ")}</div>
       </div>
       {isAcknowledged(a)
-        ? <span className="text-[13px] font-semibold text-[#075E54]">✓ Acknowledged</span>
+        ? <span className="text-[13px] font-semibold text-[var(--brand-dark)]">✓ Acknowledged</span>
         : <button type="button" disabled={busy || !a.id} onClick={onAck}
             className="rounded-xl bg-[#E53935] px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-60">{busy ? "…" : "Acknowledge"}</button>}
     </div>
@@ -318,7 +318,7 @@ function Categories({ k, onOpenLog }: { k: AlertKpis; onOpenLog: () => void }) {
       <div className="divide-y divide-[#E9EDEF]">
         {cats.map((c) => (
           <button key={c} type="button" onClick={onOpenLog} className="w-full text-left flex items-center gap-3.5 py-3 hover:bg-[#F8F9FA] rounded-lg">
-            <span className="w-[42px] h-[42px] rounded-xl bg-[#E7F3F1] text-[#075E54] text-[12px] font-bold flex items-center justify-center">{ALERT_CATEGORY_LABEL[c].slice(0, 3).toUpperCase()}</span>
+            <span className="w-[42px] h-[42px] rounded-xl bg-[var(--brand-soft)] text-[var(--brand-dark)] text-[12px] font-bold flex items-center justify-center">{ALERT_CATEGORY_LABEL[c].slice(0, 3).toUpperCase()}</span>
             <span className="flex-1 min-w-0">
               <span className="block text-[15px] font-semibold text-[#111B21]">{ALERT_CATEGORY_LABEL[c]}</span>
               <span className="block truncate text-[12.5px] text-[#667781]">{(k.titlesByCategory[c] ?? []).slice(0, 3).map((t) => `${t.title} ${t.n}`).join(" · ")}</span>
@@ -464,7 +464,7 @@ export function TokensSection({ t, s }: { t: TokensState; s: SummaryState }) {
                   </div>
                 </>
               )}
-              <div className="mt-4 text-[14.5px] font-semibold text-[#075E54]">
+              <div className="mt-4 text-[14.5px] font-semibold text-[var(--brand-dark)]">
                 {(() => { const [h, sub] = runwayText(r, t.usageLoading); return h === "Not in use" ? sub : `${h} · ${sub}`; })()}
               </div>
               <p className="mt-1.5 text-[12.5px] text-[#8696A0]">Amber below 7 days or 10% left, red below 3 days.</p>
@@ -488,7 +488,7 @@ export function TokensSection({ t, s }: { t: TokensState; s: SummaryState }) {
                 <div className="mt-4 flex flex-col gap-2">
                   {t.usage.services.map((sv) => (
                     <div key={sv.service} className="flex items-center gap-2 text-[13.5px]">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#128C7E]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-[var(--brand)]" />
                       <span className="flex-1">{sv.service}</span>
                       <span className="font-semibold">{usageAmount(sv.averagePerDay, sv.unit)}</span>
                       <span className="text-[#667781]">a day</span>

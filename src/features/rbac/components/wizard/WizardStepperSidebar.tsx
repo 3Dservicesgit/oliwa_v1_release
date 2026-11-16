@@ -63,7 +63,7 @@ export function WizardStepperSidebar({ steps, activeStep, completedSteps, onStep
                   isCompleted
                     ? "bg-[#25D366] text-white"
                     : isActive
-                    ? "bg-[#128C7E] text-white"
+                    ? "bg-[var(--brand)] text-white"
                     : "bg-[#E9EDEF] text-[#667781]"
                 }`}
               >
@@ -80,7 +80,7 @@ export function WizardStepperSidebar({ steps, activeStep, completedSteps, onStep
               <div className="min-w-0">
                 <div
                   className={`text-[12px] font-black truncate ${
-                    isActive ? "text-[#111B21]" : isCompleted ? "text-[#128C7E]" : "text-[#667781]"
+                    isActive ? "text-[#111B21]" : isCompleted ? "text-[var(--brand)]" : "text-[#667781]"
                   }`}
                 >
                   {step.title}

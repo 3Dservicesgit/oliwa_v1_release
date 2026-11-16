@@ -34,7 +34,7 @@ export function PermitBadge({ driver }: { driver: Driver }) {
 export function DriverAvatar({ driver, size = 40 }: { driver: Driver; size?: number }) {
   const load = useCallback(() => driverPhotoUrl(driver.driver_uid), [driver.driver_uid]);
   const fallback = (
-    <div style={{ width: size, height: size }} className="rounded-full bg-[#E7F3F1] text-[#075E54] font-black text-[13px] grid place-items-center shrink-0">
+    <div style={{ width: size, height: size }} className="rounded-full bg-[var(--brand-soft)] text-[var(--brand-dark)] font-black text-[13px] grid place-items-center shrink-0">
       {initials(driver.full_name)}
     </div>
   );
@@ -185,7 +185,7 @@ export function DriverFormPanel({ existing, onClose, onSaved }: {
         <div className={LABEL}>Permit class(es) *</div>
         <div className="grid grid-cols-2 gap-1.5">
           {PERMIT_CLASSES.map((c) => (
-            <label key={c.code} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-[12px] ${classes.includes(c.code) ? "border-[#128C7E] bg-[#E9F7F4]" : "border-[#E9EDEF]"}`}>
+            <label key={c.code} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-[12px] ${classes.includes(c.code) ? "border-[var(--brand)] bg-[#E9F7F4]" : "border-[#E9EDEF]"}`}>
               <input type="checkbox" checked={classes.includes(c.code)} className="mt-0.5"
                 onChange={(e) => setClasses((prev) => e.target.checked ? [...prev, c.code] : prev.filter((x) => x !== c.code))} />
               <span><b>{c.code}</b> <span className="text-[#667781]">{c.covers}</span></span>
@@ -354,7 +354,7 @@ export function DriverDetailsPanel({ driverUid, units, canManage, onClose, onCha
               <div className="flex gap-1.5 flex-wrap"><StatusBadge status={driver.status} /><PermitBadge driver={driver} /></div>
               {driver.status_reason && driver.status !== "active" && <div className="text-[12px] text-[#667781]">Reason: {driver.status_reason}</div>}
               {canManage && (
-                <label className="text-[12px] font-extrabold text-[#128C7E] cursor-pointer">
+                <label className="text-[12px] font-extrabold text-[var(--brand)] cursor-pointer">
                   {driver.has_photo ? "Change photo" : "Add photo"}
                   <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => void choosePhoto(e.target.files?.[0])} />
                 </label>
@@ -413,7 +413,7 @@ export function DriverDetailsPanel({ driverUid, units, canManage, onClose, onCha
               <div className="flex gap-1.5 flex-wrap">
                 {STATUSES.map((s) => (
                   <button key={s} type="button" onClick={() => changeStatus(s)} disabled={s === driver.status}
-                    className={`h-8 px-3 rounded-lg text-[12px] font-extrabold cursor-pointer border ${s === driver.status ? "border-[#128C7E] bg-[#E9F7F4] text-[#075E54] cursor-default" : "border-[#E9EDEF] bg-white text-[#111B21]"}`}>
+                    className={`h-8 px-3 rounded-lg text-[12px] font-extrabold cursor-pointer border ${s === driver.status ? "border-[var(--brand)] bg-[#E9F7F4] text-[#075E54] cursor-default" : "border-[#E9EDEF] bg-white text-[#111B21]"}`}>
                     {statusLabel(s)}
                   </button>
                 ))}

@@ -27,10 +27,10 @@ const statusCls: Record<string, string> = {
   Unacked: "bg-[#FFEBEE] text-[#C62828]", Ack: "bg-[#EAFBEF] text-[#1A7A3A]",
 };
 const costCls: Record<string, string> = {
-  H: "bg-[#128C7E] text-white", M: "bg-[#F97316] text-white", L: "bg-[#FBBF24] text-[#111]",
+  H: "bg-[var(--brand)] text-white", M: "bg-[#F97316] text-white", L: "bg-[#FBBF24] text-[#111]",
 };
 const clusterCls: Record<string, string> = {
-  A: "bg-[#128C7E]", B: "bg-[#F97316]", C: "bg-[#FBBF24]",
+  A: "bg-[var(--brand)]", B: "bg-[#F97316]", C: "bg-[#FBBF24]",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ export function AlarmFactoryPage() {
             <div className="px-4 py-3 flex flex-col gap-2">
               {CORRELATION_BULLETS.map((b, i) => (
                 <div key={i} className="flex gap-2 text-[12px] leading-relaxed">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#128C7E] shrink-0 mt-[7px]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] shrink-0 mt-[7px]" />
                   <span><strong className="text-[#111B21]">{b.label}</strong>{" "}<span className="text-[#667781]">{b.text}</span></span>
                 </div>
               ))}
@@ -336,7 +336,7 @@ export function AlarmFactoryPage() {
                     { n:"2", title:"AI ranks operators",    sub:"distance + rating + availability" },
                   ].map(s => (
                     <div key={s.n} className="flex items-start gap-3">
-                      <span className="w-7 h-7 rounded-full bg-[#128C7E] text-white text-[12px] font-black grid place-items-center shrink-0">{s.n}</span>
+                      <span className="w-7 h-7 rounded-full bg-[var(--brand)] text-white text-[12px] font-black grid place-items-center shrink-0">{s.n}</span>
                       <div>
                         <div className="font-extrabold text-[12px] text-[#111B21]">{s.title}</div>
                         <div className="text-[11px] text-[#667781]">{s.sub}</div>
@@ -461,7 +461,7 @@ export function AlarmFactoryPage() {
             <div className="px-4 py-3 flex flex-col gap-3">
               {RUNBOOKS.map((rb) => (
                 <div key={rb.title} className="flex items-start gap-3">
-                  <span className="w-8 h-8 rounded-full bg-[#128C7E] text-white text-[10px] font-black grid place-items-center shrink-0">RB</span>
+                  <span className="w-8 h-8 rounded-full bg-[var(--brand)] text-white text-[10px] font-black grid place-items-center shrink-0">RB</span>
                   <div>
                     <div className="font-extrabold text-[12px] text-[#111B21]">{rb.title}</div>
                     <div className="text-[11px] text-[#667781] mt-0.5">{rb.steps}</div>
@@ -507,7 +507,7 @@ export function AlarmFactoryPage() {
                     onClick={() => setModalTab(t)}
                     className={`w-full text-left px-4 py-2.5 text-[13px] border-none cursor-pointer transition-colors ${
                       modalTab === t
-                        ? "font-black text-[#128C7E] bg-white border-l-[3px] border-l-[#128C7E]"
+                        ? "font-black text-[var(--brand)] bg-white border-l-[3px] border-l-[var(--brand)]"
                         : "font-semibold text-[#667781] bg-transparent hover:bg-[#F0F2F5]"
                     }`}
                   >
@@ -539,7 +539,7 @@ export function AlarmFactoryPage() {
                         <label className="text-[12px] font-extrabold text-[#111B21] mb-1.5 block">{f.label}</label>
                         <input
                           defaultValue={f.value}
-                          className="w-full h-10 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                          className="w-full h-10 rounded-lg border border-[#E9EDEF] bg-white px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
                         />
                       </div>
                     ))}
@@ -553,7 +553,7 @@ export function AlarmFactoryPage() {
               <span className="text-[11px] text-[#667781]">Audit: ON • This change will be hash-chained. Approver required.</span>
               <div className="flex gap-2">
                 <button onClick={() => setCreateRuleOpen(false)} className="h-9 px-4 rounded-lg bg-[#EF4444] text-white text-[12px] font-extrabold border-none cursor-pointer hover:brightness-110 transition-all">Request Approval (H)</button>
-                <button onClick={() => setCreateRuleOpen(false)} className="h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-extrabold border-none cursor-pointer hover:brightness-110 transition-all">Save Draft</button>
+                <button onClick={() => setCreateRuleOpen(false)} className="h-9 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-extrabold border-none cursor-pointer hover:brightness-110 transition-all">Save Draft</button>
               </div>
             </div>
           </div>
@@ -569,7 +569,7 @@ export function AlarmFactoryPage() {
 const pillStyles: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54]",
   azure: "bg-[#34B7F1] text-white",
-  teal:  "bg-[#128C7E] text-white",
+  teal:  "bg-[var(--brand)] text-white",
   ghost: "bg-white border border-[#E9EDEF] text-[#667781]",
 };
 

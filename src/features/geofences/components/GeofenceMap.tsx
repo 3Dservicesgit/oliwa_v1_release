@@ -162,7 +162,7 @@ export function GeofenceMap({
     return (
       <div className="w-full h-full flex items-center justify-center bg-[#F0F2F5]">
         <div className="flex items-center gap-2 text-[12px] text-[#667781]">
-          <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           Loading map…
         </div>
       </div>

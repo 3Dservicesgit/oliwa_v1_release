@@ -1,7 +1,7 @@
 /** OLIWA mobile colour tokens (lib/core/theme/app_theme.dart). */
 export const C = {
-  primaryDark: "#075E54",
-  primary:     "#128C7E",
+  primaryDark: "var(--brand-dark)",  // the client's branding (index.css)
+  primary:     "var(--brand)",
   primaryLight:"#1FAF98",
   action:      "#25D366",
   actionInk:   "#053B33",

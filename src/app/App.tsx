@@ -22,6 +22,7 @@ import { ProtectedRoute } from "../auth/ProtectedRoute";
 
 // ── Waswa AI: one chat drawer + launcher shared by every page ───────────────
 import { WaswaProvider } from "../components/waswa";
+import { BrandingProvider } from "../branding/BrandingContext";
 
 // ── Feature pages ────────────────────────────────────────────────────────────
 import { AegisDashboardPage }  from "../features/aegis";
@@ -60,6 +61,7 @@ export default function App() {
   return (
     <AuthProvider>
     <PermissionsProvider>
+    <BrandingProvider>
     <WaswaProvider>
     <div className="h-dvh flex flex-col bg-[#F0F2F5] overflow-hidden w-full">
       <TopBar />
@@ -112,6 +114,7 @@ export default function App() {
       </footer>
     </div>
     </WaswaProvider>
+    </BrandingProvider>
     </PermissionsProvider>
     </AuthProvider>
   );

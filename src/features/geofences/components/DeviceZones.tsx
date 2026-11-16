@@ -250,12 +250,12 @@ export function DeviceZones() {
           placeholder="Search devices or zones…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E]"
+          className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)]"
         />
 
         {loadingDevices ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex flex-col gap-1.5">
@@ -267,8 +267,8 @@ export function DeviceZones() {
                 className={[
                   "w-full text-left bg-[#F8F9FA] border rounded-lg px-3 py-2.5 cursor-pointer transition-colors",
                   selectedImei === d.imei
-                    ? "border-[#128C7E] bg-[#E9F7F4]"
-                    : "border-[#E9EDEF] hover:border-[#128C7E] hover:bg-[#F0FAF8]",
+                    ? "border-[var(--brand)] bg-[#E9F7F4]"
+                    : "border-[#E9EDEF] hover:border-[var(--brand)] hover:bg-[#F0FAF8]",
                 ].join(" ")}
               >
                 <div className="flex items-center justify-between">
@@ -282,7 +282,7 @@ export function DeviceZones() {
                     </div>
                   </div>
                   {d.loading ? (
-                    <div className="w-3 h-3 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin shrink-0" />
+                    <div className="w-3 h-3 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : (
                     <span className={[
                       "shrink-0 text-[10px] font-extrabold rounded-full px-2 py-0.5",
@@ -304,7 +304,7 @@ export function DeviceZones() {
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#E9F7F4] border border-[#C2E8E1] text-[10px] font-extrabold text-[#075E54]"
                         title={z.zone_description}
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#128C7E]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)]" />
                         {z.zone_name}
                       </span>
                     ))}
@@ -330,7 +330,7 @@ export function DeviceZones() {
           {/* Blade panel */}
           <div className="relative w-[400px] max-w-[calc(100vw-24px)] bg-white shadow-2xl flex flex-col animate-[slideIn_0.2s_ease-out]">
             {/* Blade header */}
-            <div className="shrink-0 bg-[#128C7E] px-5 py-4">
+            <div className="shrink-0 bg-[var(--brand)] px-5 py-4">
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="text-[16px] font-black text-white truncate">
@@ -377,7 +377,7 @@ export function DeviceZones() {
                   permission="can_edit_geofence"
                   fallback="hide"
                   onClick={openAddPicker}
-                  className="h-7 px-3 rounded-lg border-0 bg-[#128C7E] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[#0D7466] transition-colors"
+                  className="h-7 px-3 rounded-lg border-0 bg-[var(--brand)] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)] transition-colors"
                 >
                   + Add to Geofence
                 </GuardedButton>
@@ -385,7 +385,7 @@ export function DeviceZones() {
 
               {bladeLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : bladeZones.length === 0 ? (
                 <div className="text-center py-6">
@@ -406,7 +406,7 @@ export function DeviceZones() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-[#128C7E] shrink-0" />
+                          <span className="w-2 h-2 rounded-full bg-[var(--brand)] shrink-0" />
                           <span className="font-extrabold text-[12px] text-[#111B21] truncate">
                             {z.zone_name}
                           </span>
@@ -446,12 +446,12 @@ export function DeviceZones() {
                     value={pickerSearch}
                     onChange={(e) => setPickerSearch(e.target.value)}
                     className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21]
-                      placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] mb-2"
+                      placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)] mb-2"
                   />
 
                   {loadingGeozones ? (
                     <div className="flex items-center justify-center py-6">
-                      <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                     </div>
                   ) : availableGeozones.length === 0 ? (
                     <div className="text-center text-[12px] text-[#667781] py-4">

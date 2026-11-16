@@ -16,7 +16,7 @@ import {
 
 const LABEL = "block text-[12px] font-black text-[#111B21] mb-1";
 const INPUT = "w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] " +
-  "placeholder:text-[#667781] outline-none focus:border-[#128C7E]";
+  "placeholder:text-[#667781] outline-none focus:border-[var(--brand)]";
 const HINT = "text-[11px] text-[#667781] mt-1";
 
 export function ConditionFields({ condition, onCondition, value, onValue, icons, geofence, savedUnavailable }: {
@@ -33,7 +33,7 @@ export function ConditionFields({ condition, onCondition, value, onValue, icons,
 }) {
   const chip = (on: boolean) =>
     `h-8 px-4 rounded-full text-[12px] font-black border cursor-pointer transition-all ${
-      on ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781]"}`;
+      on ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]" : "bg-white border-[#E9EDEF] text-[#667781]"}`;
 
   const codes = condition === "fuel_issue_flagged" ? fuelCodes(value) : [];
   // "none" when every check is unticked, so the form asks for one instead of
@@ -105,15 +105,15 @@ export function ConditionFields({ condition, onCondition, value, onValue, icons,
               Fuel checks {codes.length === FUEL_CODES.length ? "(any of all 9)" : `(${codes.length} chosen)`}
             </span>
             <button type="button" onClick={() => onValue("all")}
-              className="text-[11px] font-black text-[#128C7E] bg-transparent border-0 cursor-pointer">
+              className="text-[11px] font-black text-[var(--brand)] bg-transparent border-0 cursor-pointer">
               Select all
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {FUEL_CODES.map((code) => (
               <label key={code} className={`flex items-center gap-2 border rounded-lg px-2.5 py-2 cursor-pointer text-[12px] ${
-                codes.includes(code) ? "border-[#128C7E] bg-[#128C7E]/5" : "border-[#E9EDEF]"}`}>
-                <input type="checkbox" checked={codes.includes(code)} onChange={() => toggleCode(code)} className="accent-[#128C7E]" />
+                codes.includes(code) ? "border-[var(--brand)] bg-[var(--brand)]/5" : "border-[#E9EDEF]"}`}>
+                <input type="checkbox" checked={codes.includes(code)} onChange={() => toggleCode(code)} className="accent-[var(--brand)]" />
                 {FUEL_DISCREPANCY_LABELS[code]}
               </label>
             ))}

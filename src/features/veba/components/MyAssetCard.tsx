@@ -111,7 +111,7 @@ export function MyAssetCard({ device, listing, onListAsset, onPhotoUploaded }: M
           <div
             className={[
               "w-full h-full flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors",
-              dragOver ? "bg-[#E9F7F4]" : "bg-[#F0F2F5] hover:bg-[#E9F7F4]",
+              dragOver ? "bg-[#E9F7F4]" : "bg-[#F0F2F5] hover:bg-[var(--brand-soft)]",
             ].join(" ")}
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -182,7 +182,7 @@ export function MyAssetCard({ device, listing, onListAsset, onPhotoUploaded }: M
             <button
               type="button"
               onClick={() => onListAsset?.(device)}
-              className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0"
+              className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0"
             >
               List on Marketplace
             </button>

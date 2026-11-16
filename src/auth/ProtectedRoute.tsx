@@ -27,7 +27,7 @@ export function ProtectedRoute({ permission, children }: ProtectedRouteProps) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#F0F2F5]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-3 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[13px] text-[#667781]">Verifying access…</span>
         </div>
       </div>
@@ -43,7 +43,7 @@ export function ProtectedRoute({ permission, children }: ProtectedRouteProps) {
           <button
             type="button"
             onClick={() => refetch()}
-            className="h-9 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[#0D7466]"
+            className="h-9 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)]"
           >
             Try again
           </button>

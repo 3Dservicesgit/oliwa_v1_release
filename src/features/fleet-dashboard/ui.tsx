@@ -66,7 +66,7 @@ export function Chip({ text, ink, tint, dot }: { text: string; ink: string; tint
 export function PrimaryButton({ children, onClick, urgent = false }: { children: React.ReactNode; onClick?: () => void; urgent?: boolean }) {
   return (
     <button type="button" onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-[14px] px-3.5 py-2 text-[14px] font-semibold transition ${urgent ? "bg-[#E53935] text-white hover:bg-[#C62828]" : "bg-[#25D366] text-[#053B33] hover:bg-[#1EBE5D]"}`}>
+      className={`inline-flex items-center gap-1 rounded-[14px] px-3.5 py-2 text-[14px] font-semibold transition ${urgent ? "bg-[#E53935] text-white hover:bg-[#C62828]" : "bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-pressed)]"}`}>
       {children}
     </button>
   );
@@ -158,7 +158,7 @@ export function Donut({ segments, centre, sub, size = 128, stroke = 16 }: {
 /** "● Live" — a pulsing dot; grey and still while reconnecting. */
 export function LivePill({ stale = false }: { stale?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${stale ? "bg-[#F0F2F5] text-[#667781]" : "bg-[#E7F3F1] text-[#075E54]"}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${stale ? "bg-[#F0F2F5] text-[#667781]" : "bg-[var(--brand-soft)] text-[var(--brand-dark)]"}`}>
       <span className="relative flex w-2 h-2">
         {!stale && <span className="absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-60 motion-safe:animate-ping" />}
         <span className={`relative inline-flex w-2 h-2 rounded-full ${stale ? "bg-[#8696A0]" : "bg-[#25D366]"}`} />
@@ -191,7 +191,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
     <div className="inline-flex flex-wrap rounded-[14px] bg-[#F0F2F5] p-1 gap-1" role="tablist">
       {options.map((o) => (
         <button key={o.id} type="button" role="tab" aria-selected={o.id === value} onClick={() => onChange(o.id)}
-          className={`rounded-[10px] px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition ${o.id === value ? "bg-white text-[#075E54] shadow-sm" : "text-[#667781] hover:text-[#111B21]"}`}>
+          className={`rounded-[10px] px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition ${o.id === value ? "bg-white text-[var(--brand-dark)] shadow-sm" : "text-[#667781] hover:text-[#111B21]"}`}>
           {o.label}
         </button>
       ))}

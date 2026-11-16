@@ -176,8 +176,8 @@ export function AssetPhotoUpload({
           className={[
             "flex flex-col items-center justify-center gap-1.5 px-4 py-6 rounded-lg border-2 border-dashed transition-colors cursor-pointer",
             dragOver
-              ? "border-[#128C7E] bg-[#E9F7F4]"
-              : "border-[#E9EDEF] bg-[#F8F9FA] hover:border-[#128C7E] hover:bg-[#E9F7F4]",
+              ? "border-[var(--brand)] bg-[#E9F7F4]"
+              : "border-[#E9EDEF] bg-[#F8F9FA] hover:border-[var(--brand)] hover:bg-[var(--brand-soft)]",
             (disabled || uploading) && "opacity-50 cursor-not-allowed",
           ]
             .filter(Boolean)

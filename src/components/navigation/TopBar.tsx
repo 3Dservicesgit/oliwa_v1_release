@@ -21,7 +21,7 @@ import type { EventCondition, EventNotification } from "../../api/types";
 
 // ── Pill variant map ────────────────────────────────────────────────────────
 const pillVariant: Record<string, string> = {
-  teal:  "bg-[#128C7E] text-white",
+  teal:  "bg-[var(--brand)] text-white",
   azure: "bg-[#34B7F1] text-white",
   green: "bg-[#25D366] text-white",
 };
@@ -130,7 +130,7 @@ function NotificationBell() {
           <div className="px-4 py-2.5 border-b border-[#E9EDEF] flex items-center justify-between shrink-0">
             <span className="font-black text-[13px] text-[#111B21]">Notifications</span>
             {unreadCount > 0 && (
-              <span className="text-[11px] font-black text-[#128C7E] bg-[#128C7E]/10 px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-black text-[var(--brand)] bg-[var(--brand)]/10 px-2 py-0.5 rounded-full">
                 {unreadCount} new
               </span>
             )}
@@ -140,7 +140,7 @@ function NotificationBell() {
           <div className="flex-1 overflow-y-auto [scrollbar-width:thin]">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : recentNotifs.length === 0 ? (
               <div className="py-8 text-center">
@@ -153,11 +153,11 @@ function NotificationBell() {
                   key={n.notification_uid}
                   onClick={() => !n.is_read && handleMarkRead(n.notification_uid)}
                   className={`px-4 py-2.5 border-b border-[#E9EDEF] cursor-pointer hover:bg-[#F0F2F5] transition-colors ${
-                    !n.is_read ? "bg-[#128C7E]/5" : ""
+                    !n.is_read ? "bg-[var(--brand)]/5" : ""
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[#128C7E] shrink-0" />}
+                    {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] shrink-0" />}
                     <span className="font-black text-[12px] text-[#111B21] truncate">{n.event_name}</span>
                   </div>
                   <p className="text-[11px] text-[#667781] truncate">
@@ -171,7 +171,7 @@ function NotificationBell() {
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-[#667781]">{n.date_triggered}</span>
-                    <span className="text-[10px] font-black text-[#128C7E]">
+                    <span className="text-[10px] font-black text-[var(--brand)]">
                       {EVENT_CONDITION_LABELS[n.condition as EventCondition] ?? n.condition}
                     </span>
                   </div>
@@ -185,7 +185,7 @@ function NotificationBell() {
             <div className="px-4 py-2 border-t border-[#E9EDEF] shrink-0">
               <button
                 onClick={() => setOpen(false)}
-                className="w-full text-center text-[12px] font-black text-[#128C7E] border-none bg-transparent cursor-pointer hover:underline"
+                className="w-full text-center text-[12px] font-black text-[var(--brand)] border-none bg-transparent cursor-pointer hover:underline"
               >
                 View all in Events &amp; Notifications
               </button>
@@ -279,7 +279,7 @@ export function TopBar({
   return (
     <header className="
       h-12 flex items-center gap-3 px-4
-      bg-[#075E54] text-white
+      bg-[var(--brand-dark)] text-white
       sticky top-0 z-[100] shrink-0
     ">
       {/* Brand */}
@@ -330,7 +330,7 @@ export function TopBar({
             className="flex items-center gap-2 bg-transparent border-none text-white cursor-pointer p-0"
           >
             <span className="
-              w-[30px] h-[30px] rounded-full bg-[#0B7B6E]
+              w-[30px] h-[30px] rounded-full bg-[var(--brand)] text-[var(--on-brand)]
               grid place-items-center font-bold text-sm shrink-0
             ">
               {avatarInitial}
@@ -354,7 +354,7 @@ export function TopBar({
                         <span className="text-[10px] text-[#667781]">Client ID</span>
                         <code className="text-[11px] font-mono text-[#111B21] truncate max-w-[150px]" title={profile.clientUid}>{profile.clientUid}</code>
                         <button type="button" onClick={copyClientId}
-                          className="h-5 px-1.5 rounded border border-[#E9EDEF] bg-white text-[10px] font-extrabold text-[#128C7E] cursor-pointer">
+                          className="h-5 px-1.5 rounded border border-[#E9EDEF] bg-white text-[10px] font-extrabold text-[var(--brand)] cursor-pointer">
                           {copied ? "Copied" : "Copy"}
                         </button>
                       </div>

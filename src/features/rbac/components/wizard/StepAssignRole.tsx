@@ -122,7 +122,7 @@ export function StepAssignRole({ preSelectedUserUid, onSuccess, onClose }: Props
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               placeholder="Search users by name, username, or email..."
-              className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]"
+              className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]"
             />
             <div className="max-h-[200px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex flex-col gap-1">
               {filteredUsers.length === 0 ? (
@@ -133,7 +133,7 @@ export function StepAssignRole({ preSelectedUserUid, onSuccess, onClose }: Props
                     key={u.account_uid}
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
                       selectedUserUid === u.account_uid
-                        ? "bg-[#EAF7F3] border border-[#128C7E]"
+                        ? "bg-[#EAF7F3] border border-[var(--brand)]"
                         : "bg-white border border-[#E9EDEF] hover:bg-[#F8FAFC]"
                     }`}
                     onClick={() => setSelectedUserUid(u.account_uid)}
@@ -143,7 +143,7 @@ export function StepAssignRole({ preSelectedUserUid, onSuccess, onClose }: Props
                       name="wizard-user"
                       checked={selectedUserUid === u.account_uid}
                       onChange={() => setSelectedUserUid(u.account_uid)}
-                      className="accent-[#128C7E]"
+                      className="accent-[var(--brand)]"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12px] font-black text-[#111B21]">{u.account_name}</div>
@@ -205,7 +205,7 @@ export function StepAssignRole({ preSelectedUserUid, onSuccess, onClose }: Props
                   <div className="flex flex-col gap-1.5 pl-1">
                     {modulePerms.map((p) => (
                       <div key={p.permission_uid} className="flex items-center gap-2.5 text-[12px]">
-                        <span className="w-2 h-2 rounded-full bg-[#128C7E] shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-[var(--brand)] shrink-0" />
                         <span className="font-black text-[#111B21]">{p.permission_name}</span>
                         <span className="text-[#667781] text-[11px]">{p.permission_description}</span>
                       </div>

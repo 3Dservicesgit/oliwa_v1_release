@@ -10,7 +10,7 @@ import { errText } from "./recordUtils";
 
 export const INPUT =
   "w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[13px] text-[#111B21] " +
-  "placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] bg-white";
+  "placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)] bg-white";
 /** INPUT for a select or date beside other controls: as wide as it needs. */
 export const INPUT_INLINE = INPUT.replace("w-full ", "") + " w-auto shrink-0";
 export const LABEL = "block text-[11px] font-extrabold text-[#667781] mb-1";
@@ -18,8 +18,8 @@ export const BTN =
   "h-9 px-4 rounded-lg border border-[#E9EDEF] bg-white text-[12px] font-extrabold " +
   "text-[#111B21] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 export const BTN_PRIMARY =
-  "h-9 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold " +
-  "cursor-pointer hover:bg-[#0D7466] disabled:opacity-50 disabled:cursor-not-allowed";
+  "h-9 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[12px] font-extrabold " +
+  "cursor-pointer hover:bg-[var(--brand-dark)] disabled:opacity-50 disabled:cursor-not-allowed";
 export const BTN_DANGER =
   "h-9 px-4 rounded-lg border border-[#FFD6D6] bg-white text-[12px] font-extrabold " +
   "text-[#B00020] cursor-pointer disabled:opacity-50";
@@ -32,7 +32,7 @@ const TONES: Record<Tone, string> = {
   amber: "bg-[#FEF3C7] text-[#92400E]",
   red: "bg-[#FEF2F2] text-[#B91C1C]",
   grey: "bg-[#F0F2F5] text-[#667781]",
-  teal: "bg-[#128C7E]/10 text-[#075E54]",
+  teal: "bg-[var(--brand)]/10 text-[var(--brand-dark)]",
   blue: "bg-[#34B7F1]/10 text-[#0B6E99]",
 };
 
@@ -44,7 +44,7 @@ export function Notice({ text, onClose }: { text: string; onClose?: () => void }
   return (
     <div role="status" className="text-[12px] text-[#075E54] bg-[#E9F7F4] border border-[#C2E8E1] rounded-lg px-3 py-2 flex items-start justify-between gap-3">
       <span>{text}</span>
-      {onClose && <button type="button" aria-label="Dismiss" onClick={onClose} className="bg-transparent border-0 cursor-pointer text-[#075E54]">✕</button>}
+      {onClose && <button type="button" aria-label="Dismiss" onClick={onClose} className="bg-transparent border-0 cursor-pointer text-[var(--brand-dark)]">✕</button>}
     </div>
   );
 }
@@ -135,7 +135,7 @@ export function PromptDialog({ prompt, onClose }: { prompt: PromptOptions; onClo
         {prompt.choices && (
           <div className="flex flex-col gap-2" role="radiogroup" aria-label={prompt.title}>
             {prompt.choices.map((c) => (
-              <label key={c.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${choice === c.value ? "border-[#128C7E] bg-[#E9F7F4]" : "border-[#E9EDEF]"}`}>
+              <label key={c.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${choice === c.value ? "border-[var(--brand)] bg-[#E9F7F4]" : "border-[#E9EDEF]"}`}>
                 <input type="radio" checked={choice === c.value} onChange={() => setChoice(c.value)} className="mt-0.5" />
                 <span>
                   <span className="block text-[13px] font-extrabold text-[#111B21]">{c.label}</span>
@@ -156,7 +156,7 @@ export function PromptDialog({ prompt, onClose }: { prompt: PromptOptions; onClo
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className={BTN}>Cancel</button>
           <button type="button" onClick={go} disabled={busy}
-            className={`h-9 px-4 rounded-lg border-0 text-white text-[12px] font-extrabold cursor-pointer disabled:opacity-50 ${prompt.danger ? "bg-[#B00020]" : "bg-[#128C7E]"}`}>
+            className={`h-9 px-4 rounded-lg border-0 text-white text-[12px] font-extrabold cursor-pointer disabled:opacity-50 ${prompt.danger ? "bg-[#B00020]" : "bg-[var(--brand)]"}`}>
             {busy ? "Working…" : prompt.action}
           </button>
         </div>

@@ -100,7 +100,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
     <div className="fixed inset-0 bg-black/35 z-50 grid place-items-center" onClick={onClose}>
       <div className="w-[min(720px,calc(100vw-24px))] max-h-[calc(100vh-24px)] bg-white rounded-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="bg-[#075E54] text-white px-5 py-3 flex items-center justify-between shrink-0">
+        <div className="bg-[var(--brand-dark)] text-white px-5 py-3 flex items-center justify-between shrink-0">
           <div>
             <div className="font-black text-[15px]">Edit Role</div>
             <div className="text-[11px] opacity-70">Update role details and permissions</div>
@@ -116,7 +116,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
 
           {loading ? (
             <div className="text-center py-8">
-              <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <div className="text-[12px] text-[#667781]">Loading role data...</div>
             </div>
           ) : (
@@ -131,7 +131,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
                       value={roleName}
                       onChange={e => setRoleName(e.target.value)}
                       placeholder="e.g. Platform Admin"
-                      className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]"
+                      className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]"
                     />
                   </Field>
                   <Field label="Description">
@@ -139,7 +139,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
                       value={roleDescription}
                       onChange={e => setRoleDescription(e.target.value)}
                       placeholder="e.g. Full access to all platform resources"
-                      className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]"
+                      className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]"
                     />
                   </Field>
                 </div>
@@ -156,9 +156,9 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
                         type="checkbox"
                         checked={allSelected}
                         onChange={toggleAll}
-                        className="w-4 h-4 accent-[#128C7E]"
+                        className="w-4 h-4 accent-[var(--brand)]"
                       />
-                      <span className="font-black text-[#128C7E]">Select All</span>
+                      <span className="font-black text-[var(--brand)]">Select All</span>
                     </label>
 
                     {/* Grouped by module */}
@@ -172,7 +172,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
                                 type="checkbox"
                                 checked={selectedPermUids.has(p.permission_uid)}
                                 onChange={() => togglePerm(p.permission_uid)}
-                                className="w-4 h-4 accent-[#128C7E]"
+                                className="w-4 h-4 accent-[var(--brand)]"
                               />
                               <span className="font-black text-[#111B21]">{p.permission_name}</span>
                               <span className="text-[#667781] text-[11px]">{p.permission_description}</span>
@@ -194,7 +194,7 @@ export function EditRoleModal({ open, role, onClose, onUpdated }: Props) {
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="h-10 px-6 rounded-lg bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-6 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? "Saving..." : "Save Changes"}
           </button>

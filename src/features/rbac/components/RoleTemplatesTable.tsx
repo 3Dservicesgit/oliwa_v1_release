@@ -58,7 +58,7 @@ export function RoleTemplatesTable({ templates, onSelect, selectedId }: Props) {
                 <td className="px-3 py-2.5">
                   <div className="flex gap-1 flex-wrap">
                     {t.permissionSets.map(ps => (
-                      <span key={ps} className="text-[10px] bg-[#EAF7F3] text-[#128C7E] px-1.5 py-0.5 rounded-full font-black">{ps}</span>
+                      <span key={ps} className="text-[10px] bg-[#EAF7F3] text-[var(--brand)] px-1.5 py-0.5 rounded-full font-black">{ps}</span>
                     ))}
                   </div>
                 </td>

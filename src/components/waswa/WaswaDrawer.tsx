@@ -25,6 +25,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { sendWaswaMessage, sendWaswaFeedback } from "../../api/services/waswa.service";
 import type { WaswaVerdict, WaswaVerifiedRef } from "../../api/types";
+import { useAssistantName } from "../../branding/branding";
 
 export interface ChatMessage {
   id:          string;
@@ -50,12 +51,14 @@ interface WaswaDrawerProps {
   moduleName?: string | null;
 }
 
-const GREETING: ChatMessage = {
-  id: "greeting",
-  role: "ai",
-  text: "Hi, I'm Waswa. Ask me about your vehicles, tokens, trips or how OLIWA works. "
-      + "If an answer is wrong, tap Wrong and our team will correct it.",
-};
+// The greeting's text is written when shown (greetingText), so it carries
+// the name the client chose even if that arrives after the drawer opened.
+const GREETING: ChatMessage = { id: "greeting", role: "ai", text: "" };
+
+function greetingText(name: string): string {
+  return `Hi, I'm ${name}. Ask me about your vehicles, tokens, trips or how OLIWA works. `
+    + "If an answer is wrong, tap Wrong and our team will correct it.";
+}
 
 const DEFAULT_QUICK_ACTIONS = [
   { id: "balance", label: "How many tokens do I have?"    },
@@ -63,11 +66,11 @@ const DEFAULT_QUICK_ACTIONS = [
   { id: "tokens",  label: "How do tracking tokens work?"  },
 ];
 
-function errorText(err: unknown): string {
+function errorText(err: unknown, name: string): string {
   if (err && typeof err === "object" && "message" in err) {
     return String((err as { message: string }).message);
   }
-  return "Waswa could not be reached. Please try again.";
+  return `${name} could not be reached. Please try again.`;
 }
 
 export function WaswaDrawer({
@@ -79,6 +82,7 @@ export function WaswaDrawer({
   pendingPrompt = null,
   moduleName    = null,
 }: WaswaDrawerProps) {
+  const assistantName = useAssistantName();
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [input,    setInput]    = useState("");
   const [sending,  setSending]  = useState(false);
@@ -119,7 +123,7 @@ export function WaswaDrawer({
       }]);
     } catch (err) {
       setMessages((prev) => [...prev, {
-        id: `${id}-err`, role: "ai", text: errorText(err), error: true, retryText: text,
+        id: `${id}-err`, role: "ai", text: errorText(err, assistantName), error: true, retryText: text,
       }]);
     } finally {
       setSending(false);
@@ -145,7 +149,7 @@ export function WaswaDrawer({
       setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, feedback: verdict } : m)));
     } catch (err) {
       setMessages((prev) => [...prev, {
-        id: `fb${Date.now()}`, role: "ai", text: `Feedback not saved: ${errorText(err)}`, error: true,
+        id: `fb${Date.now()}`, role: "ai", text: `Feedback not saved: ${errorText(err, assistantName)}`, error: true,
       }]);
     } finally {
       setFlagging(null);
@@ -183,9 +187,9 @@ export function WaswaDrawer({
         `}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#075E54] text-white shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 bg-[var(--brand-dark)] text-[var(--on-brand)] shrink-0">
           <div className="min-w-0">
-            <div className="font-black text-[14px]">Waswa AI • Co-Pilot Chat</div>
+            <div className="font-black text-[14px]">{assistantName} AI • Co-Pilot Chat</div>
             {moduleName && <div className="text-[10px] opacity-70 truncate">Context: {moduleName}</div>}
           </div>
           <div className="flex items-center gap-2">
@@ -202,7 +206,7 @@ export function WaswaDrawer({
               className={`
                 h-7 min-w-[44px] px-3 rounded-full border-none text-[11px] font-black
                 cursor-pointer transition-all
-                ${waswaOn ? "bg-[#25D366] text-white" : "bg-white/20 text-white/60"}
+                ${waswaOn ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-white/20 text-white/60"}
               `}
             >
               {waswaOn ? "ON" : "OFF"}
@@ -219,7 +223,7 @@ export function WaswaDrawer({
 
         {!waswaOn && (
           <div className="px-4 py-2 bg-[#FFFBEB] border-b border-[#FDE68A] text-[12px] text-[#92400E] shrink-0">
-            Waswa is switched off. Press <b>OFF</b> above to switch it on
+            {assistantName} is switched off. Press <b>OFF</b> above to switch it on
             {pendingPrompt && handledNonce.current !== pendingPrompt.nonce ? " — your question will be sent then." : "."}
           </div>
         )}
@@ -235,7 +239,7 @@ export function WaswaDrawer({
                 className={`
                   max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap
                   ${msg.role === "user"
-                    ? "bg-[#25D366] text-white rounded-br-sm"
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] rounded-br-sm"
                     : msg.error
                       ? "bg-[#FEF2F2] text-[#B91C1C] border border-[#FECACA] rounded-bl-sm"
                       : "bg-[#F0F2F5] text-[#111B21] rounded-bl-sm"
@@ -247,7 +251,7 @@ export function WaswaDrawer({
                     ✓ Verified answer
                   </span>
                 )}
-                {msg.text}
+                {msg.id === GREETING.id ? greetingText(assistantName) : msg.text}
               </div>
 
               {msg.error && msg.retryText && (
@@ -293,7 +297,7 @@ export function WaswaDrawer({
                     onChange={(e) => setFlagNote(e.target.value)}
                     rows={2}
                     placeholder="What's wrong, or what should it have said? (optional)"
-                    className="w-full rounded-lg border border-[#E9EDEF] bg-[#F8F9FA] px-2.5 py-1.5 text-[12px] outline-none focus:border-[#128C7E] resize-none"
+                    className="w-full rounded-lg border border-[#E9EDEF] bg-[#F8F9FA] px-2.5 py-1.5 text-[12px] outline-none focus:border-[var(--brand)] resize-none"
                   />
                   <div className="flex gap-1.5 justify-end">
                     <button
@@ -317,7 +321,7 @@ export function WaswaDrawer({
           {sending && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-sm bg-[#F0F2F5] px-3.5 py-2.5 text-[12px] text-[#667781]">
-                Waswa is thinking…
+                {assistantName} is thinking…
               </div>
             </div>
           )}
@@ -348,11 +352,11 @@ export function WaswaDrawer({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send(input)}
             disabled={!waswaOn}
-            placeholder={waswaOn ? "Ask Waswa…" : "Waswa is off"}
+            placeholder={waswaOn ? `Ask ${assistantName}…` : `${assistantName} is off`}
             className="
               flex-1 min-w-0 h-10 rounded-xl border border-[#E9EDEF]
               bg-[#F8F9FA] px-3 text-[12px] outline-none
-              focus:border-[#128C7E] transition-colors disabled:opacity-60
+              focus:border-[var(--brand)] transition-colors disabled:opacity-60
             "
           />
           <button
@@ -361,7 +365,7 @@ export function WaswaDrawer({
             aria-label="Send"
             className="
               w-10 h-10 rounded-xl border-none shrink-0
-              bg-[#25D366] text-[#075E54] font-black text-[14px]
+              bg-[var(--accent)] text-[var(--on-accent)] font-black text-[14px]
               cursor-pointer hover:brightness-105 active:opacity-85 transition-all
               grid place-items-center disabled:opacity-50 disabled:cursor-default
             "

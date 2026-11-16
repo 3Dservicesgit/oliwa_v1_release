@@ -142,8 +142,8 @@ export function StepPermission({ onSuccess, onClose, onNext }: Props) {
         ) : (
           <div className="flex flex-col gap-3">
             <label className="flex items-center gap-2.5 text-[12px] cursor-pointer pb-2 border-b border-[#E9EDEF]">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 accent-[#128C7E]" />
-              <span className="font-black text-[#128C7E]">Select All</span>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 accent-[var(--brand)]" />
+              <span className="font-black text-[var(--brand)]">Select All</span>
             </label>
             <div className="flex flex-wrap gap-2">
               {modules.map((m) => (
@@ -151,11 +151,11 @@ export function StepPermission({ onSuccess, onClose, onNext }: Props) {
                   key={m}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors text-[12px] ${
                     selectedModules.has(m)
-                      ? "bg-[#EAF7F3] border border-[#128C7E] text-[#075E54] font-black"
+                      ? "bg-[#EAF7F3] border border-[var(--brand)] text-[#075E54] font-black"
                       : "bg-white border border-[#E9EDEF] hover:bg-[#F8FAFC] text-[#111B21]"
                   }`}
                 >
-                  <input type="checkbox" checked={selectedModules.has(m)} onChange={() => toggleModule(m)} className="w-4 h-4 accent-[#128C7E]" />
+                  <input type="checkbox" checked={selectedModules.has(m)} onChange={() => toggleModule(m)} className="w-4 h-4 accent-[var(--brand)]" />
                   {m}
                 </label>
               ))}
@@ -166,7 +166,7 @@ export function StepPermission({ onSuccess, onClose, onNext }: Props) {
                 value={customModule}
                 onChange={(e) => setCustomModule(e.target.value)}
                 placeholder="Enter a new module name..."
-                className={`flex-1 h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]`}
+                className={`flex-1 h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]`}
               />
             </div>
           </div>

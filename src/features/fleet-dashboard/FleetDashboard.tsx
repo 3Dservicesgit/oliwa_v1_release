@@ -27,7 +27,7 @@ export function FleetDashboard() {
         <nav aria-label="Dashboard sections" className="flex flex-wrap gap-1.5">
           {JUMPS.map((j) => (
             <a key={j.id} href={`#${j.id}`}
-              className="rounded-full border border-[#E4E8EB] bg-white px-3 py-1 text-[13px] font-medium text-[#3B4A54] hover:border-[#128C7E] hover:text-[#075E54]"
+              className="rounded-full border border-[#E4E8EB] bg-white px-3 py-1 text-[13px] font-medium text-[#3B4A54] hover:border-[var(--brand)] hover:text-[var(--brand-dark)]"
               onClick={(e) => { e.preventDefault(); document.getElementById(j.id)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
               {j.label}
             </a>

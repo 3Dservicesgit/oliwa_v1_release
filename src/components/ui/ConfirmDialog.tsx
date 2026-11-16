@@ -31,7 +31,7 @@ const CONFIRM_STYLES: Record<Variant, string> = {
   warning:
     "bg-[#9A6700] text-white hover:bg-[#7A5200]",
   default:
-    "bg-[#128C7E] text-white hover:bg-[#0D7466]",
+    "bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)]",
 };
 
 /* ── Types ───────────────────────────────────────────────────────────── */

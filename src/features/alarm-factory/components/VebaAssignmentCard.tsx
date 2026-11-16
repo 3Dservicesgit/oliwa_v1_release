@@ -46,7 +46,7 @@ export function VebaAssignmentCard({
       <div className="flex flex-col divide-y divide-[#E9EDEF] flex-1">
         {steps.map((step) => (
           <div key={step.number} className="px-4 py-3 flex items-start gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-extrabold grid place-items-center">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--brand)] text-white text-[11px] font-extrabold grid place-items-center">
               {step.number}
             </span>
             <div>
@@ -62,7 +62,7 @@ export function VebaAssignmentCard({
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={onOpenVeba}
-            className="h-8 px-4 rounded-full bg-[#25D366] text-[#075E54] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+            className="h-8 px-4 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
           >
             Open VEBA Ops
           </button>

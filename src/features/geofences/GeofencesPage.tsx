@@ -277,7 +277,7 @@ export function GeofencesPage() {
                 permission="can_create_geofence"
                 fallback="disable"
                 onClick={handleStartDrawing}
-                className="shrink-0 h-8 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[#0D7466]"
+                className="shrink-0 h-8 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)]"
               >
                 + Mark Geofence
               </GuardedButton>
@@ -308,7 +308,7 @@ export function GeofencesPage() {
               className={[
                 "px-3 py-1.5 text-[12px] font-extrabold rounded-md cursor-pointer border-0 transition-colors",
                 activeTab === tab.key
-                  ? "bg-[#128C7E] text-white"
+                  ? "bg-[var(--brand)] text-white"
                   : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]",
               ].join(" ")}
             >
@@ -347,7 +347,7 @@ export function GeofencesPage() {
                 />
               ) : loading ? (
                 <div className="flex items-center justify-center flex-1">
-                  <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : loadError ? (
                 <div className="p-4">

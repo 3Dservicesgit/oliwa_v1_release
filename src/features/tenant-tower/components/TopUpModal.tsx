@@ -189,7 +189,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
         <div className="px-5 py-4">
           <div className="text-[12px] text-[#667781] mb-3">
             Buy tokens for <span className="font-black text-[#111B21]">{clientName}</span>
-            {tokenName && <> — <span className="font-black text-[#128C7E]">{tokenName}</span></>}
+            {tokenName && <> — <span className="font-black text-[var(--brand)]">{tokenName}</span></>}
           </div>
 
           {/* ─── STEP 1: Form ─────────────────────────────────────────────── */}
@@ -210,7 +210,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                           flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border text-left w-full
                           cursor-pointer transition-all
                           ${selectedPkg?.token_id === pkg.token_id
-                            ? "border-[#128C7E] bg-[#E9F7F4]"
+                            ? "border-[var(--brand)] bg-[#E9F7F4]"
                             : "border-[#E9EDEF] bg-[#F8FAFC] hover:bg-[#F0F2F5]"
                           }
                         `}
@@ -242,7 +242,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   placeholder="e.g. 2"
-                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </div>
 
@@ -254,7 +254,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder={phonePlaceholder(currency)}
-                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </div>
 
@@ -276,7 +276,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer disabled:opacity-50"
+                className="h-8 px-4 rounded-full text-[11px] font-black bg-[var(--brand)] text-white border-none cursor-pointer disabled:opacity-50"
               >
                 {loading ? "Processing…" : "Confirm Purchase"}
               </button>
@@ -307,7 +307,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
           {/* ─── STEP 3: Result ───────────────────────────────────────────── */}
           {step === "result" && resultStatus === "success" && (
             <div className="bg-[#EAF7F3] border border-[#25D366] rounded-xl p-4 text-center">
-              <div className="text-[14px] font-black text-[#128C7E]">Purchase Successful</div>
+              <div className="text-[14px] font-black text-[var(--brand)]">Purchase Successful</div>
               <div className="text-[12px] text-[#667781] mt-1">
                 {selectedPkg?.token_name} × {quantity} purchased via Mobile Money
               </div>
@@ -316,7 +316,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                   Total: <span className="font-black text-[#111B21]">{total == null ? "—" : `${total.toLocaleString()} ${currency}`}</span>
                 </div>
               )}
-              <button onClick={handleClose} className="mt-3 h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer">Done</button>
+              <button onClick={handleClose} className="mt-3 h-8 px-4 rounded-full text-[11px] font-black bg-[var(--brand)] text-white border-none cursor-pointer">Done</button>
             </div>
           )}
 
@@ -327,7 +327,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                 The payment was not completed. Please check your MoMo account and try again.
               </div>
               <div className="flex gap-2 justify-center mt-3">
-                <button onClick={handleRetry} className="h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer">Try Again</button>
+                <button onClick={handleRetry} className="h-8 px-4 rounded-full text-[11px] font-black bg-[var(--brand)] text-white border-none cursor-pointer">Try Again</button>
                 <button onClick={handleClose} className="h-8 px-4 rounded-full text-[11px] font-black text-[#667781] border border-[#E9EDEF] bg-white cursor-pointer hover:bg-[#F0F2F5]">Close</button>
               </div>
             </div>
@@ -340,7 +340,7 @@ export function TopUpModal({ open, onClose, clientUid, clientName, tokenUid, tok
                 We did not receive a payment confirmation in time. The payment may still process — check your transaction history.
               </div>
               <div className="flex gap-2 justify-center mt-3">
-                <button onClick={handleRetry} className="h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer">Try Again</button>
+                <button onClick={handleRetry} className="h-8 px-4 rounded-full text-[11px] font-black bg-[var(--brand)] text-white border-none cursor-pointer">Try Again</button>
                 <button onClick={handleClose} className="h-8 px-4 rounded-full text-[11px] font-black text-[#667781] border border-[#E9EDEF] bg-white cursor-pointer hover:bg-[#F0F2F5]">Close</button>
               </div>
             </div>

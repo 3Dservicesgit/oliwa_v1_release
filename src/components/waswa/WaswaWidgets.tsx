@@ -12,11 +12,12 @@
  */
 import React, { useState } from "react";
 import { useWaswa } from "./WaswaContext";
+import { useAssistantName } from "../../branding/branding";
 
 type Tone = "light" | "dark";
 
 export function WaswaAskInput({
-  placeholder = "Ask Waswa…",
+  placeholder,
   tone = "light",
   className = "",
 }: {
@@ -25,6 +26,7 @@ export function WaswaAskInput({
   className?: string;
 }) {
   const { open, on } = useWaswa();
+  const name = useAssistantName();
   const [value, setValue] = useState("");
   const submit = () => {
     const text = value.trim();
@@ -39,20 +41,20 @@ export function WaswaAskInput({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder={on ? placeholder : "Waswa is off — open Waswa to switch it on"}
-        aria-label="Ask Waswa"
+        placeholder={on ? (placeholder ?? `Ask ${name}…`) : `${name} is off — open ${name} to switch it on`}
+        aria-label={`Ask ${name}`}
         className={`flex-1 min-w-0 h-8 rounded-lg px-3 text-[11px] outline-none ${
           dark
             ? "bg-white/15 border-none text-white placeholder:text-white/60"
-            : "border border-[#E9EDEF] text-[#111B21] placeholder:text-[#667781] focus:border-[#128C7E]"
+            : "border border-[#E9EDEF] text-[#111B21] placeholder:text-[#667781] focus:border-[var(--brand)]"
         }`}
       />
       <button
         onClick={submit}
         disabled={!value.trim()}
-        aria-label="Send to Waswa"
+        aria-label={`Send to ${name}`}
         className={`w-8 h-8 shrink-0 rounded-lg border-none font-black text-[12px] cursor-pointer disabled:opacity-50 disabled:cursor-default ${
-          dark ? "bg-[#25D366] text-[#075E54]" : "bg-[#25D366] text-white"
+          dark ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[var(--accent)] text-[var(--on-accent)]"
         }`}
       >
         ➤
@@ -64,19 +66,21 @@ export function WaswaAskInput({
 export function WaswaAskChips({
   prompts,
   tone = "light",
-  label = "Ask Waswa",
+  label,
 }: {
   prompts: string[];
   tone?: Tone;
   label?: string;
 }) {
   const { open } = useWaswa();
+  const name = useAssistantName();
+  const shown = label ?? `Ask ${name}`;
   const dark = tone === "dark";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {label && (
+      {shown && (
         <span className={`text-[10px] font-extrabold uppercase tracking-wide ${dark ? "text-white/70" : "text-[#667781]"}`}>
-          {label}
+          {shown}
         </span>
       )}
       {prompts.map((p) => (
@@ -86,7 +90,7 @@ export function WaswaAskChips({
           className={`h-7 px-2.5 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
             dark
               ? "bg-white/15 border border-white/20 text-white hover:bg-white/25"
-              : "bg-white border border-[#128C7E]/30 text-[#128C7E] hover:bg-[#128C7E]/5"
+              : "bg-white border border-[var(--brand)]/30 text-[var(--brand)] hover:bg-[var(--brand)]/5"
           }`}
         >
           {p}
@@ -97,9 +101,10 @@ export function WaswaAskChips({
 }
 
 export function WaswaSampleTag({ tone = "light" }: { tone?: Tone }) {
+  const name = useAssistantName();
   return (
     <span
-      title="Illustrative content. Live Waswa insights for this screen are not connected yet — ask Waswa directly for answers from approved company knowledge."
+      title={`Illustrative content. Live ${name} insights for this screen are not connected yet — ask ${name} directly for answers from approved company knowledge.`}
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold whitespace-nowrap ${
         tone === "dark" ? "bg-white/20 text-white" : "bg-[#FEF3C7] text-[#92400E]"
       }`}
@@ -111,17 +116,18 @@ export function WaswaSampleTag({ tone = "light" }: { tone?: Tone }) {
 
 export function WaswaStatusPill({ className = "" }: { className?: string }) {
   const { on, open } = useWaswa();
+  const name = useAssistantName();
   return (
     <button
       onClick={() => open()}
-      title="Open Waswa"
+      title={`Open ${name}`}
       className={`shrink-0 whitespace-nowrap border rounded-full px-2.5 py-1 text-[11px] font-medium cursor-pointer ${
         on
-          ? "bg-[#E7FFEF] border-[#BEF0D2] text-[#075E54]"
+          ? "bg-[var(--brand-soft)] border-[var(--brand)]/20 text-[var(--brand-dark)]"
           : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781]"
       } ${className}`}
     >
-      Waswa Co-Pilot: {on ? "ON" : "OFF"}
+      {name} Co-Pilot: {on ? "ON" : "OFF"}
     </button>
   );
 }

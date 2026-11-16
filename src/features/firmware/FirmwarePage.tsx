@@ -24,23 +24,23 @@ const stageBadge: Record<string, string> = {
   RUNNING:   "text-[#25D366]",
   SCHEDULED: "text-[#34B7F1]",
   PAUSED:    "text-[#F97316]",
-  COMPLETED: "text-[#128C7E]",
+  COMPLETED: "text-[var(--brand)]",
   FAILED:    "text-[#EF4444]",
 };
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 const FLEET_VERSIONS = [
   { fw:"FMB920 v2.3.1", count:"18,420", pct:85, dot:"bg-[#25D366]" },
-  { fw:"FMB920 v2.3.0", count:"1,560",  pct:15, dot:"bg-[#128C7E]" },
+  { fw:"FMB920 v2.3.0", count:"1,560",  pct:15, dot:"bg-[var(--brand)]" },
   { fw:"TK110 v1.9.7",  count:"8,240",  pct:55, dot:"bg-[#25D366]" },
   { fw:"Ruptela v5.4.2",count:"3,320",  pct:35, dot:"bg-[#25D366]" },
   { fw:"Unknown/Drift",  count:"420",   pct:5,  dot:"bg-[#EF4444]" },
 ];
 
 const PATCH_READINESS = [
-  { k:"Signed Packages", v:"Enforced",             dot:"bg-[#128C7E]" },
-  { k:"Canary Pool",     v:"5% (2,140 devices)",   dot:"bg-[#128C7E]" },
-  { k:"Rollback Ready",  v:"v2.3.0 available",     dot:"bg-[#128C7E]" },
+  { k:"Signed Packages", v:"Enforced",             dot:"bg-[var(--brand)]" },
+  { k:"Canary Pool",     v:"5% (2,140 devices)",   dot:"bg-[var(--brand)]" },
+  { k:"Rollback Ready",  v:"v2.3.0 available",     dot:"bg-[var(--brand)]" },
   { k:"Kill Switch",     v:"ARMED (HIC)",          dot:"bg-[#F97316]" },
   { k:"Approval SLA",    v:"< 15 min (P1)",        dot:"bg-[#25D366]" },
 ];
@@ -159,7 +159,7 @@ export function FirmwarePage() {
                     <span className="flex items-center gap-2"><span className="text-[#667781]">{f.count}</span><span className={`w-2.5 h-2.5 rounded-full ${f.dot}`} /></span>
                   </div>
                   <div className="h-2 bg-[#F0F2F5] rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${f.dot === "bg-[#EF4444]" ? "bg-[#EF4444]" : "bg-[#128C7E]"}`} style={{ width:`${f.pct}%` }} />
+                    <div className={`h-full rounded-full ${f.dot === "bg-[#EF4444]" ? "bg-[#EF4444]" : "bg-[var(--brand)]"}`} style={{ width:`${f.pct}%` }} />
                   </div>
                 </div>
               ))}
@@ -237,7 +237,7 @@ export function FirmwarePage() {
                 <div className="text-[11px] text-[#667781]">• Exclude assets with active escrow bookings<br/>• Require approval to auto-reschedule (HITL)</div>
               </div>
               <div className="flex gap-2">
-                <button className="h-7 px-3 rounded-lg bg-[#25D366] text-[#075E54] text-[11px] font-black border-none cursor-pointer">Request Reschedule</button>
+                <button className="h-7 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-black border-none cursor-pointer">Request Reschedule</button>
                 <button className="h-7 px-3 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-[11px] font-black cursor-pointer">Disable VEBA Guard (HIC)</button>
               </div>
             </div>
@@ -259,8 +259,8 @@ export function FirmwarePage() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button className="h-9 px-5 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer">Open Token Engine</button>
-              <button className="h-9 px-5 rounded-lg bg-[#128C7E] text-white text-[12px] font-black border-none cursor-pointer">Top-up Wallet</button>
+              <button className="h-9 px-5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-black border-none cursor-pointer">Open Token Engine</button>
+              <button className="h-9 px-5 rounded-lg bg-[var(--brand)] text-white text-[12px] font-black border-none cursor-pointer">Top-up Wallet</button>
               <button className="h-9 px-5 rounded-lg bg-[#F97316]/15 border border-[#F97316]/30 text-[#F97316] text-[12px] font-black cursor-pointer">Pause Campaigns (HITL)</button>
             </div>
           </div>
@@ -343,7 +343,7 @@ export function FirmwarePage() {
           <>
             <div className="flex items-center justify-between px-5 py-3 border-b border-[#E9EDEF] shrink-0">
               <div>
-                <span className="text-[10px] font-black bg-[#128C7E] text-white px-2 py-0.5 rounded">BLADE</span>
+                <span className="text-[10px] font-black bg-[var(--brand)] text-white px-2 py-0.5 rounded">BLADE</span>
                 <span className="font-black text-[13px] text-[#111B21] ml-2">OTA Campaign</span>
               </div>
               <button onClick={() => setBladeOpen(false)} className="w-7 h-7 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] font-black text-[13px] cursor-pointer grid place-items-center">✕</button>
@@ -386,7 +386,7 @@ export function FirmwarePage() {
                     </div>
                   ))}
                   <div className="flex gap-2 mt-2">
-                    <button className="h-7 px-3 rounded-lg bg-[#25D366] text-[#075E54] text-[11px] font-black border-none cursor-pointer">Request Approval</button>
+                    <button className="h-7 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-black border-none cursor-pointer">Request Approval</button>
                     <Pill>Dry Run</Pill>
                     <button className="h-7 px-3 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-[11px] font-black cursor-pointer">Pause Now (HIC)</button>
                   </div>
@@ -416,8 +416,8 @@ export function FirmwarePage() {
               <span className="text-[11px] font-black text-[#25D366] border border-[#25D366]/30 px-2 py-0.5 rounded-full">AI: ON</span>
             </div>
 
-            <div className="bg-[#128C7E]/10 border border-[#128C7E]/20 rounded-xl p-3">
-              <div className="font-black text-[12px] text-[#128C7E] mb-1">Insight</div>
+            <div className="bg-[var(--brand)]/10 border border-[var(--brand)]/20 rounded-xl p-3">
+              <div className="font-black text-[12px] text-[var(--brand)] mb-1">Insight</div>
               <div className="text-[12px] text-[#111B21] leading-relaxed">
                 <strong>Failure cluster detected (FMB920 v2.3.1):</strong><br/>
                 CRC mismatch → 2.6% fails • risk: bricking + refunds.<br/>
@@ -427,11 +427,11 @@ export function FirmwarePage() {
             </div>
 
             <div className="font-black text-[13px] text-[#111B21]">Recommended Actions</div>
-            <button className="w-full h-9 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer">Approve Pause + Canary Rollback (HITL)</button>
+            <button className="w-full h-9 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-black border-none cursor-pointer">Approve Pause + Canary Rollback (HITL)</button>
 
             <div className="font-black text-[13px] text-[#111B21]">Quick Links</div>
-            <div className="flex items-center justify-between border border-[#128C7E]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[#111B21] cursor-pointer hover:bg-[#128C7E]/5">Token Top-Up (MoMo/Card)<span className="w-2.5 h-2.5 rounded-full bg-[#128C7E]" /></div>
-            <div className="flex items-center justify-between border border-[#128C7E]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[#111B21] cursor-pointer hover:bg-[#128C7E]/5">VEBA Bookings Ops<span className="w-2.5 h-2.5 rounded-full bg-[#128C7E]" /></div>
+            <div className="flex items-center justify-between border border-[var(--brand)]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[#111B21] cursor-pointer hover:bg-[var(--brand)]/5">Token Top-Up (MoMo/Card)<span className="w-2.5 h-2.5 rounded-full bg-[var(--brand)]" /></div>
+            <div className="flex items-center justify-between border border-[var(--brand)]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[#111B21] cursor-pointer hover:bg-[var(--brand)]/5">VEBA Bookings Ops<span className="w-2.5 h-2.5 rounded-full bg-[var(--brand)]" /></div>
 
             <button className="w-full h-9 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-[12px] font-black cursor-pointer mt-1">Kill Switch: Disable OTA Engine (HIC)</button>
 
@@ -453,7 +453,7 @@ export function FirmwarePage() {
               {/* Steps */}
               <div className="flex gap-2 mb-5">
                 {["1 Package","2 Targets","3 Rollout","4 Billing & Approval","5 Review"].map((s,i) => (
-                  <span key={s} className={`flex-1 h-9 rounded-lg text-[12px] font-black flex items-center justify-center border cursor-pointer ${i === 3 ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{s}</span>
+                  <span key={s} className={`flex-1 h-9 rounded-lg text-[12px] font-black flex items-center justify-center border cursor-pointer ${i === 3 ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{s}</span>
                 ))}
               </div>
 
@@ -461,7 +461,7 @@ export function FirmwarePage() {
               <div className="text-[13px] font-black text-[#111B21] mb-1">Billing preset</div>
               <div className="text-[12px] text-[#667781] mb-1">Token domain: ota_update &ensp;• &ensp;FIFO wallet consumption &ensp;• &ensp;multi-currency</div>
               <div className="text-[12px] text-[#667781] mb-3">Reserve on START → burn on COMPLETE → refund on FAILED (policy)</div>
-              <button className="h-8 px-4 rounded-lg bg-[#25D366] text-[#075E54] text-[11px] font-black border-none cursor-pointer mb-4">Auto-estimate cost</button>
+              <button className="h-8 px-4 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-black border-none cursor-pointer mb-4">Auto-estimate cost</button>
 
               {/* Cost Estimate */}
               <div className="font-black text-[13px] text-[#111B21] mb-2">Cost Estimate</div>
@@ -497,7 +497,7 @@ export function FirmwarePage() {
                   • Kill switch always available (HIC) and cannot be bypassed.
                 </div>
                 <div className="flex items-center gap-2 mt-3 border border-[#E9EDEF] rounded-lg px-3 py-2 bg-white">
-                  <span className="w-4 h-4 rounded border border-[#128C7E] bg-[#128C7E] text-white grid place-items-center text-[10px] font-black shrink-0">✓</span>
+                  <span className="w-4 h-4 rounded border border-[var(--brand)] bg-[var(--brand)] text-white grid place-items-center text-[10px] font-black shrink-0">✓</span>
                   <span className="text-[12px] font-black text-[#111B21]">I understand and request approval</span>
                 </div>
               </div>
@@ -505,7 +505,7 @@ export function FirmwarePage() {
 
             <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#E9EDEF] bg-white shrink-0">
               <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer">Save Draft</button>
-              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Request Approval</button>
+              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Request Approval</button>
             </div>
           </div>
         </div>

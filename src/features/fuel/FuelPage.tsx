@@ -144,7 +144,7 @@ export function FuelPage() {
       <div className="flex gap-1.5 flex-wrap">
         {([["issues", `Issues${openCount ? ` · ${openCount} to review` : ""}`], ["vehicles", "Vehicles"], ["drivers", "Drivers"]] as [View, string][]).map(([v, label]) => (
           <button key={v} type="button" onClick={() => setView(v)}
-            className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${view === v ? "bg-[#075E54] border-[#075E54] text-white" : "bg-white border-[#E9EDEF] text-[#111B21]"}`}>
+            className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${view === v ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-white border-[#E9EDEF] text-[#111B21]"}`}>
             {label}
           </button>
         ))}

@@ -5,6 +5,7 @@
  * and the natural-language prompt input bar.
  */
 import React, { useState } from "react";
+import { useAssistantName } from "../../branding/branding";
 import { Card } from "../ui";
 
 interface WaswaAIBladeProps {
@@ -14,6 +15,7 @@ interface WaswaAIBladeProps {
 }
 
 export function WaswaAIBlade({ message, onApproveMint }: WaswaAIBladeProps) {
+  const assistantName = useAssistantName();
   const [prompt, setPrompt] = useState("");
 
   const defaultMessage = (
@@ -26,7 +28,7 @@ export function WaswaAIBlade({ message, onApproveMint }: WaswaAIBladeProps) {
 
   return (
     <Card
-      title="Waswa AI — Proactive Co‑Pilot"
+      title={`${assistantName} AI — Proactive Co‑Pilot`}
       subtitle="Humans approve high-risk moves (HITL/HIC)."
     >
       {/* AI-FIRST badge row */}
@@ -54,17 +56,17 @@ export function WaswaAIBlade({ message, onApproveMint }: WaswaAIBladeProps) {
         <input
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder='Ask Waswa… e.g., "Show auth anomalies for MTN customers in UG last 24h"'
+          placeholder={`Ask ${assistantName}… e.g., "Show auth anomalies for MTN customers in UG last 24h"`}
           className="
             flex-1 min-w-0 h-[42px] rounded-xl border border-[#E9EDEF]
             bg-[#F8F9FA] px-3 text-[12px] outline-none
-            focus:border-[#128C7E] transition-colors
+            focus:border-[var(--brand)] transition-colors
           "
         />
         <button
           className="
             w-11 h-[42px] rounded-xl border-none shrink-0
-            bg-[#25D366] text-[#075E54] font-black text-[16px]
+            bg-[var(--accent)] text-[var(--on-accent)] font-black text-[16px]
             cursor-pointer hover:brightness-105 active:opacity-85 transition-all
           "
         >
@@ -77,8 +79,8 @@ export function WaswaAIBlade({ message, onApproveMint }: WaswaAIBladeProps) {
 
 // ── Internal button helper ──────────────────────────────────────────────────
 const variantCls: Record<string, string> = {
-  green: "bg-[#25D366] text-[#075E54]",
-  teal:  "bg-[#128C7E] text-white",
+  green: "bg-[var(--accent)] text-[var(--on-accent)]",
+  teal:  "bg-[var(--brand)] text-[var(--on-brand)]",
   azure: "bg-[#34B7F1] text-white",
   dark:  "bg-[#111B21] text-white",
 };

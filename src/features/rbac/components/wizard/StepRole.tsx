@@ -134,8 +134,8 @@ export function StepRole({ preSelectedPermissionUids, onSuccess, onClose, onNext
         ) : (
           <div className="flex flex-col gap-3">
             <label className="flex items-center gap-2.5 text-[12px] cursor-pointer pb-2 border-b border-[#E9EDEF]">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 accent-[#128C7E]" />
-              <span className="font-black text-[#128C7E]">Select All</span>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 accent-[var(--brand)]" />
+              <span className="font-black text-[var(--brand)]">Select All</span>
             </label>
             {Object.entries(byModule).map(([mod, perms]) => (
               <div key={mod}>
@@ -147,7 +147,7 @@ export function StepRole({ preSelectedPermissionUids, onSuccess, onClose, onNext
                         type="checkbox"
                         checked={selectedPerms.has(p.permission_uid)}
                         onChange={() => togglePerm(p.permission_uid)}
-                        className="w-4 h-4 accent-[#128C7E]"
+                        className="w-4 h-4 accent-[var(--brand)]"
                       />
                       <span className="font-black text-[#111B21]">{p.permission_name}</span>
                       <span className="text-[#667781] text-[11px]">{p.permission_description}</span>

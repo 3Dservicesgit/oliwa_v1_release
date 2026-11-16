@@ -112,7 +112,7 @@ export function TokenTopupModal({ open, onClose, onSubmit }: TokenTopupModalProp
                 <input
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="flex-1 min-w-0 h-11 rounded-xl border border-[#E9EDEF] bg-white px-4 text-[16px] font-extrabold text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                  className="flex-1 min-w-0 h-11 rounded-xl border border-[#E9EDEF] bg-white px-4 text-[16px] font-extrabold text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
                 />
                 <button className="h-11 px-4 rounded-xl border border-[#E9EDEF] bg-[#F8F9FA] text-[13px] font-extrabold text-[#111B21] cursor-pointer hover:bg-[#F0F2F5] transition-colors whitespace-nowrap">
                   Currency ▾
@@ -128,7 +128,7 @@ export function TokenTopupModal({ open, onClose, onSubmit }: TokenTopupModalProp
                   <button
                     key={p.id}
                     onClick={() => p.value && setAmount(p.value.toLocaleString())}
-                    className="h-10 rounded-xl border border-[#E9EDEF] bg-[#F8F9FA] text-[12px] font-extrabold text-[#111B21] cursor-pointer hover:bg-[#E9F7F4] hover:border-[#C2E8E1] transition-all"
+                    className="h-10 rounded-xl border border-[#E9EDEF] bg-[#F8F9FA] text-[12px] font-extrabold text-[#111B21] cursor-pointer hover:bg-[var(--brand-soft)] hover:border-[#C2E8E1] transition-all"
                   >
                     {p.label}
                   </button>
@@ -177,7 +177,7 @@ export function TokenTopupModal({ open, onClose, onSubmit }: TokenTopupModalProp
                     flex items-center justify-between gap-3 h-[60px] rounded-xl border px-4
                     cursor-pointer transition-all text-left w-full
                     ${channel === ch.id
-                      ? "border-[#128C7E] bg-[#E9F7F4]"
+                      ? "border-[var(--brand)] bg-[#E9F7F4]"
                       : "border-[#E9EDEF] bg-white hover:bg-[#F8F9FA]"
                     }
                   `}
@@ -210,7 +210,7 @@ export function TokenTopupModal({ open, onClose, onSubmit }: TokenTopupModalProp
             <button
               onClick={handleConfirm}
               disabled={busy}
-              className="h-10 px-6 rounded-xl border-none bg-[#25D366] text-[#075E54] text-[13px] font-black cursor-pointer hover:brightness-105 active:opacity-85 transition-all disabled:opacity-50"
+              className="h-10 px-6 rounded-xl border-none bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black cursor-pointer hover:brightness-105 active:opacity-85 transition-all disabled:opacity-50"
             >
               {busy ? "Processing…" : "Pay & Mint"}
             </button>

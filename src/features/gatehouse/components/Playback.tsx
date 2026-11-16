@@ -57,7 +57,7 @@ function SpeedProfile({ timeline, progress, onScrub }: {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(progress * 100)}
-      className="relative h-16 cursor-pointer select-none touch-none outline-none focus-visible:ring-2 focus-visible:ring-[#128C7E] rounded"
+      className="relative h-16 cursor-pointer select-none touch-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] rounded"
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); scrubAt(e.clientX); }}
       onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) scrubAt(e.clientX); }}
       onKeyDown={(e) => {
@@ -170,7 +170,7 @@ export function PlaybackPanel({
             {cell("DRIVEN", `${driven.toFixed(1)} of ${total.toFixed(1)} km`, true)}
           </div>
           <div className="flex items-center gap-2.5">
-            <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${fence ? "bg-[#E7F3F1] text-[#075E54]" : "bg-[#F5F7F8] text-[#667781]"}`}>
+            <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${fence ? "bg-[var(--brand-soft)] text-[var(--brand-dark)]" : "bg-[#F5F7F8] text-[#667781]"}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                 <path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" />
               </svg>
@@ -180,22 +180,22 @@ export function PlaybackPanel({
           <div className="flex items-center justify-between gap-2">
             <label className="sr-only" htmlFor="tp-rate">Playback speed</label>
             <select id="tp-rate" value={rate} onChange={(e) => onRate(Number(e.target.value))} title="Playback speed"
-              className="h-10 rounded-xl bg-[#F0F3F4] border-none px-3 text-[13px] font-semibold text-[#075E54] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#128C7E]">
+              className="h-10 rounded-xl bg-[#F0F3F4] border-none px-3 text-[13px] font-semibold text-[var(--brand-dark)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]">
               {TripTimeline.rates.map((r) => (
                 <option key={r} value={r}>×{r}{r === TripTimeline.defaultRate ? " (normal)" : ""}</option>
               ))}
             </select>
             <div className="flex items-center gap-1">
               <button type="button" title="Previous stop" aria-label="Previous stop" onClick={() => onSkip(false)}
-                className="w-10 h-10 rounded-full bg-transparent border-none text-[#075E54] cursor-pointer hover:bg-[#F0F3F4] flex items-center justify-center">
+                className="w-10 h-10 rounded-full bg-transparent border-none text-[var(--brand-dark)] cursor-pointer hover:bg-[#F0F3F4] flex items-center justify-center">
                 <PrevIcon />
               </button>
               <button type="button" title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"} onClick={onToggle}
-                className="w-12 h-12 rounded-2xl bg-[#25D366] text-[#053B33] border-none cursor-pointer hover:brightness-105 flex items-center justify-center shadow-[0_4px_14px_rgba(37,211,102,0.35)]">
+                className="w-12 h-12 rounded-2xl bg-[var(--accent)] text-[var(--on-accent)] border-none cursor-pointer hover:brightness-105 flex items-center justify-center shadow-[0_4px_14px_rgba(37,211,102,0.35)]">
                 {playing ? <PauseIcon /> : <PlayIcon size={22} />}
               </button>
               <button type="button" title="Next stop" aria-label="Next stop" onClick={() => onSkip(true)}
-                className="w-10 h-10 rounded-full bg-transparent border-none text-[#075E54] cursor-pointer hover:bg-[#F0F3F4] flex items-center justify-center">
+                className="w-10 h-10 rounded-full bg-transparent border-none text-[var(--brand-dark)] cursor-pointer hover:bg-[#F0F3F4] flex items-center justify-center">
                 <NextIcon />
               </button>
             </div>

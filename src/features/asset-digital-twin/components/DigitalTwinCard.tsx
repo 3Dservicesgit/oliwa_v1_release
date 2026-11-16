@@ -66,7 +66,7 @@ export function DigitalTwinCard({ asset, enrichment, onSelect }: DigitalTwinCard
       {/* Footer: last-seen + a "View" affordance */}
       <div className="px-3 py-1.5 border-t border-[#E9EDEF] flex items-center justify-between text-[10px]" style={{ color: COLORS.muted }}>
         <span>Last seen {asset.lastSeen}</span>
-        {onSelect && <span className="font-extrabold text-[#128C7E]">Open twin -&gt;</span>}
+        {onSelect && <span className="font-extrabold text-[var(--brand)]">Open twin -&gt;</span>}
       </div>
     </article>
   );

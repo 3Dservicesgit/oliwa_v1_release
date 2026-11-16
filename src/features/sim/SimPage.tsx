@@ -70,7 +70,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
   return (
     <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl shadow-lg border text-[13px] font-black flex items-center gap-3 ${
       type === "success"
-        ? "bg-[#25D366]/10 border-[#25D366]/30 text-[#128C7E]"
+        ? "bg-[#25D366]/10 border-[#25D366]/30 text-[var(--brand)]"
         : "bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]"
     }`}>
       <span>{message}</span>
@@ -99,7 +99,7 @@ function ConfirmDialog({
           <button onClick={onConfirm} className={`h-9 px-4 rounded-lg border text-[12px] font-black text-white cursor-pointer transition-all ${
             isDestructive
               ? "bg-[#EF4444] border-[#EF4444] hover:bg-[#DC2626]"
-              : "bg-[#128C7E] border-[#128C7E] hover:bg-[#0E7A6D]"
+              : "bg-[var(--brand)] border-[var(--brand)] hover:bg-[var(--brand-dark)]"
           }`}>
             {confirmLabel}
           </button>
@@ -119,22 +119,22 @@ function PaymentAuthorizingOverlay({ amountLabel, phone }: { amountLabel?: strin
       <div className="bg-white rounded-2xl shadow-2xl border border-[#E9EDEF] w-full max-w-[360px] p-6 flex flex-col items-center text-center gap-4">
         {/* Spinner */}
         <div className="relative w-16 h-16">
-          <div className="absolute inset-0 rounded-full border-4 border-[#128C7E]/15" />
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#128C7E] animate-spin" />
+          <div className="absolute inset-0 rounded-full border-4 border-[var(--brand)]/15" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[var(--brand)] animate-spin" />
           <div className="absolute inset-0 flex items-center justify-center text-[22px]">📲</div>
         </div>
 
         <div>
           <h3 className="font-black text-[16px] text-[#111B21] mb-1.5">Authorise the Payment</h3>
           <p className="text-[12px] text-[#667781] leading-relaxed">
-            A payment request{amountLabel ? <> for <span className="font-black text-[#128C7E]">{amountLabel}</span></> : null} has been sent
+            A payment request{amountLabel ? <> for <span className="font-black text-[var(--brand)]">{amountLabel}</span></> : null} has been sent
             {phone ? <> to <span className="font-black text-[#111B21]">{phone}</span></> : null}. Check your phone and enter your
             Mobile Money PIN to approve the transaction.
           </p>
         </div>
 
         <div className="w-full bg-[#F0F2F5] rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-          <span className="inline-block w-4 h-4 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin shrink-0" />
+          <span className="inline-block w-4 h-4 border-2 border-[var(--brand)]/30 border-t-[var(--brand)] rounded-full animate-spin shrink-0" />
           <span className="text-[11px] text-[#667781] font-black text-left">Waiting for confirmation… please keep this window open.</span>
         </div>
       </div>
@@ -147,8 +147,8 @@ function PaymentSuccessOverlay({ message, onDone }: { message: string; onDone: (
   return (
     <div className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-[#E9EDEF] w-full max-w-[360px] p-6 flex flex-col items-center text-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-[#128C7E]/10 flex items-center justify-center">
-          <span className="text-[#128C7E] text-[34px] leading-none">&#10003;</span>
+        <div className="w-16 h-16 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
+          <span className="text-[var(--brand)] text-[34px] leading-none">&#10003;</span>
         </div>
         <div>
           <h3 className="font-black text-[16px] text-[#111B21] mb-1.5">Payment Successful</h3>
@@ -156,7 +156,7 @@ function PaymentSuccessOverlay({ message, onDone }: { message: string; onDone: (
         </div>
         <button
           onClick={onDone}
-          className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+          className="w-full h-10 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
         >
           Done
         </button>
@@ -177,7 +177,7 @@ function BalanceCard({ b }: { b: ClientTokenBalance }) {
     ? "bg-[#EF4444]"
     : isLow
       ? "bg-[#F97316]"
-      : "bg-[#128C7E]";
+      : "bg-[var(--brand)]";
 
   const borderColor = isExpired
     ? "border-[#EF4444]/30"
@@ -200,7 +200,7 @@ function BalanceCard({ b }: { b: ClientTokenBalance }) {
           </span>
         )}
         {!isLow && !isExpired && b.token_hours_left > 0 && (
-          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30">
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30">
             ACTIVE
           </span>
         )}
@@ -309,7 +309,7 @@ const PKG_ICON_SIZE: Record<PkgView, { box: string; text: string }> = {
 };
 
 const PKG_TYPE_META: Record<string, { icon: string; tint: string; text: string }> = {
-  time:        { icon: "⏱",  tint: "bg-[#128C7E]/10", text: "text-[#0E7A6D]" },
+  time:        { icon: "⏱",  tint: "bg-[var(--brand)]/10", text: "text-[var(--brand-dark)]" },
   parameter:   { icon: "⚙",  tint: "bg-[#34B7F1]/10", text: "text-[#1E88B5]" },
   event:       { icon: "⚡", tint: "bg-[#F97316]/10", text: "text-[#C2570B]" },
   volume:      { icon: "🛢", tint: "bg-[#3B82F6]/10", text: "text-[#2563EB]" },
@@ -375,7 +375,7 @@ function PackageCard({
   const scope = pkg.billing_scope;
 
   return (
-    <div className="bg-white border border-[#E9EDEF] rounded-xl p-4 flex flex-col gap-3 hover:border-[#128C7E]/40 hover:shadow-sm transition-all">
+    <div className="bg-white border border-[#E9EDEF] rounded-xl p-4 flex flex-col gap-3 hover:border-[var(--brand)]/40 hover:shadow-sm transition-all">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="font-black text-[13px] text-[#111B21]">{pkg.token_name}</span>
@@ -383,7 +383,7 @@ function PackageCard({
             <div className="text-[10px] text-[#667781] mt-0.5 uppercase tracking-wide truncate">{productName}</div>
           )}
         </div>
-        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 shrink-0">
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 shrink-0">
           {pkg.token_type}
         </span>
       </div>
@@ -391,7 +391,7 @@ function PackageCard({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">Cost</div>
-          <div className="text-[18px] font-black text-[#128C7E] leading-tight">
+          <div className="text-[18px] font-black text-[var(--brand)] leading-tight">
             {currency} {price.toLocaleString()}
           </div>
           <div className="text-[10px] text-[#667781]">{getPkgBillingUnitLabel(pkg)}</div>
@@ -422,7 +422,7 @@ function PackageCard({
 
       <button
         onClick={() => onBuy(pkg)}
-        className="w-full h-9 rounded-lg bg-[#128C7E] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+        className="w-full h-9 rounded-lg bg-[var(--brand)] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
       >
         Buy Now
       </button>
@@ -549,9 +549,9 @@ function BuyDrawer({
 
       <div className="fixed right-0 top-0 bottom-0 z-[210] w-full max-w-[380px] bg-white shadow-2xl border-l border-[#E9EDEF] flex flex-col">
         {/* Header */}
-        <div className="shrink-0 px-4 py-3 border-b border-[#E9EDEF] flex items-center justify-between bg-[#128C7E]/5">
+        <div className="shrink-0 px-4 py-3 border-b border-[#E9EDEF] flex items-center justify-between bg-[var(--brand)]/5">
           <div>
-            <h3 className="font-black text-[15px] text-[#128C7E]">Buy Tokens</h3>
+            <h3 className="font-black text-[15px] text-[var(--brand)]">Buy Tokens</h3>
             <p className="text-[11px] text-[#667781] mt-0.5">
               {isMobileMoney ? "Purchase via Mobile Money" : "Request invoice for payment"}
             </p>
@@ -565,10 +565,10 @@ function BuyDrawer({
         <div className="flex-1 min-h-0 p-4 overflow-y-auto [scrollbar-width:thin]">
 
           {/* ── Package summary ─────────────────────────────────────── */}
-          <div className="bg-[#128C7E]/5 border border-[#128C7E]/20 rounded-xl p-3 mb-3">
+          <div className="bg-[var(--brand)]/5 border border-[var(--brand)]/20 rounded-xl p-3 mb-3">
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="font-black text-[14px] text-[#111B21]">{pkg.token_name}</div>
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 shrink-0 capitalize">
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 shrink-0 capitalize">
                 {pkg.token_type}
               </span>
             </div>
@@ -576,7 +576,7 @@ function BuyDrawer({
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
               <div>
                 <span className="text-[#667781]">Cost: </span>
-                <span className="font-black text-[#128C7E]">{currency} {price.toLocaleString()}</span>
+                <span className="font-black text-[var(--brand)]">{currency} {price.toLocaleString()}</span>
               </div>
               <div>
                 <span className="text-[#667781]">Billing Unit: </span>
@@ -591,7 +591,7 @@ function BuyDrawer({
                 <span className="font-black capitalize">{getPkgBillingScope(pkg)}</span>
               </div>
             </div>
-            <div className="mt-2 pt-2 border-t border-[#128C7E]/15 text-[11px] text-[#667781]">
+            <div className="mt-2 pt-2 border-t border-[var(--brand)]/15 text-[11px] text-[#667781]">
               Charged <span className="font-black text-[#111B21]">{currency} {price.toLocaleString()}</span> {getPkgBillingUnitLabel(pkg)}
             </div>
           </div>
@@ -611,7 +611,7 @@ function BuyDrawer({
           {/* ── Total Cost ──────────────────────────────────────────── */}
           <div className="bg-[#F0F2F5] rounded-xl p-4 mb-4">
             <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide mb-1">Total Cost</div>
-            <div className="text-[24px] font-black text-[#128C7E]">{currency} {total.toLocaleString()}</div>
+            <div className="text-[24px] font-black text-[var(--brand)]">{currency} {total.toLocaleString()}</div>
             <div className="text-[11px] text-[#667781]">
               {qty} × {currency} {price.toLocaleString()}
             </div>
@@ -629,7 +629,7 @@ function BuyDrawer({
                   <select
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
-                    className="h-10 pl-2 pr-1 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all shrink-0 w-[120px]"
+                    className="h-10 pl-2 pr-1 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all shrink-0 w-[120px]"
                   >
                     {COUNTRY_CODES.map((c) => (
                       <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
@@ -640,7 +640,7 @@ function BuyDrawer({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                     placeholder={currency === "KES" ? "e.g. 0712345678" : "e.g. 0771234567"}
-                    className="flex-1 h-10 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+                    className="flex-1 h-10 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
                   />
                 </div>
                 <p className="text-[10px] text-[#667781] mt-1">
@@ -691,7 +691,7 @@ function BuyDrawer({
             <button
               onClick={handleMoMoPay}
               disabled={!canPayMomo}
-              className="w-full h-10 rounded-lg bg-[#128C7E] text-white text-[13px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full h-10 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {submitting ? "Sending payment request..." : polling ? "Waiting for confirmation..." : status === "success" ? "Done!" : `Pay ${currency} ${total.toLocaleString()}`}
             </button>
@@ -729,7 +729,7 @@ function BuyDrawer({
 function subStatusBadge(status: string) {
   const s = status?.toLowerCase() || "";
   if (s === "active" || s === "running")
-    return "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]";
+    return "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]";
   if (s === "paused")
     return "bg-[#F97316]/10 border-[#F97316]/30 text-[#F97316]";
   if (s === "expired")
@@ -934,7 +934,7 @@ function BudgetTab({
       {pkgLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
             <span className="text-[12px] text-[#667781]">Loading token pricing...</span>
           </div>
         </div>
@@ -953,7 +953,7 @@ function BudgetTab({
             {/* Step 1: Currency */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">1</span>
+                <span className="w-6 h-6 rounded-full bg-[var(--brand)] text-white text-[11px] font-black flex items-center justify-center shrink-0">1</span>
                 <label className="text-[12px] font-black text-[#111B21]">Select Currency</label>
               </div>
               <div className="flex gap-2">
@@ -967,7 +967,7 @@ function BudgetTab({
                       className={[
                         "h-10 px-5 rounded-lg text-[13px] font-black border cursor-pointer transition-all",
                         currency === c
-                          ? "bg-[#128C7E] border-[#128C7E] text-white"
+                          ? "bg-[var(--brand)] border-[var(--brand)] text-white"
                           : hasPkgs
                             ? "bg-white border-[#E9EDEF] text-[#667781] hover:bg-[#F0F2F5]"
                             : "bg-[#F0F2F5] border-[#E9EDEF] text-[#CCC] cursor-not-allowed",
@@ -984,12 +984,12 @@ function BudgetTab({
             {/* Step 2: Select Product */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
+                <span className="w-6 h-6 rounded-full bg-[var(--brand)] text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
                 <label className="text-[12px] font-black text-[#111B21]">Select Product</label>
               </div>
               {productsLoading ? (
                 <p className="text-[11px] text-[#667781] flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                  <span className="inline-block w-3 h-3 border-2 border-[var(--brand)]/30 border-t-[var(--brand)] rounded-full animate-spin" />
                   Loading products…
                 </p>
               ) : availableProducts.length === 0 ? (
@@ -1000,7 +1000,7 @@ function BudgetTab({
                 <select
                   value={selectedProduct ?? ""}
                   onChange={(e) => { setSelectedProduct(e.target.value || null); setBudgetStr(""); }}
-                  className="w-full h-11 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all cursor-pointer capitalize"
+                  className="w-full h-11 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all cursor-pointer capitalize"
                 >
                   <option value="">-- Choose a product --</option>
                   {availableProducts.map((prod) => (
@@ -1015,7 +1015,7 @@ function BudgetTab({
             {/* Step 3: Select Token (immediately loaded for the product) */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                <span className="w-6 h-6 rounded-full bg-[var(--brand)] text-white text-[11px] font-black flex items-center justify-center shrink-0">3</span>
                 <label className="text-[12px] font-black text-[#111B21]">Select Token</label>
                 {productTokens.length > 0 && (
                   <span className="text-[10px] text-[#667781] ml-auto">{productTokens.length} token{productTokens.length !== 1 ? "s" : ""} available</span>
@@ -1023,7 +1023,7 @@ function BudgetTab({
               </div>
               {productTokensLoading && (
                 <p className="text-[11px] text-[#667781] flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                  <span className="inline-block w-3 h-3 border-2 border-[var(--brand)]/30 border-t-[var(--brand)] rounded-full animate-spin" />
                   Loading tokens…
                 </p>
               )}
@@ -1046,7 +1046,7 @@ function BudgetTab({
                         className={[
                           "w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer",
                           isSelected
-                            ? "bg-[#128C7E]/5 border-[#128C7E] ring-1 ring-[#128C7E]/30"
+                            ? "bg-[var(--brand)]/5 border-[var(--brand)] ring-1 ring-[var(--brand)]/30"
                             : "bg-white border-[#E9EDEF] hover:bg-[#F8F9FA]",
                         ].join(" ")}
                       >
@@ -1054,9 +1054,9 @@ function BudgetTab({
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={[
                               "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
-                              isSelected ? "border-[#128C7E]" : "border-[#CCC]",
+                              isSelected ? "border-[var(--brand)]" : "border-[#CCC]",
                             ].join(" ")}>
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-[#128C7E]" />}
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-[var(--brand)]" />}
                             </div>
                             <div className="min-w-0">
                               <div className="text-[13px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
@@ -1066,7 +1066,7 @@ function BudgetTab({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-[13px] font-black text-[#128C7E]">
+                            <div className="text-[13px] font-black text-[var(--brand)]">
                               {currency} {price.toLocaleString()}
                             </div>
                             <div className="text-[10px] text-[#667781]">{getPkgBillingUnitLabel(pkg)}</div>
@@ -1083,7 +1083,7 @@ function BudgetTab({
             {selectedPkg && (
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">4</span>
+                <span className="w-6 h-6 rounded-full bg-[var(--brand)] text-white text-[11px] font-black flex items-center justify-center shrink-0">4</span>
                 <label className="text-[12px] font-black text-[#111B21]">Enter Your Budget</label>
               </div>
               <div className="relative">
@@ -1095,12 +1095,12 @@ function BudgetTab({
                   value={budgetStr}
                   onChange={(e) => setBudgetStr(e.target.value)}
                   placeholder={currency === "UGX" ? "e.g. 50000" : "e.g. 5000"}
-                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[18px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all placeholder:text-[#CCC] placeholder:font-normal"
+                  className="w-full h-12 pl-12 pr-4 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[18px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all placeholder:text-[#CCC] placeholder:font-normal"
                 />
               </div>
               {unitPrice > 0 && (
                 <p className="text-[10px] text-[#667781] mt-1.5">
-                  Token rate: <b className="text-[#128C7E]">{currency} {unitPrice.toLocaleString()}</b> {getPkgBillingUnitLabel(selectedPkg)}
+                  Token rate: <b className="text-[var(--brand)]">{currency} {unitPrice.toLocaleString()}</b> {getPkgBillingUnitLabel(selectedPkg)}
                   <span> ({selectedPkg.token_name})</span>
                 </p>
               )}
@@ -1109,11 +1109,11 @@ function BudgetTab({
 
             {/* Calculation Result */}
             {budget > 0 && unitPrice > 0 && (
-              <div className="bg-[#128C7E]/5 border border-[#128C7E]/20 rounded-xl p-4">
+              <div className="bg-[var(--brand)]/5 border border-[var(--brand)]/20 rounded-xl p-4">
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
                     <div className="text-[10px] text-[#667781] font-bold uppercase tracking-wide">Tokens</div>
-                    <div className="text-[28px] font-black text-[#128C7E] leading-tight">{tokenCount}</div>
+                    <div className="text-[28px] font-black text-[var(--brand)] leading-tight">{tokenCount}</div>
                   </div>
                   <div>
                     <div className="text-[10px] text-[#667781] font-bold uppercase tracking-wide">Cost</div>
@@ -1140,14 +1140,14 @@ function BudgetTab({
             {tokenCount > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-[#128C7E] text-white text-[11px] font-black flex items-center justify-center shrink-0">5</span>
+                  <span className="w-6 h-6 rounded-full bg-[var(--brand)] text-white text-[11px] font-black flex items-center justify-center shrink-0">5</span>
                   <label className="text-[12px] font-black text-[#111B21]">Mobile Money Number</label>
                 </div>
                 <div className="flex gap-1.5">
                   <select
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
-                    className="h-10 pl-2 pr-1 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all shrink-0 w-[120px]"
+                    className="h-10 pl-2 pr-1 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all shrink-0 w-[120px]"
                   >
                     {COUNTRY_CODES.map((c) => (
                       <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
@@ -1159,7 +1159,7 @@ function BudgetTab({
                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
                     placeholder={currency === "UGX" ? "e.g. 0771234567" : "e.g. 0712345678"}
                     maxLength={15}
-                    className="flex-1 h-10 px-3 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+                    className="flex-1 h-10 px-3 rounded-lg bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
                   />
                 </div>
                 <p className="text-[10px] text-[#667781] mt-1">
@@ -1201,11 +1201,11 @@ function BudgetTab({
                 )}
                 <div className="border-t border-[#E9EDEF] pt-3 flex justify-between text-[13px]">
                   <span className="font-black text-[#111B21]">Tokens</span>
-                  <span className="font-black text-[#128C7E] text-[18px]">{tokenCount}</span>
+                  <span className="font-black text-[var(--brand)] text-[18px]">{tokenCount}</span>
                 </div>
                 <div className="border-t border-[#E9EDEF] pt-3 flex justify-between text-[14px]">
                   <span className="font-black text-[#111B21]">Total</span>
-                  <span className="font-black text-[#128C7E]">{currency} {totalCost.toLocaleString()}</span>
+                  <span className="font-black text-[var(--brand)]">{currency} {totalCost.toLocaleString()}</span>
                 </div>
                 {change > 0 && (
                   <div className="flex justify-between text-[11px]">
@@ -1230,7 +1230,7 @@ function BudgetTab({
               <button
                 onClick={handlePay}
                 disabled={!canPay}
-                className="w-full mt-4 h-11 rounded-xl bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-110 active:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="w-full mt-4 h-11 rounded-xl bg-[var(--brand)] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-110 active:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>
@@ -1359,19 +1359,19 @@ export function SimPage() {
     const currency = getPkgCurrency(pkg);
     const product = pkg.product?.product_name;
     const iconEl = <div className={`${sz.box} rounded-xl ${meta.tint} ${meta.text} grid place-items-center ${sz.text} shrink-0`}>{meta.icon}</div>;
-    const priceEl = <span className="font-black text-[#128C7E]">{currency} {price.toLocaleString()}</span>;
+    const priceEl = <span className="font-black text-[var(--brand)]">{currency} {price.toLocaleString()}</span>;
     const buyBtn = (cls = "") => (
-      <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} className={`rounded-lg bg-[#128C7E] text-white font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all ${cls}`}>Buy Now</button>
+      <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} className={`rounded-lg bg-[var(--brand)] text-white font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all ${cls}`}>Buy Now</button>
     );
     const buyMini = (
-      <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} title="Buy" className="h-7 px-2.5 rounded-md bg-[#128C7E] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all shrink-0">Buy</button>
+      <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} title="Buy" className="h-7 px-2.5 rounded-md bg-[var(--brand)] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all shrink-0">Buy</button>
     );
     const common = { key: pkg.token_id, onDoubleClick: () => setBuyTarget(pkg) };
 
     // Icon views — centered tile with a Buy button
     if (pkgView === "xl" || pkgView === "large" || pkgView === "medium") {
       return (
-        <div {...common} className="group rounded-xl border border-[#E9EDEF] bg-white p-3 flex flex-col items-center text-center gap-2 cursor-default hover:border-[#128C7E]/40 hover:shadow-sm transition-all">
+        <div {...common} className="group rounded-xl border border-[#E9EDEF] bg-white p-3 flex flex-col items-center text-center gap-2 cursor-default hover:border-[var(--brand)]/40 hover:shadow-sm transition-all">
           {iconEl}
           <div className="min-w-0 w-full">
             <div className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
@@ -1386,7 +1386,7 @@ export function SimPage() {
     // Small / List — compact horizontal row
     if (pkgView === "small" || pkgView === "list") {
       return (
-        <div {...common} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-[#E9EDEF] bg-white cursor-default hover:border-[#128C7E]/40 transition-all">
+        <div {...common} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-[#E9EDEF] bg-white cursor-default hover:border-[var(--brand)]/40 transition-all">
           {iconEl}
           <div className="min-w-0 flex-1">
             <div className="text-[12px] font-bold text-[#111B21] truncate">{pkg.token_name}</div>
@@ -1400,7 +1400,7 @@ export function SimPage() {
     // Tiles — icon + meta + price + Buy
     if (pkgView === "tiles") {
       return (
-        <div {...common} className="group flex flex-col gap-2 rounded-xl border border-[#E9EDEF] bg-white p-3 cursor-default hover:border-[#128C7E]/40 hover:shadow-sm transition-all">
+        <div {...common} className="group flex flex-col gap-2 rounded-xl border border-[#E9EDEF] bg-white p-3 cursor-default hover:border-[var(--brand)]/40 hover:shadow-sm transition-all">
           <div className="flex items-start gap-3">
             {iconEl}
             <div className="min-w-0 flex-1">
@@ -1408,7 +1408,7 @@ export function SimPage() {
               <div className="text-[10px] text-[#667781] truncate capitalize">{pkg.token_type || "—"}{product ? ` · ${product.toUpperCase()}` : ""}</div>
               <div className="text-[13px] mt-0.5 truncate">{priceEl} <span className="text-[10px] text-[#9AA5AD] font-normal">{getPkgBillingUnitLabel(pkg)}</span></div>
             </div>
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 capitalize shrink-0">{pkg.token_type}</span>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 capitalize shrink-0">{pkg.token_type}</span>
           </div>
           {buyBtn("w-full h-8 text-[12px]")}
         </div>
@@ -1417,12 +1417,12 @@ export function SimPage() {
 
     // Content — full-width detailed row
     return (
-      <div {...common} className="group flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#E9EDEF] bg-white cursor-default hover:border-[#128C7E]/40 transition-all">
+      <div {...common} className="group flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#E9EDEF] bg-white cursor-default hover:border-[var(--brand)]/40 transition-all">
         {iconEl}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</span>
-            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30 capitalize shrink-0">{pkg.token_type}</span>
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 capitalize shrink-0">{pkg.token_type}</span>
           </div>
           <div className="text-[10px] text-[#667781] truncate mt-0.5">
             {product ? `Product ${product.toUpperCase()}` : "No product"} · {getPkgBillingUnitLabel(pkg)} · {getPkgBillingTrigger(pkg)}
@@ -1654,7 +1654,7 @@ export function SimPage() {
                 onClick={() => setTab(t.key)}
                 className={`h-9 px-4 rounded-lg text-[12px] font-black border cursor-pointer transition-all flex items-center gap-1.5 ${
                   tab === t.key
-                    ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                    ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                     : "bg-white border-[#E9EDEF] text-[#667781] hover:bg-[#F0F2F5]"
                 }`}
               >
@@ -1680,7 +1680,7 @@ export function SimPage() {
               {balanceLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                     <span className="text-[12px] text-[#667781]">Loading balance...</span>
                   </div>
                 </div>
@@ -1691,7 +1691,7 @@ export function SimPage() {
                   <p className="text-[12px] text-[#667781]">{balanceError}</p>
                   <button
                     onClick={() => fetchBalance()}
-                    className="mt-3 h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+                    className="mt-3 h-9 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
                   >
                     Try Again
                   </button>
@@ -1703,7 +1703,7 @@ export function SimPage() {
                   <p className="text-[12px] text-[#667781]">Purchase your first token package to get started.</p>
                   <button
                     onClick={() => setTab("buy")}
-                    className="mt-3 h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+                    className="mt-3 h-9 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
                   >
                     Browse Packages
                   </button>
@@ -1712,9 +1712,9 @@ export function SimPage() {
                 <>
                   {/* Summary KPIs */}
                   <div className="grid grid-cols-4 gap-3 mb-4">
-                    <div className="bg-[#128C7E]/5 border border-[#128C7E]/15 rounded-xl p-3 text-center">
+                    <div className="bg-[var(--brand)]/5 border border-[var(--brand)]/15 rounded-xl p-3 text-center">
                       <div className="text-[10px] text-[#667781] font-black uppercase">Total Left</div>
-                      <div className="text-[18px] font-black text-[#128C7E]">{totalHoursLeft.toLocaleString()}</div>
+                      <div className="text-[18px] font-black text-[var(--brand)]">{totalHoursLeft.toLocaleString()}</div>
                       <div className="text-[9px] text-[#667781]">hours</div>
                     </div>
                     <div className="bg-[#F0F2F5] border border-[#E9EDEF] rounded-xl p-3 text-center">
@@ -1769,14 +1769,14 @@ export function SimPage() {
                 <label className="text-[12px] font-black text-[#111B21] mb-1.5 block">Filter by Product</label>
                 {buyProductsLoading ? (
                   <p className="text-[11px] text-[#667781] flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                    <span className="inline-block w-3 h-3 border-2 border-[var(--brand)]/30 border-t-[var(--brand)] rounded-full animate-spin" />
                     Loading products…
                   </p>
                 ) : (
                   <select
                     value={buyProductFilter ?? ""}
                     onChange={(e) => { setBuyProductFilter(e.target.value || null); setPkgSearch(""); }}
-                    className="w-full max-w-xs h-10 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all cursor-pointer capitalize"
+                    className="w-full max-w-xs h-10 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all cursor-pointer capitalize"
                   >
                     <option value="">All Products</option>
                     {buyProducts.map((p) => (
@@ -1798,7 +1798,7 @@ export function SimPage() {
                     <button
                       onClick={() => setPkgSortMenuOpen((o) => !o)}
                       title="Sort by"
-                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgSortMenuOpen ? "bg-[#128C7E] text-white border-[#128C7E]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgSortMenuOpen ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
                     >
                       <span className="text-[12px] leading-none">↕</span>
                       Sort
@@ -1814,7 +1814,7 @@ export function SimPage() {
                               onClick={() => setPkgSort((prev) => ({ key: o.key, dir: prev.key === o.key ? prev.dir : "asc" }))}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
                             >
-                              <span className="w-3 text-[#128C7E] text-[10px]">{pkgSort.key === o.key ? "●" : ""}</span>
+                              <span className="w-3 text-[var(--brand)] text-[10px]">{pkgSort.key === o.key ? "●" : ""}</span>
                               <span className={pkgSort.key === o.key ? "font-black text-[#111B21]" : "text-[#111B21]"}>{o.label}</span>
                             </button>
                           ))}
@@ -1825,7 +1825,7 @@ export function SimPage() {
                               onClick={() => setPkgSort((prev) => ({ ...prev, dir: d }))}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
                             >
-                              <span className="w-3 text-[#128C7E] text-[10px]">{pkgSort.dir === d ? "●" : ""}</span>
+                              <span className="w-3 text-[var(--brand)] text-[10px]">{pkgSort.dir === d ? "●" : ""}</span>
                               <span className="w-4 text-[11px] text-[#667781] text-center">{d === "asc" ? "▲" : "▼"}</span>
                               <span className={pkgSort.dir === d ? "font-black text-[#111B21]" : "text-[#111B21]"}>{d === "asc" ? "Ascending" : "Descending"}</span>
                             </button>
@@ -1840,7 +1840,7 @@ export function SimPage() {
                     <button
                       onClick={() => setPkgViewMenuOpen((o) => !o)}
                       title="Change view"
-                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgViewMenuOpen ? "bg-[#128C7E] text-white border-[#128C7E]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgViewMenuOpen ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
                     >
                       <span className="text-[13px] leading-none">{PKG_VIEW_OPTIONS.find((o) => o.key === pkgView)?.glyph}</span>
                       View
@@ -1856,7 +1856,7 @@ export function SimPage() {
                               onClick={() => { setPkgView(o.key); setPkgViewMenuOpen(false); }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
                             >
-                              <span className="w-3 text-[#128C7E] text-[10px]">{pkgView === o.key ? "●" : ""}</span>
+                              <span className="w-3 text-[var(--brand)] text-[10px]">{pkgView === o.key ? "●" : ""}</span>
                               <span className="w-4 text-[14px] text-[#667781] text-center">{o.glyph}</span>
                               <span className={pkgView === o.key ? "font-black text-[#111B21]" : "text-[#111B21]"}>{o.label}</span>
                             </button>
@@ -1881,14 +1881,14 @@ export function SimPage() {
                   value={pkgSearch}
                   onChange={(e) => setPkgSearch(e.target.value)}
                   placeholder="Search tokens by name, type, or currency..."
-                  className="w-full h-9 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+                  className="w-full h-9 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all"
                 />
               </div>
 
               {isLoadingTokens ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                     <span className="text-[12px] text-[#667781]">Loading packages...</span>
                   </div>
                 </div>
@@ -1929,9 +1929,9 @@ export function SimPage() {
                           <th key={c.key} className="px-3 py-2">
                             <button
                               onClick={() => togglePkgSort(c.key)}
-                              className="flex items-center gap-1 text-[10px] font-black text-[#667781] uppercase tracking-wide bg-transparent border-none cursor-pointer hover:text-[#128C7E] transition-colors"
+                              className="flex items-center gap-1 text-[10px] font-black text-[#667781] uppercase tracking-wide bg-transparent border-none cursor-pointer hover:text-[var(--brand)] transition-colors"
                             >
-                              {c.label}<span className="text-[8px] text-[#128C7E]">{pkgSortArrow(c.key)}</span>
+                              {c.label}<span className="text-[8px] text-[var(--brand)]">{pkgSortArrow(c.key)}</span>
                             </button>
                           </th>
                         ))}
@@ -1951,11 +1951,11 @@ export function SimPage() {
                               {productName && <div className="text-[10px] text-[#667781] uppercase tracking-wide">{productName}</div>}
                             </td>
                             <td className="px-3 py-2.5">
-                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E] border border-[#128C7E]/30">
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30">
                                 {pkg.token_type}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 text-[12px] font-black text-[#128C7E]">
+                            <td className="px-3 py-2.5 text-[12px] font-black text-[var(--brand)]">
                               {currency} {price.toLocaleString()}
                               <span className="text-[10px] text-[#667781] font-normal"> {getPkgBillingUnitLabel(pkg)}</span>
                             </td>
@@ -1963,7 +1963,7 @@ export function SimPage() {
                             <td className="px-3 py-2.5 text-center">
                               <button
                                 onClick={() => setBuyTarget(pkg)}
-                                className="h-7 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+                                className="h-7 px-3 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
                               >
                                 Buy Now
                               </button>
@@ -2015,7 +2015,7 @@ export function SimPage() {
               {devicesLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                     <span className="text-[12px] text-[#667781]">Loading devices...</span>
                   </div>
                 </div>
@@ -2081,7 +2081,7 @@ export function SimPage() {
                                   <button
                                     onClick={() => setConfirmAction({ type: "restore", imei: d.device_imei, deviceName: d.device_name })}
                                     title="Restore subscription"
-                                    className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[10px] font-black cursor-pointer hover:bg-[#128C7E]/20 transition-all gap-1"
+                                    className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/30 text-[var(--brand)] text-[10px] font-black cursor-pointer hover:bg-[var(--brand)]/20 transition-all gap-1"
                                   >
                                     ▶ Restore
                                   </button>
@@ -2122,7 +2122,7 @@ export function SimPage() {
               {txnLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                     <span className="text-[12px] text-[#667781]">Loading transactions...</span>
                   </div>
                 </div>
@@ -2133,7 +2133,7 @@ export function SimPage() {
                   <p className="text-[12px] text-[#667781]">Your payment history will appear here after your first purchase.</p>
                   <button
                     onClick={() => setTab("buy")}
-                    className="mt-3 h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+                    className="mt-3 h-9 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
                   >
                     Buy Tokens
                   </button>
@@ -2157,7 +2157,7 @@ export function SimPage() {
                       {transactions.map((t, i) => {
                         const st = t.payment_status?.toLowerCase() || "";
                         const statusClass = st === "success"
-                          ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                          ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                           : st === "pending"
                             ? "bg-[#F97316]/10 border-[#F97316]/30 text-[#F97316]"
                             : st === "failed"

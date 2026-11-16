@@ -202,7 +202,7 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
         {imei && (
           <div className={`mt-2 text-[12px] rounded-lg px-3 py-2 border ${profile ? "border-[#E9EDEF] text-[#667781]" : "border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]"}`}>
             {profile ? profileLine(profile) : "No fuel profile: consumption will not be checked."}{" "}
-            <button type="button" onClick={() => onSetProfile(imei)} className="bg-transparent border-0 p-0 font-extrabold text-[#128C7E] cursor-pointer underline">
+            <button type="button" onClick={() => onSetProfile(imei)} className="bg-transparent border-0 p-0 font-extrabold text-[var(--brand)] cursor-pointer underline">
               {profile ? "Change" : "Set profile"}
             </button>
           </div>
@@ -237,7 +237,7 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
         <div className="flex gap-1.5">
           {FUEL_TYPES.map((t) => (
             <button key={t} type="button" onClick={() => setFuelType(t)}
-              className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${fuelType === t ? "bg-[#075E54] border-[#075E54] text-white" : "bg-white border-[#E9EDEF]"}`}>
+              className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${fuelType === t ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-white border-[#E9EDEF]"}`}>
               {fuelLabel(t)}
             </button>
           ))}
@@ -276,7 +276,7 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
         <div className="flex gap-1.5 flex-wrap">
           {PAYMENT_METHODS.map((m) => (
             <button key={m} type="button" onClick={() => setPayment(m)}
-              className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${payment === m ? "bg-[#075E54] border-[#075E54] text-white" : "bg-white border-[#E9EDEF]"}`}>
+              className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${payment === m ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-white border-[#E9EDEF]"}`}>
               {paymentLabel(m)}
             </button>
           ))}
@@ -545,7 +545,7 @@ export function FuelProfilePanel({ imei, label, existing, capability, onClose, o
         <div className="flex gap-1.5">
           {FUEL_TYPES.map((f) => (
             <button key={f} type="button" onClick={() => setFuelType(f)}
-              className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${fuelType === f ? "bg-[#075E54] border-[#075E54] text-white" : "bg-white border-[#E9EDEF]"}`}>
+              className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${fuelType === f ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-white border-[#E9EDEF]"}`}>
               {fuelLabel(f)}
             </button>
           ))}

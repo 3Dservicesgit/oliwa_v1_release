@@ -130,7 +130,7 @@ export function DriversPage() {
       <div className="flex gap-1.5">
         {([["drivers", "Drivers"], ["scoring", "Scoring rules"]] as [Tab, string][]).map(([t, label]) => (
           <button key={t} type="button" onClick={() => setTab(t)}
-            className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${tab === t ? "bg-[#075E54] border-[#075E54] text-white" : "bg-white border-[#E9EDEF] text-[#111B21]"}`}>
+            className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${tab === t ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-white border-[#E9EDEF] text-[#111B21]"}`}>
             {label}
           </button>
         ))}

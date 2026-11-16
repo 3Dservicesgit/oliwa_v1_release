@@ -664,7 +664,7 @@ export default function GatehousePage() {
                     placeholder="Filter vehicles…"
                     aria-label="Filter vehicles"
                     className="w-full h-8 rounded-lg border border-[#E9EDEF] px-3 text-[11px] text-[#111B21]
-                      placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors mb-1.5"
+                      placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[var(--brand)] transition-colors mb-1.5"
                   />
                 )}
                 <select
@@ -672,7 +672,7 @@ export default function GatehousePage() {
                   value={selImei}
                   onChange={(e) => setSelImei(e.target.value)}
                   className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px]
-                    text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA] cursor-pointer"
+                    text-[#111B21] outline-none focus:border-[var(--brand)] bg-[#F8F9FA] cursor-pointer"
                 >
                   <option value="">— Select a vehicle —</option>
                   {filteredDevices.map((d) => (
@@ -709,10 +709,10 @@ export default function GatehousePage() {
                           <input type="date" aria-label={`${which} date`} value={start ? fromDate : toDate}
                             max={inputDate(today)}
                             onChange={(e) => (start ? setFromDate : setToDate)(e.target.value)}
-                            className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                            className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] bg-[#F8F9FA]" />
                           <input type="time" aria-label={`${which} time`} value={start ? fromTime : toTime}
                             onChange={(e) => (start ? setFromTime : setToTime)(e.target.value)}
-                            className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8F9FA]" />
+                            className="w-[110px] h-9 rounded-lg border border-[#E9EDEF] px-2 text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] bg-[#F8F9FA]" />
                         </div>
                       </div>
                     );
@@ -737,7 +737,7 @@ export default function GatehousePage() {
                   </div>
                   {rangeError && <div className="text-[11px] text-[#B45309]">{rangeError}</div>}
                   <button type="button" onClick={playRange} disabled={!selImei || rangeLoading}
-                    className="h-9 rounded-lg bg-[#128C7E] text-white text-[12px] font-extrabold border-none cursor-pointer
+                    className="h-9 rounded-lg bg-[var(--brand)] text-white text-[12px] font-extrabold border-none cursor-pointer
                       hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                     {rangeLoading
                       ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Loading…</>
@@ -756,7 +756,7 @@ export default function GatehousePage() {
               )}
               {selImei && dayLoading && (
                 <div className="px-4 py-8 text-center">
-                  <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[#128C7E] rounded-full animate-spin" />
+                  <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[var(--brand)] rounded-full animate-spin" />
                   <div className="text-[12px] text-[#667781] mt-2">
                     Loading {dayTitle(day, today)}…{loadedPages > 1 ? ` page ${loadedPages}` : ""}
                     {truncatedPages ? ` (${MAX_POINTS.toLocaleString()} points)` : ""}
@@ -765,7 +765,7 @@ export default function GatehousePage() {
               )}
               {selImei && !dayLoading && dayTrip && !hasDay && (
                 <div className="flex items-start gap-3 px-4 py-6">
-                  <span className="shrink-0 w-10 h-10 rounded-xl bg-[#E7F3F1] text-[#075E54] flex items-center justify-center"><CarIcon size={18} /></span>
+                  <span className="shrink-0 w-10 h-10 rounded-xl bg-[var(--brand-soft)] text-[var(--brand-dark)] flex items-center justify-center"><CarIcon size={18} /></span>
                   <p className="m-0 text-[13px] text-[#667781]">
                     {dayTrip.unavailable ?? `Nothing recorded on ${dayLabel(day)}. The unit sent no positions that day.`}
                   </p>
@@ -806,7 +806,7 @@ export default function GatehousePage() {
                 <div className="font-black text-[14px] text-[#111B21] truncate">
                   {selectedDevice ? selectedDevice.name : "Route Map"}
                 </div>
-                <div className="text-[11px] text-[#128C7E] font-bold truncate">
+                <div className="text-[11px] text-[var(--brand)] font-bold truncate">
                   {playback ? playback.title : selImei ? `Trip history · ${dayTitle(day, today)}` : ""}
                 </div>
               </div>
@@ -816,9 +816,9 @@ export default function GatehousePage() {
                   <div className="relative">
                     <button onClick={() => setReportOpen((o) => !o)} disabled={reportBusy} aria-haspopup="menu" aria-expanded={reportOpen}
                       title="Download the Trips report for these dates"
-                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA] disabled:opacity-50 flex items-center gap-1.5">
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[var(--brand-dark)] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA] disabled:opacity-50 flex items-center gap-1.5">
                       {reportBusy
-                        ? <span className="inline-block w-3 h-3 border-2 border-[#128C7E]/30 border-t-[#128C7E] rounded-full animate-spin" />
+                        ? <span className="inline-block w-3 h-3 border-2 border-[var(--brand)]/30 border-t-[var(--brand)] rounded-full animate-spin" />
                         : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>}
                       Trips report
                     </button>
@@ -838,16 +838,16 @@ export default function GatehousePage() {
                   <>
                     {playing && !follow && (
                       <button onClick={followVehicle} title="Follow the vehicle again"
-                        className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-extrabold border-none cursor-pointer hover:brightness-110">
+                        className="h-8 px-3 rounded-lg bg-[var(--brand)] text-white text-[11px] font-extrabold border-none cursor-pointer hover:brightness-110">
                         Follow vehicle
                       </button>
                     )}
                     <button onClick={fitRoute}
-                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA]">
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[var(--brand-dark)] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA]">
                       Fit route
                     </button>
                     <button onClick={backToDay}
-                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA]">
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[var(--brand-dark)] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA]">
                       Back to the day
                     </button>
                   </>
@@ -855,11 +855,11 @@ export default function GatehousePage() {
                   <>
                     <button onClick={() => { setSelected(null); if (timeline) fit(timeline.points); }}
                       disabled={!hasDay}
-                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[#075E54] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA] disabled:opacity-40 disabled:cursor-not-allowed">
+                      className="h-8 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[var(--brand-dark)] text-[11px] font-extrabold cursor-pointer hover:bg-[#F8F9FA] disabled:opacity-40 disabled:cursor-not-allowed">
                       Show the whole day
                     </button>
                     <button onClick={playDay} disabled={!timeline || timeline.points.length < 2}
-                      className="h-8 px-3 rounded-lg bg-[#25D366] text-[#053B33] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                      className="h-8 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
                       <PlayIcon size={12} /> Play the whole day
                     </button>
                   </>
@@ -869,7 +869,7 @@ export default function GatehousePage() {
 
             {reportMsg && (
               <div role="status" className={`shrink-0 px-4 py-1.5 text-[11px] border-b flex items-center justify-between gap-2 ${
-                reportMsg.ok ? "text-[#075E54] bg-[#E7F3F1] border-[#D8E8E4]" : "text-[#B45309] bg-[#FFFBEB] border-[#FDE68A]"}`}>
+                reportMsg.ok ? "text-[var(--brand-dark)] bg-[var(--brand-soft)] border-[#D8E8E4]" : "text-[#B45309] bg-[#FFFBEB] border-[#FDE68A]"}`}>
                 {reportMsg.text}
                 <button onClick={() => setReportMsg(null)} aria-label="Dismiss" className="bg-transparent border-none cursor-pointer text-current text-[14px] leading-none">×</button>
               </div>

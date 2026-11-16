@@ -179,7 +179,7 @@ function GeofenceZoneSelector({
         </label>
         {loading ? (
           <div className="flex items-center gap-2 py-3">
-            <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
             <span className="text-[12px] text-[#667781]">Loading zones...</span>
           </div>
         ) : zones.length === 0 ? (
@@ -309,7 +309,7 @@ function EventDeviceSelector({
 
       {loading ? (
         <div className="flex items-center gap-2 py-3">
-          <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[12px] text-[#667781]">Loading devices...</span>
         </div>
       ) : devices.length === 0 ? (
@@ -324,7 +324,7 @@ function EventDeviceSelector({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search devices..."
-              className="flex-1 h-8 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+              className="flex-1 h-8 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)]"
             />
             <button
               type="button"
@@ -342,7 +342,7 @@ function EventDeviceSelector({
                 key={d.device_imei}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer transition-all ${
                   selectedImeis.includes(d.device_imei)
-                    ? "bg-[#128C7E]/8 border border-[#128C7E]/30"
+                    ? "bg-[var(--brand)]/8 border border-[var(--brand)]/30"
                     : "border border-transparent hover:bg-[#F0F2F5]"
                 }`}
               >
@@ -350,7 +350,7 @@ function EventDeviceSelector({
                   type="checkbox"
                   checked={selectedImeis.includes(d.device_imei)}
                   onChange={() => toggle(d.device_imei)}
-                  className="accent-[#128C7E] w-3.5 h-3.5"
+                  className="accent-[var(--brand)] w-3.5 h-3.5"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-[12px] font-black text-[#111B21] truncate">
@@ -366,7 +366,7 @@ function EventDeviceSelector({
           </div>
 
           {selectedImeis.length > 0 && (
-            <p className="text-[11px] text-[#128C7E] mt-1 font-black">
+            <p className="text-[11px] text-[var(--brand)] mt-1 font-black">
               {selectedImeis.length} device{selectedImeis.length !== 1 ? "s" : ""} selected
             </p>
           )}
@@ -520,7 +520,7 @@ function CreateEventDrawer({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Over Speed Alert"
-              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)]"
             />
           </div>
 
@@ -532,7 +532,7 @@ function CreateEventDrawer({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what this event rule monitors..."
               rows={3}
-              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E] resize-none"
+              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)] resize-none"
             />
           </div>
 
@@ -565,7 +565,7 @@ function CreateEventDrawer({
                   onClick={() => toggleChannel(ch)}
                   className={`h-8 px-4 rounded-full text-[12px] font-black border cursor-pointer transition-all ${
                     alertChannels.includes(ch)
-                      ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                      ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                       : "bg-white border-[#E9EDEF] text-[#667781]"
                   }`}
                 >
@@ -584,7 +584,7 @@ function CreateEventDrawer({
                 onChange={(e) => setAlertEmail(e.target.value)}
                 placeholder="alert@company.com"
                 type="email"
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)]"
               />
             </div>
           )}
@@ -597,7 +597,7 @@ function CreateEventDrawer({
                 value={alertPhone}
                 onChange={(e) => setAlertPhone(e.target.value)}
                 placeholder="+256700123456, +254712345678"
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)]"
               />
               <p className="text-[11px] text-[#667781] mt-1">Comma-separated phone numbers with country code. Used for SMS and WhatsApp alerts.</p>
             </div>
@@ -622,7 +622,7 @@ function CreateEventDrawer({
           <button
             onClick={handleSubmit}
             disabled={create.isRunning}
-            className="h-10 px-5 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
+            className="h-10 px-5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {create.isRunning ? "Creating..." : "Create Event"}
           </button>
@@ -815,7 +815,7 @@ function EditEventDrawer({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+              className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
             />
           </div>
 
@@ -826,7 +826,7 @@ function EditEventDrawer({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] resize-none"
+              className="w-full rounded-lg border border-[#E9EDEF] px-3 py-2 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] resize-none"
             />
           </div>
 
@@ -864,7 +864,7 @@ function EditEventDrawer({
                   onClick={() => toggleChannel(ch)}
                   className={`h-8 px-4 rounded-full text-[12px] font-black border cursor-pointer transition-all ${
                     alertChannels.includes(ch)
-                      ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                      ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                       : "bg-white border-[#E9EDEF] text-[#667781]"
                   }`}
                 >
@@ -882,7 +882,7 @@ function EditEventDrawer({
                 value={alertEmail}
                 onChange={(e) => setAlertEmail(e.target.value)}
                 type="email"
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
               />
             </div>
           )}
@@ -894,7 +894,7 @@ function EditEventDrawer({
               <input
                 value={alertPhone}
                 onChange={(e) => setAlertPhone(e.target.value)}
-                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E]"
+                className="w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)]"
               />
             </div>
           )}
@@ -919,7 +919,7 @@ function EditEventDrawer({
           <button
             onClick={handleSubmit}
             disabled={update.isRunning}
-            className="h-10 px-5 rounded-lg bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
+            className="h-10 px-5 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {update.isRunning ? "Saving..." : "Save Changes"}
           </button>
@@ -1022,7 +1022,7 @@ function EventCard({
   }
 
   return (
-    <div className="bg-white border border-[#E9EDEF] rounded-xl p-4 hover:border-[#128C7E]/40 transition-all">
+    <div className="bg-white border border-[#E9EDEF] rounded-xl p-4 hover:border-[var(--brand)]/40 transition-all">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className={`w-10 h-10 rounded-xl border flex items-center justify-center text-[18px] shrink-0 ${colorClass}`}>
@@ -1037,7 +1037,7 @@ function EventCard({
           <GuardedButton
             permission="events.update"
             onClick={() => onEdit(event)}
-            className="w-8 h-8 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] text-[12px] cursor-pointer grid place-items-center hover:bg-[#128C7E]/10 hover:text-[#128C7E]"
+            className="w-8 h-8 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[#667781] text-[12px] cursor-pointer grid place-items-center hover:bg-[var(--brand)]/10 hover:text-[var(--brand)]"
           >
             &#9998;
           </GuardedButton>
@@ -1083,7 +1083,7 @@ function EventCard({
           <span className="flex items-center gap-1">
             <span className="font-black">Channels:</span>
             {channels.map((ch) => (
-              <span key={ch} className="bg-[#128C7E]/10 text-[#128C7E] px-1.5 py-0.5 rounded text-[10px] font-black">
+              <span key={ch} className="bg-[var(--brand)]/10 text-[var(--brand)] px-1.5 py-0.5 rounded text-[10px] font-black">
                 {channelLabel(ch)}
               </span>
             ))}
@@ -1155,7 +1155,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-3 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[13px] text-[#667781]">Loading alerts...</span>
         </div>
       </div>
@@ -1170,7 +1170,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
         <button
           type="button"
           onClick={() => void fetchNotifications()}
-          className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-extrabold border-none cursor-pointer"
+          className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-extrabold border-none cursor-pointer"
         >
           Try again
         </button>
@@ -1190,7 +1190,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
               onClick={() => setFilterCondition(f)}
               className={`h-7 px-3 rounded-full text-[11px] font-black border cursor-pointer transition-all ${
                 filterCondition === f
-                  ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]"
+                  ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]"
                   : "bg-white border-[#E9EDEF] text-[#667781]"
               }`}
             >
@@ -1225,7 +1225,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
               <div
                 key={n.notification_uid}
                 className={`bg-white border rounded-xl px-4 py-3 flex items-start gap-3 transition-all ${
-                  n.is_read ? "border-[#E9EDEF]" : "border-[#128C7E]/40 bg-[#128C7E]/3"
+                  n.is_read ? "border-[#E9EDEF]" : "border-[var(--brand)]/40 bg-[var(--brand)]/3"
                 }`}
               >
                 <span className={`w-8 h-8 rounded-lg border flex items-center justify-center text-[14px] shrink-0 mt-0.5 ${colorClass}`}>
@@ -1235,7 +1235,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="font-black text-[13px] text-[#111B21] truncate">{n.event_name}</span>
                     {!n.is_read && (
-                      <span className="w-2 h-2 rounded-full bg-[#128C7E] shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-[var(--brand)] shrink-0" />
                     )}
                   </div>
                   <p className="text-[12px] text-[#667781] mb-1">
@@ -1260,7 +1260,7 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
                       <Link
                         to={`/gatehouse?imei=${encodeURIComponent(n.device_imei)}${
                           /^\d{4}-\d{2}-\d{2}/.test(n.date_triggered ?? "") ? `&date=${n.date_triggered.slice(0, 10)}` : ""}`}
-                        className="font-black text-[#128C7E] no-underline hover:underline"
+                        className="font-black text-[var(--brand)] no-underline hover:underline"
                         title="This vehicle's trips and stops on the alert's day"
                       >
                         Trip history →
@@ -1364,7 +1364,7 @@ export function EventsPage() {
                 <GuardedButton
                   permission="events.create"
                   onClick={() => setCreateOpen(true)}
-                  className="h-8 px-4 rounded-full bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105 whitespace-nowrap"
+                  className="h-8 px-4 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-black border-none cursor-pointer hover:brightness-105 whitespace-nowrap"
                 >
                   + New Event Rule
                 </GuardedButton>
@@ -1391,7 +1391,7 @@ export function EventsPage() {
             </div>
             <div className="bg-white border border-[#E9EDEF] rounded-xl p-3">
               <div className="text-[11px] text-[#667781]">Other Alerts</div>
-              <div className="text-[22px] font-black text-[#128C7E] mt-1 leading-tight">
+              <div className="text-[22px] font-black text-[var(--brand)] mt-1 leading-tight">
                 {(conditionCounts["ignition_change"] ?? 0) +
                   (conditionCounts["low_battery"] ?? 0) +
                   (conditionCounts["device_offline"] ?? 0)}
@@ -1406,7 +1406,7 @@ export function EventsPage() {
               onClick={() => setActiveTab("rules")}
               className={`flex-1 h-9 rounded-lg text-[13px] font-black border-none cursor-pointer transition-all ${
                 activeTab === "rules"
-                  ? "bg-[#128C7E] text-white"
+                  ? "bg-[var(--brand)] text-white"
                   : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]"
               }`}
             >
@@ -1416,7 +1416,7 @@ export function EventsPage() {
               onClick={() => setActiveTab("history")}
               className={`flex-1 h-9 rounded-lg text-[13px] font-black border-none cursor-pointer transition-all ${
                 activeTab === "history"
-                  ? "bg-[#128C7E] text-white"
+                  ? "bg-[var(--brand)] text-white"
                   : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]"
               }`}
             >
@@ -1450,7 +1450,7 @@ export function EventsPage() {
               {loading ? (
                 <div className="flex-1 flex items-center justify-center py-12">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-3 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-3 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                     <span className="text-[13px] text-[#667781]">Loading events...</span>
                   </div>
                 </div>
@@ -1479,7 +1479,7 @@ export function EventsPage() {
                     <GuardedButton
                       permission="events.create"
                       onClick={() => setCreateOpen(true)}
-                      className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105"
+                      className="h-10 px-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105"
                     >
                       Create First Event Rule
                     </GuardedButton>

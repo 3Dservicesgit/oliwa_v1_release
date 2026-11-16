@@ -19,7 +19,7 @@ const stText: Record<string, string> = {
 const typeBg: Record<string, string> = {
   MakerChecker: "bg-[#FEF2F2] text-[#EF4444]",
   SoD:          "bg-[#FFF7ED] text-[#F97316]",
-  TimeBound:    "bg-[#EAF7F3] text-[#128C7E]",
+  TimeBound:    "bg-[#EAF7F3] text-[var(--brand)]",
   GeoFence:     "bg-[#EFF6FF] text-[#3B82F6]",
   Custom:       "bg-[#F0F2F5] text-[#667781]",
 };

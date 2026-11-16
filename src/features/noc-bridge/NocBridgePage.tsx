@@ -248,8 +248,8 @@ function KpiChip({ label, value, active, onClick }: {
       className={[
         "flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-center transition-all cursor-pointer border",
         active
-          ? "bg-[#128C7E] text-white border-[#128C7E]"
-          : "bg-white text-[#111B21] border-[#E9EDEF] hover:border-[#128C7E]",
+          ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+          : "bg-white text-[#111B21] border-[#E9EDEF] hover:border-[var(--brand)]",
       ].join(" ")}
     >
       <span className="text-[16px] font-black leading-tight">{value}</span>
@@ -1023,7 +1023,7 @@ export default function NocBridgePage() {
               onChange={(e) => { setSearchQ(e.target.value); setPage(1); }}
               placeholder="Search name, IMEI, location…"
               className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21]
-                placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors"
+                placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[var(--brand)] transition-colors"
             />
           </div>
 
@@ -1031,7 +1031,7 @@ export default function NocBridgePage() {
           <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
             {loading && (
               <div className="px-4 py-8 text-center">
-                <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[#128C7E] rounded-full animate-spin" />
+                <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[var(--brand)] rounded-full animate-spin" />
                 <div className="text-[12px] text-[#667781] mt-2">Loading devices…</div>
               </div>
             )}
@@ -1052,7 +1052,7 @@ export default function NocBridgePage() {
                   className={[
                     "flex items-center gap-3 px-3 py-2.5 cursor-pointer",
                     "border-b border-[#E9EDEF] last:border-b-0 transition-colors",
-                    selected ? "bg-[#E7F7EF] border-l-[3px] border-l-[#128C7E]" : "hover:bg-[#F8F9FA]",
+                    selected ? "bg-[#E7F7EF] border-l-[3px] border-l-[var(--brand)]" : "hover:bg-[#F8F9FA]",
                     expired ? "opacity-50" : "",
                   ].join(" ")}
                 >
@@ -1202,7 +1202,7 @@ export default function NocBridgePage() {
             {/* Detail body */}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2" style={{ scrollbarWidth: "thin" }}>
               {/* Location section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-2 mb-1">Location</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-2 mb-1">Location</div>
               <DetailRow icon="📍" label="Address" value={selectedUnit.geocoded_location || selectedUnit.country || "Waiting for GPS…"} />
               <DetailRow icon="🧭" label="Coordinates"
                 value={selectedUnit.coords ? `${selectedUnit.coords.lat.toFixed(6)}, ${selectedUnit.coords.lng.toFixed(6)}` : "—"} mono />
@@ -1211,27 +1211,27 @@ export default function NocBridgePage() {
               <DetailRow icon="🔄" label="Motion State" value={selectedUnit.motion_state || selectedUnit.status} />
 
               {/* Vehicle section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Vehicle</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Vehicle</div>
               <DetailRow icon="🚗" label="Make / Model"
                 value={[selectedUnit.car_make, selectedUnit.car_model].filter(Boolean).join(" ") || "—"} />
               <DetailRow icon="📋" label="Vehicle Type" value={selectedUnit.car_type} />
               <DetailRow icon="🔑" label="VIN" value={selectedUnit.vin_number} mono />
 
               {/* Device section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Device</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Device</div>
               <DetailRow icon="📡" label="Hardware" value={[selectedUnit.hardware, selectedUnit.hardware_model].filter(Boolean).join(" / ") || "—"} />
               <DetailRow icon="📶" label="SIM Card" value={selectedUnit.simcard} mono />
               <DetailRow icon="🛰" label="Satellites" value={selectedUnit.satellites > 0 ? String(selectedUnit.satellites) : "—"} />
               <DetailRow icon="📊" label="HDOP (Accuracy)" value={selectedUnit.hdop || "—"} />
 
               {/* Telemetry section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Telemetry</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Telemetry</div>
               <DetailRow icon="🔥" label="Ignition" value={selectedUnit.ignition || "—"} />
               <DetailRow icon="🛣" label="Mileage" value={selectedUnit.mileage || "—"} />
               <DetailRow icon="⛽" label="Fuel Level" value={selectedUnit.fuel_level || "—"} />
 
               {/* Subscription section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Subscription</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Subscription</div>
               <DetailRow icon="💳" label="Billing Status" value={selectedUnit.billing_status || "—"} />
               <DetailRow icon="📦" label="Subscription"
                 value={String(selectedUnit.subscription_status || "—").replace(/^\w/, (c) => c.toUpperCase())} />
@@ -1241,7 +1241,7 @@ export default function NocBridgePage() {
                 <Link
                   to={`/gatehouse?imei=${encodeURIComponent(selectedUnit.imei)}`}
                   className="flex items-center justify-center gap-2 mt-4 h-9 rounded-lg
-                    bg-white border border-[#128C7E] text-[#128C7E] text-[12px] font-extrabold no-underline
+                    bg-white border border-[var(--brand)] text-[var(--brand)] text-[12px] font-extrabold no-underline
                     hover:bg-[#E7F7EF] transition-all"
                 >
                   Trip history
@@ -1254,7 +1254,7 @@ export default function NocBridgePage() {
                   href={`https://www.google.com/maps?q=${selectedUnit.coords.lat},${selectedUnit.coords.lng}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 mt-4 mb-3 h-9 rounded-lg
-                    bg-[#128C7E] text-white text-[12px] font-extrabold no-underline
+                    bg-[var(--brand)] text-white text-[12px] font-extrabold no-underline
                     hover:brightness-110 transition-all"
                 >
                   Open in Google Maps

@@ -145,7 +145,7 @@ export function ListingDetailPanel({
                     Tenant-private
                   </span>
                 ) : (
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E]">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)]">
                     Public
                   </span>
                 )}
@@ -262,7 +262,7 @@ export function ListingDetailPanel({
                 onEdit(l);
               }}
               disabled={actionPending}
-              className="px-3 py-1.5 text-[11px] font-extrabold rounded-md border border-[#128C7E] bg-white text-[#128C7E] hover:bg-[#E9F7F4] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-[11px] font-extrabold rounded-md border border-[var(--brand)] bg-white text-[var(--brand)] hover:bg-[var(--brand-soft)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Edit Listing
             </GuardedButton>
@@ -292,7 +292,7 @@ export function ListingDetailPanel({
                   )
                 }
                 disabled={actionPending}
-                className="px-3 py-1.5 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {actionPending ? "Reactivating..." : l.status === "archived" ? "Unarchive & Reactivate" : "Reactivate Listing"}
               </GuardedButton>

@@ -39,7 +39,7 @@ export function DeviceHealth({ k }: { k: FleetStatusKpis }) {
     <div>
       <div className="flex items-center gap-2">
         <span className="flex-1 text-[14px] font-medium text-[#111B21]">Device health</span>
-        {healthy !== null && <span className="text-[13.5px] font-semibold text-[#075E54]">{Math.round(healthy * 100)}% healthy</span>}
+        {healthy !== null && <span className="text-[13.5px] font-semibold text-[var(--brand-dark)]">{Math.round(healthy * 100)}% healthy</span>}
       </div>
       <div className="mt-2.5 flex flex-wrap gap-2">
         {k.weakGps === 0 && stale24 === 0 && k.counts.noData === 0 && <span className="text-[13px] text-[#667781]">No device issues</span>}

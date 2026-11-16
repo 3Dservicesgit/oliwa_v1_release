@@ -45,7 +45,7 @@ export function DayStrip({ day, today, onDay, rangeOpen, onRange }: {
     <div className="flex items-center gap-0 min-w-0">
       <button type="button" onClick={onRange} aria-pressed={rangeOpen} title="Play a time range"
         className={`shrink-0 w-[58px] h-[42px] rounded-[10px] border flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-          rangeOpen ? "bg-[#075E54] border-[#075E54] text-white" : "bg-[#E7F3F1] border-[#D8E8E4] text-[#075E54] hover:brightness-95"}`}>
+          rangeOpen ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-[var(--brand-soft)] border-[#D8E8E4] text-[var(--brand-dark)] hover:brightness-95"}`}>
         <ClockIcon />
         <span className="text-[10px] font-bold leading-none">Time range</span>
       </button>
@@ -57,7 +57,7 @@ export function DayStrip({ day, today, onDay, rangeOpen, onRange }: {
           return (
             <button key={d} type="button" onClick={() => onDay(d)} aria-pressed={on}
               className={`shrink-0 w-[50px] h-[42px] rounded-[10px] border flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                on ? "bg-[#075E54] border-[#075E54]" : "bg-white border-[#D8E8E4] hover:bg-[#F8F9FA]"}`}>
+                on ? "bg-[var(--brand-dark)] border-[var(--brand-dark)]" : "bg-white border-[#D8E8E4] hover:bg-[#F8F9FA]"}`}>
               <span className={`text-[10px] leading-tight ${on ? "text-white/70" : "text-[#667781]"}`}>
                 {d === today ? "Today" : WEEKDAYS[date.getDay()]}
               </span>
@@ -71,7 +71,7 @@ export function DayStrip({ day, today, onDay, rangeOpen, onRange }: {
       <div className="relative shrink-0 ml-2">
         <button type="button" title="Show another day"
           onClick={() => { const el = picker.current; if (!el) return; try { el.showPicker(); } catch { el.focus(); } }}
-          className="w-8 h-[42px] rounded-[10px] border border-[#D8E8E4] bg-white text-[#075E54] flex items-center justify-center cursor-pointer hover:bg-[#F8F9FA]">
+          className="w-8 h-[42px] rounded-[10px] border border-[#D8E8E4] bg-white text-[var(--brand-dark)] flex items-center justify-center cursor-pointer hover:bg-[#F8F9FA]">
           <CalendarIcon />
         </button>
         <input ref={picker} type="date" aria-label="Show another day" max={inputDate(today)} value={inputDate(day)}
@@ -136,8 +136,8 @@ export function SegmentRow({ segment: s, first, last, selected, place, engineMs,
   return (
     <div role="button" tabIndex={0} onClick={onSelect}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
-      className={`flex items-stretch cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#128C7E] ${
-        selected ? "bg-[#E7F3F1]" : "hover:bg-[#F8F9FA]"}`}>
+      className={`flex items-stretch cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] ${
+        selected ? "bg-[var(--brand-soft)]" : "hover:bg-[#F8F9FA]"}`}>
       <div className="w-[52px] shrink-0 pt-[18px] pr-1 text-right text-[13px] font-semibold text-[#111B21]">
         {s.openStart ? "" : hhmm(s.start)}
       </div>
@@ -174,7 +174,7 @@ export function SegmentRow({ segment: s, first, last, selected, place, engineMs,
       {trip ? (
         <button type="button" title="Play this trip" aria-label={`Play the trip from ${hhmm(s.start)}`}
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="self-center shrink-0 mr-2 w-9 h-9 rounded-full bg-[#25D366] text-[#053B33] flex items-center justify-center border-none cursor-pointer hover:brightness-105">
+          className="self-center shrink-0 mr-2 w-9 h-9 rounded-full bg-[var(--accent)] text-[var(--on-accent)] flex items-center justify-center border-none cursor-pointer hover:brightness-105">
           <PlayIcon size={15} />
         </button>
       ) : <span className="w-4 shrink-0" />}

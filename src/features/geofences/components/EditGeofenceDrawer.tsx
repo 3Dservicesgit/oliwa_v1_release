@@ -91,9 +91,9 @@ export function EditGeofenceDrawer({
   if (!open || !geozone) return null;
 
   return (
-    <div className="bg-white border border-[#128C7E] rounded-xl shadow-lg flex flex-col overflow-hidden">
+    <div className="bg-white border border-[var(--brand)] rounded-xl shadow-lg flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#128C7E] shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 bg-[var(--brand)] shrink-0">
         <div>
           <div className="font-black text-[13px] text-white">Edit Geofence</div>
           <div className="text-[10px] text-white/70 mt-0.5">
@@ -121,7 +121,7 @@ export function EditGeofenceDrawer({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)]"
           />
         </div>
 
@@ -135,7 +135,7 @@ export function EditGeofenceDrawer({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] resize-none"
+            className="w-full px-3 py-2 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] resize-none"
           />
         </div>
 
@@ -144,7 +144,7 @@ export function EditGeofenceDrawer({
         <ShapeEditor draft={draft} onChange={onDraftChange} />
 
         {shapeChanged && (
-          <div className="text-[10px] font-extrabold text-[#128C7E]">Shape changed — saved when you press Save Changes.</div>
+          <div className="text-[10px] font-extrabold text-[var(--brand)]">Shape changed — saved when you press Save Changes.</div>
         )}
 
         {/* Error */}
@@ -167,7 +167,7 @@ export function EditGeofenceDrawer({
             type="button"
             onClick={() => updateMutation.mutate()}
             disabled={updateMutation.isRunning}
-            className="flex-1 h-8 rounded-lg border-0 bg-[#128C7E] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[#0D7466] disabled:opacity-50"
+            className="flex-1 h-8 rounded-lg border-0 bg-[var(--brand)] text-white text-[11px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)] disabled:opacity-50"
           >
             {updateMutation.isRunning ? "Saving…" : "Save Changes"}
           </button>

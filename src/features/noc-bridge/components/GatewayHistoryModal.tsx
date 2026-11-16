@@ -97,7 +97,7 @@ export function GatewayHistoryModal({ onClose, gateways, initialGateway }: Gatew
               onClick={() => setSelected(gw.name)}
               className={`h-[28px] rounded-full px-3 text-[12px] font-bold cursor-pointer transition-all ${
                 selected === gw.name
-                  ? "bg-[#128C7E] text-white"
+                  ? "bg-[var(--brand)] text-white"
                   : "bg-[#1A1E23] text-[#9AA6B2] border border-[#2B3137] hover:bg-[#2B3137]"
               }`}
             >

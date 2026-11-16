@@ -95,7 +95,7 @@ export function IncomingBookingRequests() {
   if (loading) {
     return (
       <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 flex items-center justify-center gap-3">
-        <div className="w-5 h-5 border-[3px] border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-[3px] border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
         <span className="text-[12px] text-[#667781]">Loading incoming booking requests...</span>
       </div>
     );
@@ -187,7 +187,7 @@ export function IncomingBookingRequests() {
                             permission="can_approve_booking_request"
                             onClick={() => run(approveMut, r.request_uid)}
                             disabled={isPending}
-                            className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isPending ? "..." : "Approve"}
                           </GuardedButton>
