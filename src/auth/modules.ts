@@ -172,8 +172,8 @@ const BUILT_MODULES: ModuleDef[] = [
   },
   {
     id: "fuel",
-    name: "FuelMath",
-    navLabel: "FuelMath",
+    name: "Fuel Refill",
+    navLabel: "Fuel Refill",
     navGlyph: "F",
     route: "/fuel",
     viewPermission: "fuel.view",
@@ -251,8 +251,10 @@ const BUILT_MODULES: ModuleDef[] = [
     route: "/audit",
     viewPermission: "audit.view",
     group: "admin",
-    showInNavRail: true,
-    showInSidebar: true,
+    // A tab of User Management now (features/team/AccountRoutes.tsx), not a
+    // menu entry of its own. Kept here for its permission and route.
+    showInNavRail: false,
+    showInSidebar: false,
     catalogModuleName: "Trip Replay & Audit",
   },
 ];

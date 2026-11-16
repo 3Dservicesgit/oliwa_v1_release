@@ -19,7 +19,7 @@ import {
 } from "../../components/ui/records";
 import { errText, isoDay, whenText } from "../../components/ui/recordUtils";
 import { FuelIssuePanel, FuelProfilePanel, RecordFuelPanel, ReviewBadge } from "./FuelPanels";
-import { driverLabel, fuelLabel, fuelNum, isReviewed, litres, needsReview, ugx } from "./fuelFormat";
+import { driverLabel, fuelLabel, fuelNum, isReviewed, litres, needsReview, ugx, vol } from "./fuelFormat";
 
 type View = "issues" | "vehicles" | "drivers";
 type Filter = "all" | "open" | "reviewed" | "voided";
@@ -64,7 +64,7 @@ export function FuelPage() {
       setProfiles(p);
     } catch (e) {
       const msg = errText(e);
-      setError(/404|no such endpoint/i.test(msg) ? "FuelMath is not available on the server yet." : msg);
+      setError(/404|no such endpoint/i.test(msg) ? "Fuel Refill is not available on the server yet." : msg);
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,7 @@ export function FuelPage() {
         : filter === "reviewed" ? isReviewed(i) && !i.voided
         : filter === "voided" ? i.voided
         : !i.voided;
-      return keep && (!q || `${units.label(i.device_imei)} ${driverLabel(i)} ${i.station_name} ${i.receipt_number ?? ""}`.toLowerCase().includes(q));
+      return keep && (!q || `${units.label(i.device_imei)} ${driverLabel(i)} ${i.station_name} ${i.receipt_number ?? ""} ${i.voucher_number ?? ""}`.toLowerCase().includes(q));
     });
   }, [issues, filter, search, units]);
 
@@ -102,7 +102,7 @@ export function FuelPage() {
     <div className="flex flex-col h-full w-full bg-[#F0F2F5] p-3 gap-3 overflow-y-auto">
       <div className={`${CARD} px-4 py-3 flex items-start justify-between gap-4 flex-wrap`}>
         <div>
-          <div className="font-black text-[16px] text-[#111B21]">FuelMath</div>
+          <div className="font-black text-[16px] text-[#111B21]">Fuel Refill</div>
           <div className="text-[12px] text-[#667781] mt-0.5">Fuel issued to drivers, checked against where the tracker says each vehicle was and how far it drove.</div>
         </div>
         <div className="flex items-end gap-2 flex-wrap">
@@ -122,7 +122,7 @@ export function FuelPage() {
       {error ? <ErrorBanner text={error} onRetry={() => void load()} /> : (
         <>
           <div className="grid grid-cols-3 gap-3">
-            {[["Spent", ugx(t.cost)], ["Issued", litres(t.litres)], ["To review", String(t.open_reviews)]].map(([label, value]) => (
+            {[["Spent", ugx(t.cost)], ["Issued", vol(t.litres)], ["To review", String(t.open_reviews)]].map(([label, value]) => (
               <div key={label} className={`${CARD} px-4 py-3`}>
                 <div className="text-[11px] font-extrabold text-[#667781]">{label}</div>
                 <div className={`text-[20px] font-black ${label === "To review" && t.open_reviews > 0 ? "text-[#B45309]" : "text-[#111B21]"}`}>{loading ? "…" : value}</div>
@@ -154,7 +154,7 @@ export function FuelPage() {
         {view === "issues" && (
           <>
             <div className="px-4 py-3 border-b border-[#E9EDEF] flex gap-2 flex-wrap">
-              <input className={`${INPUT} flex-1 min-w-[200px]`} placeholder="Search vehicle, driver, station or receipt…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search issues" />
+              <input className={`${INPUT} flex-1 min-w-[200px]`} placeholder="Search vehicle, driver, location, receipt or voucher…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search issues" />
               <select aria-label="Show" value={filter} onChange={(e) => setFilter(e.target.value as Filter)} className={INPUT_INLINE}>
                 <option value="all">All issues</option>
                 <option value="open">Needs review</option>
@@ -172,9 +172,9 @@ export function FuelPage() {
                   <table className="w-full text-[13px]">
                     <thead>
                       <tr className="text-left text-[11px] font-extrabold text-[#667781] bg-[#F8F9FA]">
-                        <th className="px-4 py-2">When</th><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2">Driver</th>
-                        <th className="px-4 py-2 text-right">Litres</th><th className="px-4 py-2 text-right">Total</th>
-                        <th className="px-4 py-2">Station</th><th className="px-4 py-2">Checks</th>
+                        <th className="px-4 py-2">Date</th><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2">Driver</th>
+                        <th className="px-4 py-2 text-right">Vol</th><th className="px-4 py-2 text-right">Total</th>
+                        <th className="px-4 py-2">Location</th><th className="px-4 py-2">Checks</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -184,7 +184,7 @@ export function FuelPage() {
                           <td className="px-4 py-2.5 whitespace-nowrap">{whenText(i.issued_at)}</td>
                           <td className="px-4 py-2.5 font-extrabold text-[#111B21]">{units.label(i.device_imei)}</td>
                           <td className={`px-4 py-2.5 ${i.driver_uid ? "" : "text-[#8696A0]"}`}>{driverLabel(i)}</td>
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap">{litres(fuelNum(i.litres))}{i.full_tank ? " · full" : ""}</td>
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap">{litres(fuelNum(i.litres))}</td>
                           <td className="px-4 py-2.5 text-right whitespace-nowrap">{ugx(fuelNum(i.total_cost))}</td>
                           <td className="px-4 py-2.5">{i.station_name}</td>
                           <td className="px-4 py-2.5"><ReviewBadge issue={i} /></td>

@@ -44,6 +44,8 @@ export interface FuelIssue {
   odometer_km: number | string | null;
   station_name: string;
   receipt_number: string | null;
+  /** The fuel voucher handed over at the pump (migration 057). */
+  voucher_number?: string | null;
   payment_method: PaymentMethod | string;
   notes: string | null;
   has_receipt: boolean;
@@ -75,6 +77,7 @@ export interface FuelIssueFields {
   full_tank: boolean;
   odometer_km?: string;
   receipt_number?: string;
+  voucher_number?: string;
   notes?: string;
 }
 

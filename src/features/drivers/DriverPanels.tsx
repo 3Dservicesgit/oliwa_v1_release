@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  assignDriver, driverPhotoUrl, getDriver, getDriverAssignments, registerDriver,
+  assignDriver, deleteDriver, driverPhotoUrl, getDriver, getDriverAssignments, registerDriver,
   setDriverStatus, unassignDriver, updateDriver, uploadDriverPhoto,
 } from "../../api/services/drivers.service";
 import type { Driver, DriverAssignment, DriverFields, DriverStatus } from "../../api/types/drivers.types";
@@ -295,6 +295,22 @@ export function DriverDetailsPanel({ driverUid, units, canManage, onClose, onCha
     });
   };
 
+  /** Only offered for a driver with no history; the server checks again. */
+  const remove = () => {
+    if (!driver) return;
+    setPrompt({
+      title: `Delete ${driver.full_name}?`,
+      body: "They have never driven a vehicle or been issued fuel, so they will be removed completely. This cannot be undone.",
+      action: "Delete",
+      danger: true,
+      run: async () => {
+        await deleteDriver(driver.driver_uid);
+        onChanged();
+        onClose();
+      },
+    });
+  };
+
   const choosePhoto = async (file: File | undefined) => {
     if (!driver || !file) return;
     const bad = photoProblem(file);
@@ -401,7 +417,15 @@ export function DriverDetailsPanel({ driverUid, units, canManage, onClose, onCha
                     {statusLabel(s)}
                   </button>
                 ))}
+                {driver.deletable && (
+                  <button type="button" className={BTN_DANGER} onClick={remove}>Delete</button>
+                )}
               </div>
+              {!driver.deletable && (
+                <div className="text-[11px] text-[#667781] mt-1.5">
+                  Drivers who have driven a vehicle or been issued fuel stay in the record and cannot be deleted. Mark them inactive instead.
+                </div>
+              )}
             </section>
           )}
 

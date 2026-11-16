@@ -6,6 +6,7 @@
  *   POST /drivers/registry                     → registerDriver
  *   GET  /drivers/registry/{uid}               → getDriver
  *   PUT  /drivers/registry/{uid}               → updateDriver
+ *   DELETE /drivers/registry/{uid}             → deleteDriver (no history only)
  *   PUT  /drivers/registry/{uid}/status        → setDriverStatus
  *   POST /drivers/registry/{uid}/assign        → assignDriver
  *   POST /drivers/registry/{uid}/unassign      → unassignDriver
@@ -17,7 +18,7 @@
  *
  * Every call works on the signed-in user's own client (driver_registry.py).
  */
-import { get, getBlobUrl, post, postMultipart, put } from "../client";
+import { del, get, getBlobUrl, post, postMultipart, put } from "../client";
 import type {
   Driver, DriverAssignment, DriverFields, DriverScoreRule, DriverStatus,
 } from "../types/drivers.types";
@@ -45,6 +46,12 @@ export async function registerDriver(fields: DriverFields): Promise<Driver> {
 
 export async function updateDriver(uid: string, fields: DriverFields): Promise<Driver> {
   return (await put<Driver>(`${BASE}/${enc(uid)}`, { data: fields })).data;
+}
+
+/** Deletes a driver with no history. One with history is refused (409,
+ *  "Deactivate them instead"). */
+export async function deleteDriver(uid: string): Promise<void> {
+  await del(`${BASE}/${enc(uid)}`);
 }
 
 export async function setDriverStatus(uid: string, status: DriverStatus, reason?: string): Promise<Driver> {

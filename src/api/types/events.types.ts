@@ -34,7 +34,7 @@ export const EVENT_CONDITION_DESCRIPTIONS: Record<EventCondition, string> = {
   ignition_change:  "Triggers when the ignition is switched on or off. Needs the unit's ignition input to be set up.",
   low_battery:      "Not available yet: battery readings from the trackers do not reach the server.",
   device_offline:   "Triggers once when a device has sent nothing for the minutes you set, and not again until it reports.",
-  fuel_issue_flagged:    "Triggers when fuel recorded in FuelMath for the vehicle does not match the tracker or the vehicle, e.g. it was not stopped at the pump. Works without a fuel sensor.",
+  fuel_issue_flagged:    "Triggers when fuel recorded in Fuel Refill for the vehicle does not match the tracker or the vehicle, e.g. it was not stopped at the pump. Works without a fuel sensor.",
   high_fuel_consumption: "Triggers when a full tank shows the vehicle used more fuel than its expected km/L allows since the last full tank (at least 100 km). Needs a fuel profile; works without a fuel sensor.",
 };
 

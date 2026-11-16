@@ -30,6 +30,9 @@ export interface Driver {
   has_photo?: boolean;
   current_imei?: string | null;      // the vehicle they are in now
   assigned_at?: string | null;
+  /** No history (never in a vehicle, no fuel issued), so it may be deleted.
+   *  Sent on single-driver reads only; absent in lists. */
+  deletable?: boolean;
 }
 
 /** Fields sent to register or edit a driver. On edit only the fields sent

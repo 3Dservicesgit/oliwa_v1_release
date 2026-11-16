@@ -23,7 +23,7 @@ export const CONDITION_SUMMARY: Record<EventCondition, string> = {
   geofence_breach: "Enters or leaves a geofence",
   device_offline: "Stops reporting for a while",
   low_battery: "Battery readings don't reach the server yet",
-  fuel_issue_flagged: "A FuelMath receipt doesn't add up",
+  fuel_issue_flagged: "A Fuel Refill receipt doesn't add up",
   high_fuel_consumption: "More fuel than expected between full tanks",
 };
 

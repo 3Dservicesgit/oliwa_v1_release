@@ -65,12 +65,12 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
   const [fuelType, setFuelType] = useState<FuelType>("diesel");
   const [litresText, setLitresText] = useState("");
   const [priceText, setPriceText] = useState("");
-  const [fullTank, setFullTank] = useState(true);
   const [odometer, setOdometer] = useState("");
   const [station, setStation] = useState("");
   const [stations, setStations] = useState<string[]>([]);
   const [payment, setPayment] = useState<PaymentMethod>("fuel_card");
   const [receipt, setReceipt] = useState("");
+  const [voucher, setVoucher] = useState("");
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [tried, setTried] = useState(false);
@@ -118,10 +118,10 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
     if (!imei) p.imei = "Choose the vehicle.";
     if (!issuedAt) p.issuedAt = "Enter the date and time on the receipt.";
     else if (new Date(issuedAt).getTime() > Date.now() + 5 * 60_000) p.issuedAt = "That time is in the future.";
-    if (l === null || l > 1000) p.litres = "Enter the litres.";
-    if (price === null || price < 100 || price > 50000) p.price = "UGX 100 to 50,000.";
-    if (odometer.trim() && Number.isNaN(Number(odometer.replace(/,/g, "").trim()))) p.odometer = "Enter the reading in km.";
-    if (station.trim().length < 2) p.station = "Enter the station name.";
+    if (l === null || l > 1000) p.litres = "Enter the volume.";
+    if (price === null || price < 100 || price > 50000) p.price = "100 to 50,000.";
+    if (odometer.trim() && Number.isNaN(Number(odometer.replace(/,/g, "").trim()))) p.odometer = "Enter the odometer reading.";
+    if (station.trim().length < 2) p.station = "Enter the location.";
     return p;
   }, [imei, issuedAt, l, price, odometer, station]);
 
@@ -146,9 +146,12 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
         fuel_type: fuelType,
         station_name: station.trim(),
         payment_method: payment,
-        full_tank: fullTank,
+        // No "filled to full" question any more: every refill counts as a
+        // full tank, so consumption is measured from one refill to the next.
+        full_tank: true,
         odometer_km: odometer.replace(/,/g, "").trim(),
         receipt_number: receipt.trim(),
+        voucher_number: voucher.trim(),
         notes: notes.trim(),
       });
       let message = `${litres(fuelNum(issue.litres))} · ${ugx(fuelNum(issue.total_cost))} recorded.`;
@@ -243,34 +246,26 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={LABEL} htmlFor="fuel-litres">Litres *</label>
+          <label className={LABEL} htmlFor="fuel-litres">Vol *</label>
           <input id="fuel-litres" inputMode="decimal" className={`${INPUT} ${bad("litres")}`} value={litresText} onChange={(e) => setLitresText(e.target.value)} />
           {hint("litres", overTank ? <span className="text-[#92400E]">More than this vehicle's {litres(tank)} tank holds.</span> : undefined)}
         </div>
         <div>
-          <label className={LABEL} htmlFor="fuel-price">Price per litre (UGX) *</label>
+          <label className={LABEL} htmlFor="fuel-price">Price per litre *</label>
           <input id="fuel-price" inputMode="decimal" className={`${INPUT} ${bad("price")}`} value={priceText} onChange={(e) => setPriceText(e.target.value)} />
           {hint("price")}
         </div>
       </div>
       <div className="text-[15px] font-black text-[#111B21]">Total: {total === null ? "—" : ugx(total)}</div>
 
-      <label className="flex items-start gap-2 cursor-pointer">
-        <input type="checkbox" checked={fullTank} onChange={(e) => setFullTank(e.target.checked)} className="mt-0.5" />
-        <span>
-          <span className="block text-[13px] font-extrabold text-[#111B21]">Filled to full</span>
-          <span className="block text-[11px] text-[#667781]">Consumption is measured from one full tank to the next.</span>
-        </span>
-      </label>
-
       <div>
-        <label className={LABEL} htmlFor="fuel-odo">Odometer (km)</label>
+        <label className={LABEL} htmlFor="fuel-odo">Odometer reading</label>
         <input id="fuel-odo" inputMode="numeric" className={`${INPUT} ${bad("odometer")}`} value={odometer} onChange={(e) => setOdometer(e.target.value)} />
         {hint("odometer")}
       </div>
 
       <div>
-        <label className={LABEL} htmlFor="fuel-station">Station *</label>
+        <label className={LABEL} htmlFor="fuel-station">Location *</label>
         <input id="fuel-station" list="fuel-stations" className={`${INPUT} ${bad("station")}`} value={station} onChange={(e) => setStation(e.target.value)} placeholder="e.g. Shell Jinja Road" />
         <datalist id="fuel-stations">{stations.map((s) => <option key={s} value={s} />)}</datalist>
         {hint("station")}
@@ -291,6 +286,10 @@ export function RecordFuelPanel({ units, profiles, capabilities, initialImei, on
       <div>
         <label className={LABEL} htmlFor="fuel-receipt">Receipt number</label>
         <input id="fuel-receipt" className={INPUT} value={receipt} onChange={(e) => setReceipt(e.target.value.toUpperCase())} />
+      </div>
+      <div>
+        <label className={LABEL} htmlFor="fuel-voucher">Voucher number</label>
+        <input id="fuel-voucher" className={INPUT} value={voucher} onChange={(e) => setVoucher(e.target.value.toUpperCase())} />
       </div>
       <div>
         <div className={LABEL}>Receipt photo</div>
@@ -397,7 +396,7 @@ export function FuelIssuePanel({ issueUid, units, profiles, canManage, initialNo
       {notice && <Notice text={notice} onClose={() => setNotice(null)} />}
       {!i ? (!error && <div className="text-[13px] text-[#667781]">Loading…</div>) : (
         <>
-          <div className="flex gap-1.5 flex-wrap"><ReviewBadge issue={i} />{i.full_tank && <Badge tone="teal">Full tank</Badge>}</div>
+          <div className="flex gap-1.5 flex-wrap"><ReviewBadge issue={i} /></div>
           {i.voided && <div className="text-[12px] text-[#667781]">Voided: {i.void_reason}</div>}
 
           <section>
@@ -434,13 +433,14 @@ export function FuelIssuePanel({ issueUid, units, profiles, canManage, initialNo
             {row("Vehicle", units.label(i.device_imei))}
             {row("Driver", driverLabel(i))}
             {row("Fuel", fuelLabel(String(i.fuel_type)))}
-            {row("Litres", litres(fuelNum(i.litres)))}
+            {row("Vol", litres(fuelNum(i.litres)))}
             {row("Price per litre", ugx(fuelNum(i.unit_price)))}
             {row("Total", ugx(fuelNum(i.total_cost)))}
-            {row("Station", i.station_name)}
+            {row("Location", i.station_name)}
             {row("Paid by", paymentLabel(String(i.payment_method)))}
             {row("Receipt number", i.receipt_number)}
-            {row("Odometer", fuelNum(i.odometer_km) !== null ? `${fuelNum(i.odometer_km)!.toLocaleString()} km` : null)}
+            {row("Voucher number", i.voucher_number)}
+            {row("Odometer reading", fuelNum(i.odometer_km) !== null ? fuelNum(i.odometer_km)!.toLocaleString() : null)}
             {i.notes && <div className="text-[12px] text-[#667781] mt-2 whitespace-pre-wrap">{i.notes}</div>}
           </section>
 

@@ -118,7 +118,7 @@ export function ConditionFields({ condition, onCondition, value, onValue, icons,
               </label>
             ))}
           </div>
-          <p className={HINT}>Checked each time fuel is recorded in FuelMath. Works without a fuel sensor.</p>
+          <p className={HINT}>Checked each time fuel is recorded in Fuel Refill. Works without a fuel sensor.</p>
         </div>
       )}
 
@@ -129,7 +129,7 @@ export function ConditionFields({ condition, onCondition, value, onValue, icons,
             placeholder="Leave empty to use each vehicle's tolerance" className={INPUT} />
           <p className={HINT}>
             5 to 100, or empty to use the tolerance in each vehicle's fuel profile. Only vehicles with a fuel
-            profile are checked (FuelMath → Vehicles).
+            profile are checked (Fuel Refill → Vehicles).
           </p>
         </div>
       )}

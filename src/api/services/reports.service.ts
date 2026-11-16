@@ -313,7 +313,7 @@ export async function generateReport(
 // ── FuelMath reports ────────────────────────────────────────────────────────
 
 const FUEL_NO_DATA_HINTS: Record<string, string> = {
-  fuel_issuance: "No fuel was recorded in FuelMath for these vehicles in this period. Record receipts under FuelMath first.",
+  fuel_issuance: "No fuel was recorded in Fuel Refill for these vehicles in this period. Record refills under Fuel Refill first.",
   fuel_consumption: "Consumption is measured between two full tanks: these vehicles need at least two full-tank receipts in this period.",
   fuel_exceptions: "The checks flagged nothing for these vehicles in this period.",
 };

@@ -71,6 +71,12 @@ export function litres(l: number | null | undefined): string {
   return `${Number.isInteger(n) ? n.toFixed(0) : n.toFixed(1)} L`;
 }
 
+/** "40 Vol", "40.5 Vol" — the Fuel Refill overview's volume. */
+export function vol(l: number | null | undefined): string {
+  const n = l ?? 0;
+  return `${Number.isInteger(n) ? n.toFixed(0) : n.toFixed(1)} Vol`;
+}
+
 export const flags = (i: FuelIssue): FuelFlag[] => (Array.isArray(i.flags) ? i.flags : []);
 export const discrepancies = (i: FuelIssue) => flags(i).filter((f) => f.kind === "discrepancy");
 export const notices = (i: FuelIssue) => flags(i).filter((f) => f.kind !== "discrepancy");

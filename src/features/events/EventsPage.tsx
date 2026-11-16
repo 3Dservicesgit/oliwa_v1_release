@@ -1212,8 +1212,14 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
         <div className="flex flex-col gap-2">
           {filtered.map((n) => {
             const condKey = n.condition as EventCondition;
-            const icon = CONDITION_ICONS[condKey] ?? "?";
-            const colorClass = CONDITION_COLORS[condKey] ?? "bg-[#667781]/15 text-[#667781] border-[#667781]/30";
+            // Built in on the server (permit_reminders.py), not an event rule:
+            // about a driver, so no playback, and the value is a full sentence.
+            const isPermit = (n.condition as string) === "permit_expiring";
+            const icon = CONDITION_ICONS[condKey] ?? (isPermit ? "\u{1FAAA}" : "?");
+            const colorClass = CONDITION_COLORS[condKey] ?? (isPermit
+              ? "bg-[#B45309]/15 text-[#B45309] border-[#B45309]/30"
+              : "bg-[#667781]/15 text-[#667781] border-[#667781]/30");
+            const condLabel = EVENT_CONDITION_LABELS[condKey] ?? (isPermit ? "Driver Permit" : n.condition);
 
             return (
               <div
@@ -1242,15 +1248,15 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
                       </span>
                     )}
                     {!n.geozone_name && n.trigger_value && (
-                      <span> — value: {n.trigger_value}</span>
+                      <span> — {isPermit ? "" : "value: "}{n.trigger_value}</span>
                     )}
                   </p>
                   <div className="flex items-center gap-3 text-[10px] text-[#667781]">
                     <span>{n.date_triggered}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${colorClass}`}>
-                      {EVENT_CONDITION_LABELS[condKey]}
+                      {condLabel}
                     </span>
-                    {canPlayback && n.device_imei && (
+                    {canPlayback && n.device_imei && !isPermit && (
                       <Link
                         to={`/gatehouse?imei=${encodeURIComponent(n.device_imei)}${
                           /^\d{4}-\d{2}-\d{2}/.test(n.date_triggered ?? "") ? `&date=${n.date_triggered.slice(0, 10)}` : ""}`}
