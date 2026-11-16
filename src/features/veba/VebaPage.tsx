@@ -53,7 +53,7 @@ export function VebaPage() {
                 className={[
                   "px-3 py-1.5 text-[12px] font-extrabold rounded-md cursor-pointer border-0 transition-colors",
                   activeTab === tab.key
-                    ? "bg-[#128C7E] text-white"
+                    ? "bg-[var(--brand)] text-white"
                     : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]",
                 ].join(" ")}
               >

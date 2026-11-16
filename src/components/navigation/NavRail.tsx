@@ -69,7 +69,7 @@ function RailLink({ item, mobile = false }: { item: NavRailItem; mobile?: boolea
           "rounded-[10px] border font-bold text-[14px] grid place-items-center",
           "cursor-pointer shrink-0 no-underline transition-colors duration-150",
           isActive
-            ? "bg-[#128C7E] text-white border-transparent"
+            ? "bg-[var(--brand)] text-white border-transparent"
             : "bg-[#EEF3F4] text-[#667781] border-[#E9EDEF] hover:bg-[#DCF1EE]",
         ].join(" ")
       }

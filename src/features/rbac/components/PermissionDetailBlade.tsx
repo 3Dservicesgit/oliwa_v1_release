@@ -44,7 +44,7 @@ export function PermissionDetailBlade({ permission, onClose, onEdit, onDelete }:
           <div className="p-4 flex flex-col gap-2">
             {permission.actions.map(a => (
               <div key={a} className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#128C7E]" />
+                <span className="w-2 h-2 rounded-full bg-[var(--brand)]" />
                 <span className="text-[12px] font-black text-[#111B21]">{a}</span>
               </div>
             ))}
@@ -62,7 +62,7 @@ export function PermissionDetailBlade({ permission, onClose, onEdit, onDelete }:
         <BSection title="Module Info">
           <div className="p-4">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black bg-[#EAF7F3] text-[#128C7E] px-2 py-1 rounded-full">{permission.module}</span>
+              <span className="text-[10px] font-black bg-[#EAF7F3] text-[var(--brand)] px-2 py-1 rounded-full">{permission.module}</span>
               <span className="text-[11px] text-[#667781]">Bound to the {permission.module} module</span>
             </div>
           </div>
@@ -71,7 +71,7 @@ export function PermissionDetailBlade({ permission, onClose, onEdit, onDelete }:
 
       {/* Actions */}
       <div className="flex items-center gap-2 px-5 py-3 border-t border-[#E9EDEF] shrink-0">
-        <button onClick={() => onEdit(permission)} className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105">Edit Permission</button>
+        <button onClick={() => onEdit(permission)} className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105">Edit Permission</button>
         <button onClick={() => onDelete(permission)} className="h-8 px-4 rounded-lg bg-white border border-[#EF4444] text-[#EF4444] text-[11px] font-black cursor-pointer hover:bg-[#FEF2F2]">Delete</button>
       </div>
     </div>

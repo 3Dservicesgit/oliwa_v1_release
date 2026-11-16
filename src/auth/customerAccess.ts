@@ -34,6 +34,8 @@ const VIEWER: readonly string[] = [
   "events.view",            // Events & Alerts
   "sim.view",               // Token Subscription
   "veba.view",              // VEBA Marketplace
+  "drivers.view",           // Drivers
+  "fuel.view",              // FuelMath
   "can_browse_asset_listings",
 ];
 
@@ -41,6 +43,8 @@ const OPERATOR: readonly string[] = [
   ...VIEWER,
   "can_create_geofence", "can_edit_geofence", "can_delete_geofence",
   "events.create", "events.update", "events.delete",
+  "drivers.manage",         // register, edit, status, assign drivers
+  "fuel.manage",            // record, review and void fuel; fuel profiles
   "can_book_asset",
 ];
 

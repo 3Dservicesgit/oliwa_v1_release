@@ -1,2 +1,16 @@
 @import "tailwindcss";
 
+
+/* Client branding (src/branding): BrandingProvider overwrites these with the
+   client's colours once signed in. These are the OLIWA defaults, so nothing
+   renders uncoloured before it loads. */
+:root {
+  --brand: #128C7E;
+  --brand-dark: #0D6258;
+  --brand-light: #4DA99E;
+  --brand-soft: #E7F4F2;
+  --on-brand: #FFFFFF;
+  --accent: #25D366;
+  --accent-pressed: #21BA5A;
+  --on-accent: #111B21;
+}

@@ -111,7 +111,7 @@ export function AttachDevicesModal({
           <div>
             <div className="font-black text-[15px] text-[#111B21]">Attach Devices</div>
             <div className="text-[11px] text-[#667781] mt-0.5">
-              to <span className="font-extrabold text-[#128C7E]">{geozone.geozone_name}</span>
+              to <span className="font-extrabold text-[var(--brand)]">{geozone.geozone_name}</span>
             </div>
           </div>
           <button
@@ -129,7 +129,7 @@ export function AttachDevicesModal({
             placeholder="Search devices by IMEI, name, or vehicle…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E]"
+            className="w-full h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)]"
           />
         </div>
 
@@ -137,7 +137,7 @@ export function AttachDevicesModal({
         <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : filteredDevices.length === 0 ? (
             <div className="text-center text-[12px] text-[#667781] py-12">
@@ -152,7 +152,7 @@ export function AttachDevicesModal({
                       type="checkbox"
                       checked={selected.size === filteredDevices.length && filteredDevices.length > 0}
                       onChange={toggleAll}
-                      className="accent-[#128C7E]"
+                      className="accent-[var(--brand)]"
                     />
                   </th>
                   <th className="text-left px-3 py-2 font-extrabold text-[#667781]">IMEI</th>
@@ -175,7 +175,7 @@ export function AttachDevicesModal({
                         type="checkbox"
                         checked={selected.has(d.device_imei)}
                         onChange={() => toggle(d.device_imei)}
-                        className="accent-[#128C7E]"
+                        className="accent-[var(--brand)]"
                       />
                     </td>
                     <td className="px-3 py-2 font-mono text-[#111B21]">{d.device_imei}</td>
@@ -214,7 +214,7 @@ export function AttachDevicesModal({
               type="button"
               onClick={() => attachMutation.mutate()}
               disabled={selected.size === 0 || attachMutation.isRunning}
-              className="h-9 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[#0D7466] disabled:opacity-50"
+              className="h-9 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)] disabled:opacity-50"
             >
               {attachMutation.isRunning ? "Attaching…" : "Attach"}
             </button>

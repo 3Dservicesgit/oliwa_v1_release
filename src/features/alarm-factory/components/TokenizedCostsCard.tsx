@@ -72,7 +72,7 @@ export function TokenizedCostsCard({
         <div className="flex gap-2 flex-wrap pt-1">
           <button
             onClick={onTopup}
-            className="h-8 px-4 rounded-full bg-[#25D366] text-[#075E54] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+            className="h-8 px-4 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
           >
             Top-up Tokens
           </button>

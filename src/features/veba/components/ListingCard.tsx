@@ -130,7 +130,7 @@ export function ListingCard({ listing, isOwner, onRequestBooking, onPhotoUploade
     <div
       className={[
         "w-full h-full flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors",
-        dragOver ? "bg-[#E9F7F4]" : "bg-[#F0F2F5] hover:bg-[#E9F7F4]",
+        dragOver ? "bg-[#E9F7F4]" : "bg-[#F0F2F5] hover:bg-[var(--brand-soft)]",
       ].join(" ")}
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -157,7 +157,7 @@ export function ListingCard({ listing, isOwner, onRequestBooking, onPhotoUploade
           {listing.visibility === "tenant" ? (
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white border border-[#E9EDEF] text-[#667781]">Tenant-private</span>
           ) : (
-            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#128C7E] text-white">Marketplace</span>
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[var(--brand)] text-white">Marketplace</span>
           )}
         </div>
       </div>
@@ -200,7 +200,7 @@ export function ListingCard({ listing, isOwner, onRequestBooking, onPhotoUploade
             <GuardedButton
               permission="can_book_asset"
               onClick={() => onRequestBooking?.(listing)}
-              className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Request booking
             </GuardedButton>

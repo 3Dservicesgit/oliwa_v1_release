@@ -20,7 +20,7 @@ import { BookingRequestModal } from "./BookingRequestModal";
 
 const INPUT =
   "h-8 px-2.5 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] " +
-  "placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] bg-white";
+  "placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)] bg-white";
 
 function matches(listing: VebaListing, query: string): boolean {
   if (!query.trim()) return true;
@@ -108,10 +108,10 @@ export function BrowseMarketplace() {
 
       {/* ── Request sent ────────────────────────────────────────────── */}
       {sent && (
-        <div role="status" className="text-[12px] text-[#075E54] bg-[#E9F7F4] border border-[#128C7E]/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+        <div role="status" className="text-[12px] text-[#075E54] bg-[#E9F7F4] border border-[var(--brand)]/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
           <span>Request sent. The owner will review it — you can follow it under <b>My Bookings</b>.</span>
           <button type="button" onClick={() => setSent(null)}
-            className="text-[11px] font-extrabold text-[#075E54] bg-transparent border-0 cursor-pointer">
+            className="text-[11px] font-extrabold text-[var(--brand-dark)] bg-transparent border-0 cursor-pointer">
             Dismiss
           </button>
         </div>

@@ -55,7 +55,7 @@ export function WaswaAutoCorrelationCard({
         </div>
         <button
           onClick={onAuto}
-          className="text-[11px] font-extrabold bg-[#128C7E] text-white px-3 py-1 rounded-full border-none cursor-pointer hover:brightness-105 transition-all"
+          className="text-[11px] font-extrabold bg-[var(--brand)] text-[var(--on-brand)] px-3 py-1 rounded-full border-none cursor-pointer hover:brightness-105 transition-all"
         >
           Auto
         </button>
@@ -65,7 +65,7 @@ export function WaswaAutoCorrelationCard({
       <div className="px-4 py-3 flex flex-col gap-2.5">
         {bullets.map((b) => (
           <div key={b.id} className="flex items-start gap-2 text-[12px] leading-relaxed">
-            <span className="text-[#128C7E] shrink-0 mt-0.5">•</span>
+            <span className="text-[var(--brand)] shrink-0 mt-0.5">•</span>
             <span>
               <span className="font-extrabold text-[#111B21]">{b.label}</span>
               <span className="text-[#667781]"> {b.value}</span>

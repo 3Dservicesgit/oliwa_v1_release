@@ -25,7 +25,7 @@ import {
 
 const INPUT =
   "w-full h-8 px-2 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] " +
-  "placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] font-mono";
+  "placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)] font-mono";
 const LABEL = "block text-[10px] font-extrabold text-[#667781] mb-1";
 
 const SHAPES: GeozoneShape[] = ["polygon", "circle", "line"];
@@ -88,7 +88,7 @@ export function ShapeEditor({ draft, onChange }: ShapeEditorProps) {
                 className={[
                   "h-14 rounded-lg border flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors",
                   on
-                    ? "border-[#128C7E] bg-[#E9F7F4] text-[#075E54]"
+                    ? "border-[var(--brand)] bg-[#E9F7F4] text-[#075E54]"
                     : "border-[#E9EDEF] bg-white text-[#667781] hover:bg-[#F8F9FA]",
                 ].join(" ")}
               >
@@ -146,7 +146,7 @@ export function ShapeEditor({ draft, onChange }: ShapeEditorProps) {
               <span className={LABEL.replace(" mb-1", "")}>
                 {draft.type === "line" ? "Route points *" : "Corner points *"}
               </span>
-              <span className={`text-[10px] font-extrabold ${validCount >= minimum ? "text-[#128C7E]" : "text-[#B45309]"}`}>
+              <span className={`text-[10px] font-extrabold ${validCount >= minimum ? "text-[var(--brand)]" : "text-[#B45309]"}`}>
                 {validCount} of at least {minimum}
               </span>
             </div>
@@ -162,7 +162,7 @@ export function ShapeEditor({ draft, onChange }: ShapeEditorProps) {
                 const bad = (p.lat !== "" || p.lng !== "") && !parsePoint(p);
                 return (
                   <div key={i} className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 shrink-0 rounded-full bg-[#128C7E] text-white text-[10px] font-black grid place-items-center">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-[var(--brand)] text-white text-[10px] font-black grid place-items-center">
                       {i + 1}
                     </span>
                     <input
@@ -198,7 +198,7 @@ export function ShapeEditor({ draft, onChange }: ShapeEditorProps) {
               <button
                 type="button"
                 onClick={addPoint}
-                className="h-7 px-3 rounded-lg border border-dashed border-[#128C7E] bg-white text-[11px] font-extrabold text-[#128C7E] cursor-pointer hover:bg-[#E9F7F4]"
+                className="h-7 px-3 rounded-lg border border-dashed border-[var(--brand)] bg-white text-[11px] font-extrabold text-[var(--brand)] cursor-pointer hover:bg-[var(--brand-soft)]"
               >
                 + Add point
               </button>

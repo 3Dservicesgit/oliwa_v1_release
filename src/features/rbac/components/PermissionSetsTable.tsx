@@ -29,7 +29,7 @@ export function PermissionSetsTable({ sets, onSelect, onEdit, onDelete, onCreate
         <div className="flex items-center gap-2">
           <button
             onClick={onCreate}
-            className="h-8 px-3 rounded-full text-[11px] font-black bg-[#25D366] text-[#075E54] border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+            className="h-8 px-3 rounded-full text-[11px] font-black bg-[var(--accent)] text-[var(--on-accent)] border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
           >
             + Create Permission
           </button>
@@ -59,7 +59,7 @@ export function PermissionSetsTable({ sets, onSelect, onEdit, onDelete, onCreate
                 <td className="px-3 py-2.5">
                   <div className="flex gap-1 flex-wrap">
                     {s.actions.map(a => (
-                      <span key={a} className="text-[10px] bg-[#EAF7F3] text-[#128C7E] px-1.5 py-0.5 rounded-full font-black">{a}</span>
+                      <span key={a} className="text-[10px] bg-[#EAF7F3] text-[var(--brand)] px-1.5 py-0.5 rounded-full font-black">{a}</span>
                     ))}
                   </div>
                 </td>

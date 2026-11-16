@@ -172,14 +172,14 @@ export function MoneyPage() {
   const uniqueClients = Array.from(new Set(payments.map(p => p.client_name))).sort();
 
   const ESCROW_BOOKINGS = [
-    { bkg:"BKG-7781", asset:"D6 Dozer", stage:"Awaiting payout", stageTone:"bg-[#25D366] text-white", escrow:"KES 320,000", action:"Approve payout (HITL)", actionColor:"text-[#128C7E]" },
-    { bkg:"BKG-7774", asset:"Boda",     stage:"Dispute opened",  stageTone:"bg-[#EF4444] text-white", escrow:"UGX 180,000", action:"Open case",             actionColor:"text-[#128C7E]" },
+    { bkg:"BKG-7781", asset:"D6 Dozer", stage:"Awaiting payout", stageTone:"bg-[#25D366] text-white", escrow:"KES 320,000", action:"Approve payout (HITL)", actionColor:"text-[var(--brand)]" },
+    { bkg:"BKG-7774", asset:"Boda",     stage:"Dispute opened",  stageTone:"bg-[#EF4444] text-white", escrow:"UGX 180,000", action:"Open case",             actionColor:"text-[var(--brand)]" },
   ];
 
   const APPROVALS = [
-    { dot:"bg-[#FBBF24]", title:"Refund > KES 75,000",  sub:"PMT-10491 • Reason: callback failed after debit", badge:"HITL", badgeTone:"bg-[#128C7E] text-white" },
+    { dot:"bg-[#FBBF24]", title:"Refund > KES 75,000",  sub:"PMT-10491 • Reason: callback failed after debit", badge:"HITL", badgeTone:"bg-[var(--brand)] text-white" },
     { dot:"bg-[#EF4444]", title:"Manual Token Mint",     sub:"PMT-10492 • Mint 125,000 TOK to keep service live", badge:"HIC",  badgeTone:"bg-[#EF4444] text-white" },
-    { dot:"bg-[#FBBF24]", title:"Escrow Release",        sub:"BKG-7781 • Approve payout to owner (instant settlement, chained).", badge:"HITL", badgeTone:"bg-[#128C7E] text-white" },
+    { dot:"bg-[#FBBF24]", title:"Escrow Release",        sub:"BKG-7781 • Approve payout to owner (instant settlement, chained).", badge:"HITL", badgeTone:"bg-[var(--brand)] text-white" },
   ];
 
   const BLADE_EVENTS = [
@@ -202,7 +202,7 @@ export function MoneyPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-black text-[16px] text-[#111B21]">The Money Switchboard</span>
-                  <span className="text-[10px] font-black bg-[#128C7E] text-white px-2 py-0.5 rounded-full">HITL/HIC</span>
+                  <span className="text-[10px] font-black bg-[var(--brand)] text-white px-2 py-0.5 rounded-full">HITL/HIC</span>
                 </div>
                 <div className="text-[11px] text-[#667781] mt-0.5">Unified: Mobile Money + Tokens</div>
               </div>
@@ -229,7 +229,7 @@ export function MoneyPage() {
                 <KpiCard label="Successful Transactions" value={formatCurrency(stats.successful.total)} sub="All currencies combined" dot="bg-[#25D366]" />
                 <KpiCard label="Pending Transactions" value={formatCurrency(stats.pending.total)} sub="Awaiting confirmation" dot="bg-[#F97316]" />
                 <KpiCard label="Failed Transactions" value={formatCurrency(stats.failed.total)} sub="Failed or reversed" dot="bg-[#EF4444]" />
-                <KpiCard label="Total Volume" value={formatCurrency(stats.successful.total + stats.pending.total + stats.failed.total)} sub="All transactions" dot="bg-[#128C7E]" />
+                <KpiCard label="Total Volume" value={formatCurrency(stats.successful.total + stats.pending.total + stats.failed.total)} sub="All transactions" dot="bg-[var(--brand)]" />
               </>
             )}
           </div>
@@ -297,7 +297,7 @@ export function MoneyPage() {
             </div>
 
             {/* Summary Stats Card */}
-            <div className="bg-gradient-to-br from-[#128C7E] to-[#0D999B] rounded-xl p-4 text-white flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-[var(--brand)] to-[#0D999B] rounded-xl p-4 text-white flex flex-col justify-between">
               <div>
                 <div className="text-[11px] opacity-90 mb-4">Overall Statistics</div>
                 <div className="space-y-3">
@@ -331,7 +331,7 @@ export function MoneyPage() {
                 <select 
                   value={filterCurrency} 
                   onChange={(e) => setFilterCurrency(e.target.value)}
-                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[#128C7E]/50"
+                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[var(--brand)]/50"
                 >
                   <option value="all">All Currencies</option>
                   {uniqueCurrencies.map(c => (
@@ -346,7 +346,7 @@ export function MoneyPage() {
                 <select 
                   value={filterStatus} 
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[#128C7E]/50"
+                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[var(--brand)]/50"
                 >
                   <option value="all">All Statuses</option>
                   <option value="successful">Successful</option>
@@ -361,7 +361,7 @@ export function MoneyPage() {
                 <select 
                   value={filterDate} 
                   onChange={(e) => setFilterDate(e.target.value)}
-                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[#128C7E]/50"
+                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[var(--brand)]/50"
                 >
                   <option value="all">All Dates</option>
                   <option value="today">Today</option>
@@ -378,7 +378,7 @@ export function MoneyPage() {
                   placeholder="Search client..."
                   value={filterClient}
                   onChange={(e) => setFilterClient(e.target.value)}
-                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[#128C7E]/50"
+                  className="w-full h-8 rounded-lg border border-[#E9EDEF] px-2 text-[11px] text-[#111B21] outline-none focus:border-[var(--brand)]/50"
                 />
               </div>
             </div>
@@ -512,7 +512,7 @@ export function MoneyPage() {
               </div>
 
               {/* Guardrails */}
-              <div className="bg-[#EAF7F3] border border-[#128C7E]/20 rounded-xl p-4 mb-4">
+              <div className="bg-[#EAF7F3] border border-[var(--brand)]/20 rounded-xl p-4 mb-4">
                 <div className="font-black text-[13px] text-[#111B21] mb-2">Guardrails (G)</div>
                 <div className="text-[12px] text-[#667781] leading-relaxed">
                   Irreversible: once approved, action cannot be undone.<br/>
@@ -540,7 +540,7 @@ export function MoneyPage() {
               {/* Audit note */}
               <div className="mb-4 border-b border-[#E9EDEF] pb-3">
                 <div className="text-[11px] text-[#667781] mb-1">Audit note (optional)</div>
-                <textarea placeholder="Type a short justification for the audit trail…" className="w-full h-20 rounded-lg border border-[#E9EDEF] px-3 py-2 text-[12px] text-[#111B21] outline-none resize-none focus:border-[#128C7E]/50" />
+                <textarea placeholder="Type a short justification for the audit trail…" className="w-full h-20 rounded-lg border border-[#E9EDEF] px-3 py-2 text-[12px] text-[#111B21] outline-none resize-none focus:border-[var(--brand)]/50" />
               </div>
 
               {/* Risk Summary */}
@@ -552,7 +552,7 @@ export function MoneyPage() {
 
             <div className="flex items-center justify-between px-5 py-3 border-t border-[#E9EDEF] bg-white shrink-0">
               <button onClick={() => setModalOpen(false)} className="h-10 px-5 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer">Cancel</button>
-              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Submit for approval</button>
+              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Submit for approval</button>
             </div>
           </div>
         </div>
@@ -570,9 +570,9 @@ const pillStyles: Record<string, string> = {
 function Loader() {
   return (
     <div className="flex items-center justify-center gap-1">
-      <div className="w-2 h-2 rounded-full bg-[#128C7E] animate-bounce" style={{ animationDelay: "0s" }}></div>
-      <div className="w-2 h-2 rounded-full bg-[#128C7E] animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-      <div className="w-2 h-2 rounded-full bg-[#128C7E] animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+      <div className="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce" style={{ animationDelay: "0s" }}></div>
+      <div className="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+      <div className="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce" style={{ animationDelay: "0.4s" }}></div>
     </div>
   );
 }

@@ -55,7 +55,7 @@ function initials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  "bg-[#128C7E]", "bg-[#3B82F6]", "bg-[#F97316]", "bg-[#8B5CF6]",
+  "bg-[var(--brand)]", "bg-[#3B82F6]", "bg-[#F97316]", "bg-[#8B5CF6]",
   "bg-[#EF4444]", "bg-[#25D366]", "bg-[#E11D48]", "bg-[#0891B2]",
 ];
 function avatarColor(uid: string): string {
@@ -68,7 +68,7 @@ function avatarColor(uid: string): string {
 
 function Toast({ message, type, onClose }: { message: string; type: "success" | "error" | "info"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
-  const bg = type === "success" ? "bg-[#128C7E]" : type === "error" ? "bg-[#EF4444]" : "bg-[#3B82F6]";
+  const bg = type === "success" ? "bg-[var(--brand)]" : type === "error" ? "bg-[#EF4444]" : "bg-[#3B82F6]";
   return (
     <div className={`fixed top-4 right-4 z-[300] ${bg} text-white px-4 py-2.5 rounded-xl shadow-lg text-[12px] font-black max-w-[360px] flex items-center gap-2`}>
       <span className="flex-1">{message}</span>
@@ -80,7 +80,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 // ── Confirm Dialog ───────────────────────────────────────────────────────────
 
 function ConfirmDialog({
-  title, message, confirmLabel = "Confirm", confirmColor = "bg-[#128C7E]",
+  title, message, confirmLabel = "Confirm", confirmColor = "bg-[var(--brand)]",
   onConfirm, onCancel, loading = false,
 }: {
   title: string; message: string; confirmLabel?: string; confirmColor?: string;
@@ -167,8 +167,8 @@ function ManageDrawer({
           <div className="flex flex-col gap-2">
             <label className="text-[11px] font-black text-[#667781] uppercase tracking-wide">Status</label>
             <div className="h-9 px-3 rounded-lg bg-[#F8FAFC] border border-[#E9EDEF] flex items-center text-[12px]">
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black ${user.access_status === "active" ? "bg-[#128C7E]/10 text-[#128C7E]" : "bg-[#EF4444]/10 text-[#EF4444]"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${user.access_status === "active" ? "bg-[#128C7E]" : "bg-[#EF4444]"}`} />
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black ${user.access_status === "active" ? "bg-[var(--brand)]/10 text-[var(--brand)]" : "bg-[#EF4444]/10 text-[#EF4444]"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${user.access_status === "active" ? "bg-[var(--brand)]" : "bg-[#EF4444]"}`} />
                 {user.access_status === "active" ? "Active" : "Blocked"}
               </span>
             </div>
@@ -184,7 +184,7 @@ function ManageDrawer({
             <select
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] cursor-pointer"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] cursor-pointer"
             >
               <option value="">— Select Role —</option>
               {roles.map((r) => (
@@ -204,7 +204,7 @@ function ManageDrawer({
           <button
             onClick={handleSave}
             disabled={saving || !selectedRole || selectedRole === user.account_role}
-            className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-1.5"
+            className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-1.5"
           >
             {saving && <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             Save Changes
@@ -230,13 +230,13 @@ function TempPasswordModal({ password, userName, onClose }: { password: string; 
         <p className="text-[12px] text-[#667781] mb-3">Temporary password for <strong>{userName}</strong>:</p>
         <div className="flex items-center gap-2 bg-[#F0F2F5] rounded-lg p-3 mb-3">
           <code className="flex-1 text-[14px] font-mono font-black text-[#111B21] select-all">{password}</code>
-          <button onClick={handleCopy} className="h-7 px-3 rounded-lg bg-[#128C7E] text-white text-[10px] font-black border-none cursor-pointer hover:brightness-110 transition-all">
+          <button onClick={handleCopy} className="h-7 px-3 rounded-lg bg-[var(--brand)] text-white text-[10px] font-black border-none cursor-pointer hover:brightness-110 transition-all">
             {copied ? "Copied!" : "Copy"}
           </button>
         </div>
         <p className="text-[11px] text-[#F97316] mb-4">Share this securely. The user should change it on next login.</p>
         <div className="flex justify-end">
-          <button onClick={onClose} className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all">Done</button>
+          <button onClick={onClose} className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all">Done</button>
         </div>
       </div>
     </div>
@@ -325,7 +325,7 @@ function AddMemberDrawer({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="e.g. John Doe"
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
             />
           </div>
 
@@ -337,7 +337,7 @@ function AddMemberDrawer({
               value={username}
               onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
               placeholder="e.g. johndoe"
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
             />
             <span className="text-[10px] text-[#667781]">No spaces. This is used to log in.</span>
           </div>
@@ -350,7 +350,7 @@ function AddMemberDrawer({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g. john@company.com"
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
             />
           </div>
 
@@ -360,7 +360,7 @@ function AddMemberDrawer({
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] cursor-pointer"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] cursor-pointer"
             >
               <option value="">— Select Role —</option>
               {roles.map((r) => (
@@ -378,7 +378,7 @@ function AddMemberDrawer({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min. 5 characters"
-                className="h-9 w-full px-3 pr-10 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+                className="h-9 w-full px-3 pr-10 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
               />
               <button
                 type="button"
@@ -393,7 +393,7 @@ function AddMemberDrawer({
 
           {/* Info box */}
           <div className="bg-[#F0F2F5] rounded-xl p-3 mt-1">
-            <div className="text-[10px] font-black text-[#128C7E] mb-1">What happens next?</div>
+            <div className="text-[10px] font-black text-[var(--brand)] mb-1">What happens next?</div>
             <div className="text-[10px] text-[#667781] leading-relaxed">
               The new team member will be able to log in immediately with the username and password you set. Share the credentials securely.
             </div>
@@ -406,7 +406,7 @@ function AddMemberDrawer({
           <button
             onClick={handleCreate}
             disabled={saving || !canSubmit}
-            className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-1.5"
+            className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-1.5"
           >
             {saving && <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             Create Member
@@ -594,7 +594,7 @@ export function RbacPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, username, email, or role..."
-              className="h-8 flex-1 min-w-[180px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+              className="h-8 flex-1 min-w-[180px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all"
             />
 
             {/* Refresh */}
@@ -608,7 +608,7 @@ export function RbacPage() {
             {/* Add Member */}
             <button
               onClick={() => setAddDrawerOpen(true)}
-              className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all flex items-center gap-1"
+              className="h-8 px-3 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-110 transition-all flex items-center gap-1"
             >
               + Add Member
             </button>
@@ -633,7 +633,7 @@ export function RbacPage() {
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                   <span className="text-[12px] text-[#667781]">Loading team members...</span>
                 </div>
               </div>
@@ -688,7 +688,7 @@ export function RbacPage() {
                               <div className="min-w-0">
                                 <div className="font-black text-[12px] text-[#111B21] truncate flex items-center gap-1.5">
                                   {u.account_name}
-                                  {isSelf && <span className="text-[9px] bg-[#128C7E]/10 text-[#128C7E] px-1.5 py-0.5 rounded-full font-black">You</span>}
+                                  {isSelf && <span className="text-[9px] bg-[var(--brand)]/10 text-[var(--brand)] px-1.5 py-0.5 rounded-full font-black">You</span>}
                                 </div>
                                 <div className="text-[10px] text-[#667781] truncate">@{u.username}</div>
                               </div>
@@ -705,12 +705,12 @@ export function RbacPage() {
                           {/* Status */}
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black ${
-                              isActive ? "bg-[#128C7E]/10 text-[#128C7E]"
+                              isActive ? "bg-[var(--brand)]/10 text-[var(--brand)]"
                               : isDeactivated ? "bg-[#667781]/10 text-[#667781]"
                               : "bg-[#EF4444]/10 text-[#EF4444]"
                             }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${
-                                isActive ? "bg-[#128C7E]" : isDeactivated ? "bg-[#667781]" : "bg-[#EF4444]"
+                                isActive ? "bg-[var(--brand)]" : isDeactivated ? "bg-[#667781]" : "bg-[#EF4444]"
                               }`} />
                               {isActive ? "Active" : isDeactivated ? "Deactivated" : "Blocked"}
                             </span>
@@ -747,7 +747,7 @@ export function RbacPage() {
                                   <ActionBtn
                                     label="Restore"
                                     icon="✓"
-                                    color="text-[#128C7E]"
+                                    color="text-[var(--brand)]"
                                     onClick={() => setConfirmAction({ user: u, action: "unblock" })}
                                   />
                                 )
@@ -803,7 +803,7 @@ export function RbacPage() {
             confirmAction.action === "block" ? "Block User" :
             confirmAction.action === "unblock" ? "Restore User" : "Reset Password"
           }
-          confirmColor={confirmAction.action === "delete" || confirmAction.action === "block" ? "bg-[#EF4444]" : "bg-[#128C7E]"}
+          confirmColor={confirmAction.action === "delete" || confirmAction.action === "block" ? "bg-[#EF4444]" : "bg-[var(--brand)]"}
           onConfirm={handleConfirmAction}
           onCancel={() => setConfirmAction(null)}
           loading={actionLoading}
@@ -850,11 +850,11 @@ export function RbacPage() {
 function KpiCard({ label, value, color = "teal", loading = false, onClick }: {
   label: string; value: string; color?: "teal" | "green" | "red"; loading?: boolean; onClick?: () => void;
 }) {
-  const valueColor = { teal: "text-[#128C7E]", green: "text-[#25D366]", red: "text-[#EF4444]" }[color];
+  const valueColor = { teal: "text-[var(--brand)]", green: "text-[#25D366]", red: "text-[#EF4444]" }[color];
   return (
     <div
       onClick={onClick}
-      className={`bg-white border border-[#E9EDEF] rounded-xl p-3 flex flex-col gap-0.5 ${onClick ? "cursor-pointer hover:border-[#128C7E] hover:shadow-sm transition-all" : ""}`}
+      className={`bg-white border border-[#E9EDEF] rounded-xl p-3 flex flex-col gap-0.5 ${onClick ? "cursor-pointer hover:border-[var(--brand)] hover:shadow-sm transition-all" : ""}`}
     >
       <div className="text-[10px] text-[#667781] font-black uppercase tracking-wide">{label}</div>
       {loading ? (
@@ -862,7 +862,7 @@ function KpiCard({ label, value, color = "teal", loading = false, onClick }: {
       ) : (
         <div className={`text-[22px] font-black leading-tight ${valueColor}`}>{value}</div>
       )}
-      {onClick && !loading && <div className="text-[9px] text-[#128C7E] font-black">Click to view</div>}
+      {onClick && !loading && <div className="text-[9px] text-[var(--brand)] font-black">Click to view</div>}
     </div>
   );
 }
@@ -875,7 +875,7 @@ function TabBtn({ active, onClick, label, count, danger = false }: {
       onClick={onClick}
       className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all flex items-center gap-1.5 ${
         active
-          ? danger ? "bg-[#EF4444] text-white" : "bg-[#128C7E] text-white"
+          ? danger ? "bg-[#EF4444] text-white" : "bg-[var(--brand)] text-white"
           : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"
       }`}
     >

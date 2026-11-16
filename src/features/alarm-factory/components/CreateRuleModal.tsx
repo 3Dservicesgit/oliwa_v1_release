@@ -36,7 +36,7 @@ function FieldInput({ value, placeholder, onChange }: { value?: string; placehol
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange?.(e.target.value)}
-      className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+      className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
     />
   );
 }
@@ -46,7 +46,7 @@ function FieldSelect({ value, options, onChange }: { value?: string; options: st
     <select
       value={value}
       onChange={(e) => onChange?.(e.target.value)}
-      className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors cursor-pointer"
+      className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors cursor-pointer"
     >
       {options.map((o) => <option key={o}>{o}</option>)}
     </select>
@@ -73,7 +73,7 @@ function BasicsPanel() {
       </FormRow>
       <FormRow label="Description">
         <textarea
-          className="w-full h-20 px-3 py-2 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors resize-none"
+          className="w-full h-20 px-3 py-2 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors resize-none"
           placeholder="Describe what this rule detects and why it matters…"
         />
       </FormRow>
@@ -183,7 +183,7 @@ function ChannelsPanel() {
               type="checkbox"
               checked={selected.includes(ch)}
               onChange={() => toggle(ch)}
-              className="accent-[#128C7E] w-4 h-4"
+              className="accent-[var(--brand)] w-4 h-4"
             />
             <span className="text-[12px] font-extrabold text-[#111B21]">{ch}</span>
           </label>
@@ -258,7 +258,7 @@ function AuditPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div className="font-black text-[14px] text-[#111B21]">Audit</div>
-      <div className="bg-[#E8F5F2] border border-[#BFE7E0] rounded-xl px-4 py-3 text-[12px] text-[#128C7E] leading-relaxed">
+      <div className="bg-[#E8F5F2] border border-[#BFE7E0] rounded-xl px-4 py-3 text-[12px] text-[var(--brand)] leading-relaxed">
         All changes to this rule are hash-chained into the NAVAS irrefutable audit trail.
         Any activation, modification, or deletion requires Approver sign-off and is permanently logged.
       </div>
@@ -338,7 +338,7 @@ export function CreateRuleModal({ open, onClose, onRequestApproval, onSaveDraft 
                 className={`
                   text-left px-4 py-2.5 text-[13px] font-extrabold border-none cursor-pointer transition-colors
                   ${activeTab === tab
-                    ? "bg-[#128C7E] text-white"
+                    ? "bg-[var(--brand)] text-white"
                     : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]"}
                 `}
               >
@@ -367,7 +367,7 @@ export function CreateRuleModal({ open, onClose, onRequestApproval, onSaveDraft 
             </button>
             <button
               onClick={onSaveDraft}
-              className="h-9 px-4 rounded-xl bg-[#25D366] text-[#075E54] text-[12px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+              className="h-9 px-4 rounded-xl bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
             >
               Save Draft
             </button>

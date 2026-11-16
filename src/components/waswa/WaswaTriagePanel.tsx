@@ -13,6 +13,7 @@
  * All styles: Tailwind utility classes only.
  */
 import React from "react";
+import { useAssistantName } from "../../branding/branding";
 
 /* ── Sub-types ─────────────────────────────────────────────────────────────── */
 
@@ -114,18 +115,19 @@ export function WaswaTriagePanel({
   momoRows          = DEFAULT_MOMO,
   queueItems        = DEFAULT_QUEUE,
 }: WaswaTriagePanelProps) {
+  const assistantName = useAssistantName();
   return (
     <aside className="hidden xl:flex flex-col w-[300px] shrink-0 bg-white border-l border-[#E9EDEF] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#E9EDEF] sticky top-0 bg-white z-10">
-        <div className="font-black text-[13px] text-[#111B21]">Waswa AI • Triage Blade</div>
+        <div className="font-black text-[13px] text-[#111B21]">{assistantName} AI • Triage Blade</div>
         <button
           onClick={onToggleWaswa}
           aria-pressed={waswaOn}
           className={`
             h-7 px-3 rounded-full border-none text-[11px] font-black cursor-pointer transition-all
-            ${waswaOn ? "bg-[#25D366] text-[#075E54]" : "bg-[#E9EDEF] text-[#667781]"}
+            ${waswaOn ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[#E9EDEF] text-[#667781]"}
           `}
         >
           {waswaOn ? "ON" : "OFF"}
@@ -152,7 +154,7 @@ export function WaswaTriagePanel({
           </button>
           <button
             onClick={onOpenAiConsole}
-            className="h-7 px-3 rounded-full bg-[#25D366] text-[#075E54] text-[10px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+            className="h-7 px-3 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[10px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
           >
             Open AI Console
           </button>
@@ -220,7 +222,7 @@ export function WaswaTriagePanel({
         <div className="flex gap-2 flex-wrap pt-1">
           <button
             onClick={onApproveSelected}
-            className="h-7 px-3 rounded-full bg-[#25D366] text-[#075E54] text-[10px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+            className="h-7 px-3 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[10px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
           >
             Approve Selected
           </button>

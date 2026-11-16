@@ -152,7 +152,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
 
 const modalBtnCls: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54] hover:brightness-105",
-  teal:  "bg-[#128C7E] text-white hover:brightness-105",
+  teal:  "bg-[var(--brand)] text-white hover:brightness-105",
   dark:  "bg-[#111B21] text-white hover:brightness-105",
 };
 

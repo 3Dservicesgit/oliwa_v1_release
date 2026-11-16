@@ -67,7 +67,7 @@ export function TokenEngineCard({
       <div className="px-4 pb-3 mt-auto">
         <button
           onClick={onMint}
-          className="w-full h-8 rounded-lg border border-[#C2E8E1] bg-[#E9F7F4] text-[12px] font-extrabold text-[#128C7E] cursor-pointer hover:brightness-95 transition-all"
+          className="w-full h-8 rounded-lg border border-[#C2E8E1] bg-[#E9F7F4] text-[12px] font-extrabold text-[var(--brand)] cursor-pointer hover:brightness-95 transition-all"
         >
           Open Token Engine →
         </button>

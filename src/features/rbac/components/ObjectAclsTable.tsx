@@ -16,7 +16,7 @@ const stDot: Record<string, string> = { Active: "bg-[#25D366]", Disabled: "bg-[#
 const stText: Record<string, string> = { Active: "text-[#1A7A3A]", Disabled: "text-[#EF4444]" };
 
 const accessBg: Record<string, string> = {
-  Read:  "bg-[#EAF7F3] text-[#128C7E]",
+  Read:  "bg-[#EAF7F3] text-[var(--brand)]",
   Write: "bg-[#FFF7ED] text-[#F97316]",
   Admin: "bg-[#FEF2F2] text-[#EF4444]",
   None:  "bg-[#F0F2F5] text-[#667781]",

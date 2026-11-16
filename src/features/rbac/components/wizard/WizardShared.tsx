@@ -44,7 +44,7 @@ export function StepSuccessBanner({
         {nextLabel && onNext && (
           <button
             onClick={onNext}
-            className="h-8 px-4 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer hover:brightness-105"
+            className="h-8 px-4 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-black border-none cursor-pointer hover:brightness-105"
           >
             {nextLabel} &rarr;
           </button>
@@ -71,11 +71,11 @@ export function ErrorBanner({ message }: { message: string }) {
 
 /** Standard input class string used across all steps. */
 export const INPUT_CLS =
-  "w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]";
+  "w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]";
 
 /** Standard select class string. */
 export const SELECT_CLS = INPUT_CLS;
 
 /** Primary submit button class string. */
 export const BTN_PRIMARY =
-  "h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed";
+  "h-10 px-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed";

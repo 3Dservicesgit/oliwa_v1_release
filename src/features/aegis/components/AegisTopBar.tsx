@@ -93,7 +93,7 @@ export function AegisTopBar({
     : whoLabel;
 
   return (
-    <header className="h-12 flex items-center gap-0 bg-[#075E54] text-white sticky top-0 z-[100] shrink-0 overflow-hidden">
+    <header className="h-12 flex items-center gap-0 bg-[var(--brand-dark)] text-white sticky top-0 z-[100] shrink-0 overflow-hidden">
 
       {/* Left: Tenant + wallet */}
       <div className="flex items-center gap-2 px-3 shrink-0 border-r border-white/10 h-full">
@@ -167,7 +167,7 @@ export function AegisTopBar({
 
         {/* Avatar + name */}
         <div className="flex items-center gap-1.5 border-l border-white/10 pl-2">
-          <div className="w-7 h-7 rounded-full bg-[#128C7E] grid place-items-center font-bold text-[12px] shrink-0">
+          <div className="w-7 h-7 rounded-full bg-[var(--brand)] grid place-items-center font-bold text-[12px] shrink-0">
             {displayAvatarInitial}
           </div>
           <span className="hidden sm:block text-[11px] font-extrabold opacity-90 whitespace-nowrap">

@@ -61,7 +61,7 @@ export function RunbooksCard({
       <div className="flex flex-col divide-y divide-[#E9EDEF] flex-1">
         {runbooks.map((rb) => (
           <div key={rb.id} className="px-4 py-3 flex items-start gap-3">
-            <span className="shrink-0 text-[10px] font-extrabold bg-[#128C7E] text-white px-2 py-0.5 rounded-full">
+            <span className="shrink-0 text-[10px] font-extrabold bg-[var(--brand)] text-white px-2 py-0.5 rounded-full">
               RB
             </span>
             <div className="min-w-0">
@@ -76,7 +76,7 @@ export function RunbooksCard({
       <div className="px-4 py-3 border-t border-[#E9EDEF] flex gap-2 flex-wrap justify-end">
         <button
           onClick={onCreateRunbook}
-          className="h-8 px-4 rounded-full bg-[#25D366] text-[#075E54] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+          className="h-8 px-4 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
         >
           Create Runbook
         </button>

@@ -14,7 +14,7 @@ import { getGeozones, deleteGeozone, getGeozoneAttachedDevices } from "../../api
 import { getClientDevices } from "../../api/services/clients.service";
 import { useAuth } from "../../auth/AuthContext";
 import { useGuardedMutation, GuardedButton } from "../../auth/guards";
-import { parseGeozonePoints } from "../../api/types/geozones.types";
+import { parseGeozoneGeometry } from "../../api/types/geozones.types";
 import type { ParsedGeozone, LatLng, Geozone } from "../../api/types";
 import {
   emptyDraft,
@@ -27,7 +27,7 @@ import {
   type ShapeDraft,
 } from "../../utils/geofenceShapes";
 
-import { parseLiveFrame, liveStreamUrl } from "../../utils/livePosition";
+import { LiveFleet } from "../../utils/liveFleet";
 
 import { GeofenceMap } from "./components/GeofenceMap";
 import type { DeviceMarkerData } from "./components/GeofenceMap";
@@ -48,9 +48,6 @@ const TABS: { key: GeofenceTab; label: string }[] = [
 
 const FLEET_SSE = (import.meta.env.VITE_FLEET_SSE_URL as string) ?? "https://narvasocket.3dservices.co.ug";
 
-/** Wait this long before reopening a stream that dropped. */
-const STREAM_RETRY_MS = 4000;
-
 export function GeofencesPage() {
   const { state: authState } = useAuth();
   const [activeTab, setActiveTab] = useState<GeofenceTab>("my-geofences");
@@ -68,10 +65,17 @@ export function GeofencesPage() {
     getGeozones(authState.accountRoot, "client")
       .then((res) => {
         if (res.status === "success" && Array.isArray(res.data)) {
-          const parsed: ParsedGeozone[] = (res.data as Geozone[]).map((gz) => ({
-            ...gz,
-            path: parseGeozonePoints(gz.geozone_points),
-          }));
+          const parsed: ParsedGeozone[] = (res.data as Geozone[]).map((gz) => {
+            const geo = parseGeozoneGeometry(gz.geozone_points);
+            // Zones drawn in the mobile app keep their circle or line in
+            // geozone_points, with no shape details: read the shape from there.
+            const legacy = !gz.geozone_shape_params && geo.params;
+            return {
+              ...gz,
+              ...(legacy ? { geozone_shape: geo.shape, geozone_shape_params: geo.params } : {}),
+              path: geo.outline,
+            };
+          });
           setGeozones(parsed);
         } else {
           setGeozones([]);
@@ -107,23 +111,17 @@ export function GeofencesPage() {
 
   // ── Live device markers on geofence map ────────────────────────────────
   const [deviceMarkers, setDeviceMarkers] = useState<DeviceMarkerData[]>([]);
-  const sseRefs = useRef<Map<string, EventSource>>(new Map());
   const deviceDataRef = useRef<Map<string, DeviceMarkerData>>(new Map());
-  const retryTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // Fetch attached devices when a geofence is selected
   useEffect(() => {
-    // Close existing SSE connections
-    for (const es of sseRefs.current.values()) es.close();
-    sseRefs.current.clear();
-    for (const timer of retryTimers.current) clearTimeout(timer);
-    retryTimers.current.clear();
     deviceDataRef.current.clear();
     setDeviceMarkers([]);
 
     if (!selectedUid || !authState.accountRoot) return;
 
     let cancelled = false;
+    let stopFeed = () => {};
 
     (async () => {
       try {
@@ -154,21 +152,12 @@ export function GeofencesPage() {
           setDeviceMarkers(Array.from(deviceDataRef.current.values()));
         };
 
-        // 3. Follow each attached unit's live position
-        const connect = (imei: string) => {
-          if (cancelled) return;
-          let es: EventSource;
-          try {
-            es = new EventSource(liveStreamUrl(FLEET_SSE, imei));
-          } catch {
-            return;
-          }
-          sseRefs.current.set(imei, es);
-
-          es.onmessage = (ev) => {
-            const frame = parseLiveFrame(ev.data, imei);
-            if (frame.kind === "ignore") return;
-
+        // 3. Follow the attached units' live positions, read in turn a few
+        //    at a time. A stream each used to stop at 6 units: the browser's
+        //    limit per server, which the stream server's HTTP/1.1 imposes.
+        const feed = new LiveFleet({
+          base: FLEET_SSE,
+          onFrame: (imei, frame) => {
             if (frame.kind === "offline") {
               const known = deviceDataRef.current.get(imei);
               show(known
@@ -177,7 +166,6 @@ export function GeofencesPage() {
                     speed: 0, status: "Offline", lastSync: "—" });
               return;
             }
-
             const p = frame.position;
             show({
               imei,
@@ -188,23 +176,12 @@ export function GeofencesPage() {
               status: p.status,
               lastSync: p.lastSync || "—",
             });
-          };
-
-          // A dropped stream is normal (sleep, network change) — reopen it,
-          // otherwise the map quietly freezes on the last position.
-          es.onerror = () => {
-            try { es.close(); } catch { /* already closed */ }
-            sseRefs.current.delete(imei);
-            if (cancelled) return;
-            const retry = setTimeout(() => {
-              retryTimers.current.delete(retry);
-              connect(imei);
-            }, STREAM_RETRY_MS);
-            retryTimers.current.add(retry);
-          };
-        };
-
-        for (const imei of attachedImeis) connect(imei);
+          },
+        });
+        if (cancelled) return;
+        stopFeed = () => feed.stop();
+        feed.setUnits(attachedImeis);
+        feed.start();
       } catch (err) {
         console.error("[GeofencesPage] Failed to load device markers:", err);
       }
@@ -212,10 +189,7 @@ export function GeofencesPage() {
 
     return () => {
       cancelled = true;
-      for (const es of sseRefs.current.values()) es.close();
-      sseRefs.current.clear();
-      for (const timer of retryTimers.current) clearTimeout(timer);
-      retryTimers.current.clear();
+      stopFeed();
     };
   }, [selectedUid, authState.accountRoot]);
 
@@ -303,7 +277,7 @@ export function GeofencesPage() {
                 permission="can_create_geofence"
                 fallback="disable"
                 onClick={handleStartDrawing}
-                className="shrink-0 h-8 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[#0D7466]"
+                className="shrink-0 h-8 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)]"
               >
                 + Mark Geofence
               </GuardedButton>
@@ -334,7 +308,7 @@ export function GeofencesPage() {
               className={[
                 "px-3 py-1.5 text-[12px] font-extrabold rounded-md cursor-pointer border-0 transition-colors",
                 activeTab === tab.key
-                  ? "bg-[#128C7E] text-white"
+                  ? "bg-[var(--brand)] text-white"
                   : "bg-transparent text-[#667781] hover:bg-[#F0F2F5]",
               ].join(" ")}
             >
@@ -373,7 +347,7 @@ export function GeofencesPage() {
                 />
               ) : loading ? (
                 <div className="flex items-center justify-center flex-1">
-                  <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : loadError ? (
                 <div className="p-4">

@@ -6,6 +6,8 @@
  *   dll_geozone_attachments — devices ↔ geozones link (device_imei, attached_geozones JSON)
  */
 
+import { circleRing } from "../../utils/geofenceShapes.ts";
+
 // ── Core geozone ────────────────────────────────────────────────────────────
 
 /** A single coordinate pair as stored in the backend (lng, lat order). */
@@ -126,17 +128,67 @@ export interface AssignGeozonesRequest {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/** A zone's geometry, whichever way it was stored. */
+export interface GeozoneGeometry {
+  shape: GeozoneShape;
+  /** The drawn shape, for zones stored the mobile app's way; else null. */
+  params: ShapeParams | null;
+  /** The area, for inside/outside checks: empty for a line with no width. */
+  ring: LatLng[];
+  /** What to draw and frame on the map: the ring, or a line's route. */
+  outline: LatLng[];
+}
+
+const toLatLngs = (coords: unknown): LatLng[] =>
+  Array.isArray(coords)
+    ? coords
+        .filter((c): c is GeozoneCoord => Array.isArray(c) && c.length >= 2)
+        .map(([lng, lat]) => ({ lat: Number(lat), lng: Number(lng) }))
+        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    : [];
+
 /**
- * Parse the raw geozone_points JSON string into a LatLng array.
- * Backend stores coordinates as [lng, lat] pairs.
+ * Parse geozone_points. Usually a ring of [lng, lat] pairs, but zones drawn
+ * in the mobile app store their shape there instead (oliwa-mobile
+ * lib/models/geozone.dart):
+ *   {"type":"circle","center":[lng,lat],"radius":<metres>}
+ *   {"type":"line","points":[[lng,lat], ...]}
+ * Read as a ring, those came back empty, and the map's polygon for them
+ * threw inside Google Maps, blanking the Geofences page.
+ */
+export function parseGeozoneGeometry(raw: string): GeozoneGeometry {
+  const none: GeozoneGeometry = { shape: "polygon", params: null, ring: [], outline: [] };
+  let data: unknown;
+  try { data = JSON.parse(raw); } catch { return none; }
+  if (Array.isArray(data)) {
+    const ring = toLatLngs(data);
+    return { shape: "polygon", params: null, ring, outline: ring };
+  }
+  if (!data || typeof data !== "object") return none;
+  const o = data as { type?: unknown; center?: unknown; radius?: unknown; points?: unknown };
+  const type = String(o.type ?? "polygon").toLowerCase();
+  if (type === "circle") {
+    const [center] = toLatLngs([o.center]);
+    const radius = Number(o.radius);
+    if (!center || !(radius > 0)) return none;
+    const ring = circleRing(center, radius);
+    return { shape: "circle", params: { center, radius_m: radius }, ring, outline: ring };
+  }
+  const points = toLatLngs(o.points);
+  if (type === "line") {
+    // No thickness is stored, so the route has no inside.
+    return { shape: "line", params: { points, width_m: 0 }, ring: [], outline: points };
+  }
+  return { shape: "polygon", params: null, ring: points, outline: points };
+}
+
+/**
+ * The zone's area as a LatLng ring, for inside/outside checks. Backend stores
+ * coordinates as [lng, lat] pairs; a circle stored the mobile app's way comes
+ * back as its 64-sided ring, a line with no width as no area.
  */
 export function parseGeozonePoints(raw: string): LatLng[] {
-  try {
-    const coords: GeozoneCoord[] = JSON.parse(raw);
-    return coords.map(([lng, lat]) => ({ lat, lng }));
-  } catch {
-    return [];
-  }
+  return parseGeozoneGeometry(raw).ring;
 }
 
 /**

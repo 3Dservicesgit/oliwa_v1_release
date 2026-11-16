@@ -226,7 +226,7 @@ const TCONF: Record<ToastV, { bar: string; icon: string; col: string }> = {
   warn:    { bar: "bg-[#FB8C00]", icon: "⚠", col: "#FB8C00" },
   error:   { bar: "bg-[#D93025]", icon: "✕", col: "#D93025" },
   info:    { bar: "bg-[#34B7F1]", icon: "ℹ", col: "#34B7F1" },
-  success: { bar: "bg-[#128C7E]", icon: "✓", col: "#128C7E" },
+  success: { bar: "bg-[var(--brand)]", icon: "✓", col: "#128C7E" },
 };
 
 function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
@@ -311,14 +311,14 @@ function TeltonikaConfigTable({ values, formulas, onChange }: {
                 <td className="px-3 py-2">
                   <div className="flex gap-1">
                     <select value={values[k] || ""} onChange={(e) => setVal(k, e.target.value)}
-                      className="flex-1 h-8 rounded border border-[#E9EDEF] px-2 text-[11px] bg-white outline-none focus:border-[#128C7E]">
+                      className="flex-1 h-8 rounded border border-[#E9EDEF] px-2 text-[11px] bg-white outline-none focus:border-[var(--brand)]">
                       {TELTO_PARAMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </select>
                     <input
                       value={values[k] && !TELTO_PARAMS.some((p) => p.value === values[k] && p.value !== "") ? values[k] : ""}
                       onChange={(e) => setVal(k, e.target.value)}
                       placeholder="or type ID"
-                      className="w-[72px] h-8 rounded border border-[#E9EDEF] px-2 text-[11px] font-mono outline-none focus:border-[#128C7E]"
+                      className="w-[72px] h-8 rounded border border-[#E9EDEF] px-2 text-[11px] font-mono outline-none focus:border-[var(--brand)]"
                     />
                   </div>
                 </td>
@@ -328,7 +328,7 @@ function TeltonikaConfigTable({ values, formulas, onChange }: {
                       value={formulas[fk] && formulas[fk] !== "no-config" ? formulas[fk] : ""}
                       onChange={(e) => setFml(fk, e.target.value || "no-config")}
                       placeholder="no-config"
-                      className="w-full h-8 rounded border border-[#E9EDEF] px-2 text-[11px] font-mono outline-none focus:border-[#128C7E]"
+                      className="w-full h-8 rounded border border-[#E9EDEF] px-2 text-[11px] font-mono outline-none focus:border-[var(--brand)]"
                     />
                   ) : (
                     <span className="text-[#A0AAB4] text-[11px]">N/A</span>
@@ -368,7 +368,7 @@ function XirgoConfigTable({ values, formulas, onChange }: {
                 <td className="px-3 py-2 font-semibold text-[#111B21] capitalize">{humanKey(k)}</td>
                 <td className="px-3 py-2">
                   <select value={values[k] || ""} onChange={(e) => setVal(k, e.target.value)}
-                    className="w-full h-8 rounded border border-[#E9EDEF] px-2 text-[11px] bg-white outline-none focus:border-[#128C7E]">
+                    className="w-full h-8 rounded border border-[#E9EDEF] px-2 text-[11px] bg-white outline-none focus:border-[var(--brand)]">
                     <option value="">Select Source</option>
                     {XIRGO_PARAMS.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
@@ -379,7 +379,7 @@ function XirgoConfigTable({ values, formulas, onChange }: {
                       value={formulas[fk] && formulas[fk] !== "no-config" ? formulas[fk] : ""}
                       onChange={(e) => setFml(fk, e.target.value || "no-config")}
                       placeholder="no-config"
-                      className="w-full h-8 rounded border border-[#E9EDEF] px-2 text-[11px] font-mono outline-none focus:border-[#128C7E]"
+                      className="w-full h-8 rounded border border-[#E9EDEF] px-2 text-[11px] font-mono outline-none focus:border-[var(--brand)]"
                     />
                   ) : (
                     <span className="text-[#A0AAB4] text-[11px]">N/A</span>
@@ -408,9 +408,9 @@ function CalibrationRows({ entries, onChange }: {
       {entries.map((e, i) => (
         <div key={i} className="flex items-center gap-2 mb-1.5">
           <input value={e.mv} onChange={(ev) => upd(i, "mv", ev.target.value)} placeholder="Milivolts" type="number"
-            className="w-[120px] h-8 rounded border border-[#E9EDEF] px-2 text-[12px] outline-none focus:border-[#128C7E]" />
+            className="w-[120px] h-8 rounded border border-[#E9EDEF] px-2 text-[12px] outline-none focus:border-[var(--brand)]" />
           <input value={e.vl} onChange={(ev) => upd(i, "vl", ev.target.value)} placeholder="Volt Litres" type="number"
-            className="w-[120px] h-8 rounded border border-[#E9EDEF] px-2 text-[12px] outline-none focus:border-[#128C7E]" />
+            className="w-[120px] h-8 rounded border border-[#E9EDEF] px-2 text-[12px] outline-none focus:border-[var(--brand)]" />
           <button onClick={() => remove(i)}
             className="h-8 px-3 rounded border border-[#E9EDEF] text-[12px] text-[#C62828] hover:bg-[#FFEBEE] transition-colors cursor-pointer bg-transparent">
             Remove
@@ -418,7 +418,7 @@ function CalibrationRows({ entries, onChange }: {
         </div>
       ))}
       <button onClick={add}
-        className="h-8 px-3 rounded border border-[#128C7E] text-[12px] text-[#128C7E] hover:bg-[#E8F5F2] transition-colors cursor-pointer bg-transparent mt-1">
+        className="h-8 px-3 rounded border border-[var(--brand)] text-[12px] text-[var(--brand)] hover:bg-[#E8F5F2] transition-colors cursor-pointer bg-transparent mt-1">
         + Add Entry
       </button>
     </div>
@@ -435,7 +435,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputCls = "h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors bg-[#F8F9FA] disabled:opacity-60";
+const inputCls = "h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors bg-[#F8F9FA] disabled:opacity-60";
 
 function FInput({ value, onChange, placeholder, mono, disabled }: {
   value: string; onChange?: (v: string) => void;
@@ -462,7 +462,7 @@ function SaveBtn({ loading, onClick, children }: {
 }) {
   return (
     <button onClick={onClick} disabled={loading}
-      className="h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-extrabold hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none cursor-pointer">
+      className="h-9 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-extrabold hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none cursor-pointer">
       {loading ? "Saving…" : children}
     </button>
   );
@@ -488,7 +488,7 @@ function SubBadge({ status }: { status: string }) {
 }
 
 // ─── Side-panel form primitives ───────────────────────────────────────────────
-const pInputCls = "w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors bg-white disabled:opacity-50";
+const pInputCls = "w-full h-10 rounded-lg border border-[#E9EDEF] px-3 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors bg-white disabled:opacity-50";
 
 function PField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -975,7 +975,7 @@ export function DeviceManagementSection() {
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search name, IMEI, client…"
               className="h-8 w-[200px] rounded-lg border border-[#E9EDEF] px-3 text-[12px] placeholder:text-[#A0AAB4]
-                bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors text-[#111B21]"
+                bg-[#F8F9FA] outline-none focus:border-[var(--brand)] transition-colors text-[#111B21]"
             />
             <button onClick={() => { setSearch(""); reload(); }}
               className="h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#667781]
@@ -1054,7 +1054,7 @@ export function DeviceManagementSection() {
                             {canEditProps && (
                               <button
                                 onClick={() => { openEditProps(d); setOpenMenuImei(null); }}
-                                className="w-full text-left px-3 py-2 text-[12px] text-[#128C7E] hover:bg-[#F8F9FA] cursor-pointer bg-transparent border-none">
+                                className="w-full text-left px-3 py-2 text-[12px] text-[var(--brand)] hover:bg-[#F8F9FA] cursor-pointer bg-transparent border-none">
                                 Edit Properties
                               </button>
                             )}
@@ -1130,7 +1130,7 @@ export function DeviceManagementSection() {
                   setRegForm({ imei: "", model: "", vendor: "", clientUid: "", status: "" });
                   setShowRegModal(true);
                 }}
-                className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-extrabold
+                className="h-8 px-3 rounded-lg bg-[var(--brand)] text-white text-[11px] font-extrabold
                   hover:brightness-105 transition-all border-none cursor-pointer shrink-0">
                 + Register New Unit
               </button>
@@ -1142,7 +1142,7 @@ export function DeviceManagementSection() {
             onChange={(e) => { setRegSearch(e.target.value); setRegPage(1); }}
             placeholder="Search IMEI, model, client…"
             className="h-8 w-full rounded-lg border border-[#E9EDEF] px-3 text-[12px] placeholder:text-[#A0AAB4]
-              bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors text-[#111B21]"
+              bg-[#F8F9FA] outline-none focus:border-[var(--brand)] transition-colors text-[#111B21]"
           />
         </div>
 
@@ -1190,7 +1190,7 @@ export function DeviceManagementSection() {
                   ) : (
                     <button
                       onClick={() => openConfigureRegistered(d)}
-                      className="h-7 px-2.5 rounded border border-[#E9EDEF] text-[11px] text-[#128C7E]
+                      className="h-7 px-2.5 rounded border border-[#E9EDEF] text-[11px] text-[var(--brand)]
                         hover:bg-[#E8F5F2] cursor-pointer bg-white transition-colors shrink-0">
                       Configure
                     </button>
@@ -1235,7 +1235,7 @@ export function DeviceManagementSection() {
             onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-[#075E54] shrink-0">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-[var(--brand-dark)] shrink-0">
               <div>
                 <div className="font-black text-[15px] text-white">{detailsDevice.device_name || detailsDevice.device_imei}</div>
                 <div className="text-[11px] text-white/70 mt-0.5 font-mono">{detailsDevice.device_imei}</div>
@@ -1251,7 +1251,7 @@ export function DeviceManagementSection() {
                   className={[
                     "h-11 px-4 text-[13px] font-black transition-colors border-none cursor-pointer bg-transparent border-b-2",
                     detailsTab === tab
-                      ? "text-[#075E54] border-[#075E54]"
+                      ? "text-[var(--brand-dark)] border-[var(--brand-dark)]"
                       : "text-[#667781] border-transparent hover:text-[#111B21]",
                   ].join(" ")}>
                   {tab === "info" ? "Info" : "Technical Info"}
@@ -1325,7 +1325,7 @@ export function DeviceManagementSection() {
             onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-[#075E54] shrink-0">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-[var(--brand-dark)] shrink-0">
               <div>
                 <div className="font-black text-[15px] text-white">Edit Device</div>
                 <div className="text-[11px] text-white/70 mt-0.5">{editPropsDevice.device_name || editPropsDevice.device_imei}</div>
@@ -1483,7 +1483,7 @@ export function DeviceManagementSection() {
                 className={[
                   "h-9 px-4 text-[12px] font-extrabold transition-colors border-none cursor-pointer bg-transparent",
                   adTab === tab
-                    ? "text-[#128C7E] border-b-2 border-[#128C7E]"
+                    ? "text-[var(--brand)] border-b-2 border-[var(--brand)]"
                     : "text-[#667781] hover:text-[#111B21]",
                 ].join(" ")}>
                 {tab === "props" ? "Device Properties" : "Parameter Configuration"}

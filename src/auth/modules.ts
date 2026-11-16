@@ -160,6 +160,28 @@ const BUILT_MODULES: ModuleDef[] = [
     catalogModuleName: "Device Lifecycle & Firmware",
   },
   {
+    id: "drivers",
+    name: "Drivers",
+    navLabel: "Drivers",
+    navGlyph: "D",
+    route: "/drivers",
+    viewPermission: "drivers.view",
+    group: "system",
+    showInNavRail: true,
+    showInSidebar: true,
+  },
+  {
+    id: "fuel",
+    name: "Fuel Refill",
+    navLabel: "Fuel Refill",
+    navGlyph: "F",
+    route: "/fuel",
+    viewPermission: "fuel.view",
+    group: "system",
+    showInNavRail: true,
+    showInSidebar: true,
+  },
+  {
     id: "sim",
     name: "Token Subscription",
     navLabel: "Token Subscription",
@@ -229,8 +251,10 @@ const BUILT_MODULES: ModuleDef[] = [
     route: "/audit",
     viewPermission: "audit.view",
     group: "admin",
-    showInNavRail: true,
-    showInSidebar: true,
+    // A tab of User Management now (features/team/AccountRoutes.tsx), not a
+    // menu entry of its own. Kept here for its permission and route.
+    showInNavRail: false,
+    showInSidebar: false,
     catalogModuleName: "Trip Replay & Audit",
   },
 ];

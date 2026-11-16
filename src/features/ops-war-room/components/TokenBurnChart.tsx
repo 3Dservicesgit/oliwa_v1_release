@@ -25,7 +25,7 @@ interface TokenBurnChartProps {
 }
 
 const barFill: Record<BurnTone, string> = {
-  good:    "bg-[#128C7E]",
+  good:    "bg-[var(--brand)]",
   warn:    "bg-[#F97316]",
   bad:     "bg-[#EF4444]",
   neutral: "bg-[#667781]",

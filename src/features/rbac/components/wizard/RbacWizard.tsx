@@ -86,7 +86,7 @@ export function RbacWizard({ open, onClose, mode = "quick", initialStep = 1, onD
         mode === "full" ? "w-[min(1100px,90vw)]" : "w-[min(720px,85vw)]"
       }`}>
         {/* Header */}
-        <div className="bg-[#075E54] text-white px-5 py-3 flex items-center justify-between shrink-0">
+        <div className="bg-[var(--brand-dark)] text-white px-5 py-3 flex items-center justify-between shrink-0">
           <div>
             <div className="font-black text-[15px]">{STEP_TITLES[currentComponent]}</div>
             <div className="text-[11px] opacity-70">{STEP_SUBTITLES[currentComponent]}</div>

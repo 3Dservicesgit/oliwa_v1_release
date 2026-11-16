@@ -80,7 +80,7 @@ export function LiveAlertsTable({
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <button
             onClick={onAckAll}
-            className="h-7 px-3 rounded-full bg-[#25D366] text-[#075E54] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+            className="h-7 px-3 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
           >
             Ack All (low)
           </button>
