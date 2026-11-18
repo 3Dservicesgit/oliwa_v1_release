@@ -30,10 +30,15 @@ import {
   formatDateForApi,
 } from "../../api/services/reports.service";
 import {
+  DRIVER_REPORT_TYPES,
   FUEL_REPORT_TYPES,
   REPORT_TYPE_LABELS,
   REPORT_TYPE_ICONS,
+  driverReportUsesDates,
+  isDriverReport,
 } from "../../api/types/reports.types";
+import { getDrivers } from "../../api/services/drivers.service";
+import type { Driver } from "../../api/types/drivers.types";
 import type {
   ReportType,
   ReportFormat,
@@ -55,6 +60,7 @@ const FALLBACK_REPORT_TYPES: AvailableReportType[] = [
   { key: "IDILING",       label: "Idling",           icon: "⏸️",  category: "state" },
   { key: "PARKING",       label: "Parking",          icon: "🅿️",  category: "state" },
   ...FUEL_REPORT_TYPES,
+  ...DRIVER_REPORT_TYPES,
 ];
 
 // ── Date helpers ────────────────────────────────────────────────────────────
@@ -305,6 +311,8 @@ function ReportDetailsDrawer({
         IDILING: "IDILING", PARKING: "PARKING",
         FUEL_ISSUANCE: "fuel_issuance", FUEL_CONSUMPTION: "fuel_consumption",
         FUEL_EXCEPTIONS: "fuel_exceptions",
+        DRIVER_REGISTRY: "driver_registry", DRIVER_ASSIGNMENTS: "driver_assignments",
+        DRIVER_COMPLIANCE: "driver_compliance", DRIVER_FUEL: "driver_fuel",
       };
       const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
       const allImeis = devices.map((d) => d.device_imei);
@@ -500,6 +508,42 @@ function GenerateForm({
   const [searchDevice, setSearchDevice] = useState("");
   const [noDataInfo, setNoDataInfo] = useState<{ label: string; hint: string } | null>(null);
 
+  // Driver reports are chosen by driver, not vehicle: none ticked = all.
+  const driverReport = isDriverReport(reportType);
+  const showDates = !driverReport || driverReportUsesDates(reportType);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driversLoading, setDriversLoading] = useState(false);
+  const [driversError, setDriversError] = useState<string | null>(null);
+  const driversFetched = useRef(false);
+  const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
+  const [searchDriver, setSearchDriver] = useState("");
+
+  useEffect(() => {
+    if (!driverReport) return;
+    // Driver reports have no Summary workbook.
+    setFormat((f) => (f === "summary" ? "pdf" : f));
+    if (driversFetched.current) return;
+    driversFetched.current = true;
+    setDriversLoading(true);
+    getDrivers()
+      .then((list) => setDrivers(Array.isArray(list) ? list : []))
+      .catch(() => setDriversError("Could not load drivers."))
+      .finally(() => setDriversLoading(false));
+  }, [driverReport]);
+
+  const filteredDrivers = drivers.filter((d) => {
+    const q = searchDriver.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      d.full_name?.toLowerCase().includes(q) ||
+      d.phone?.toLowerCase().includes(q) ||
+      String(d.employee_number ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const toggleDriver = (uid: string) =>
+    setSelectedDrivers((prev) => (prev.includes(uid) ? prev.filter((d) => d !== uid) : [...prev, uid]));
+
   // Reset summary columns to defaults when report type changes
   const currentSummaryCols = getSummaryColumns(reportType);
   const prevTypeRef = useRef(reportType);
@@ -540,11 +584,11 @@ function GenerateForm({
     reportType;
 
   const handleGenerate = async () => {
-    if (selectedDevices.length === 0) {
+    if (!driverReport && selectedDevices.length === 0) {
       onToast("Please select at least one device.", "error");
       return;
     }
-    if (!startDate || !endDate) {
+    if (showDates && (!startDate || !endDate)) {
       onToast("Please select a date range.", "error");
       return;
     }
@@ -567,11 +611,12 @@ function GenerateForm({
       // Build payload — include summary config when format is "summary"
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload: any = {
-        report_devices: selectedDevices,
+        report_devices: driverReport ? [] : selectedDevices,
         start_date: sd,
         end_date: ed,
         origin_user: ownerUid,
       };
+      if (driverReport) payload.report_drivers = selectedDrivers;
       if (format === "summary") {
         payload.summary_config = {
           sections: summarySections,
@@ -582,7 +627,8 @@ function GenerateForm({
       await generateReport(reportType, format, payload);
 
       const clientSideTypes = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone",
-        "fuel_issuance", "fuel_consumption", "fuel_exceptions"];
+        "fuel_issuance", "fuel_consumption", "fuel_exceptions",
+        "driver_registry", "driver_assignments", "driver_compliance", "driver_fuel"];
       if (format === "summary") {
         onToast(`${currentTypeLabel} summary report downloaded!`, "success");
       } else if (clientSideTypes.includes(reportType)) {
@@ -645,7 +691,13 @@ function GenerateForm({
         </select>
       </div>
 
-      {/* Date Range */}
+      {/* Date Range (registry and compliance are "as of today") */}
+      {!showDates && (
+        <p className="text-[11px] text-[#667781] -mt-2">
+          This report shows your drivers as they are today, so it needs no dates.
+        </p>
+      )}
+      {showDates && (
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-[12px] font-black text-[#111B21] mb-1">Start Date</label>
@@ -666,8 +718,86 @@ function GenerateForm({
           />
         </div>
       </div>
+      )}
+
+      {/* Driver Selection (driver reports) */}
+      {driverReport && (
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[12px] font-black text-[#111B21]">
+            Drivers ({selectedDrivers.length === 0 ? "all" : `${selectedDrivers.length} selected`})
+          </label>
+          {selectedDrivers.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedDrivers([])}
+              className="text-[11px] font-black text-[var(--brand)] cursor-pointer border-none bg-transparent"
+            >
+              Use all drivers
+            </button>
+          )}
+        </div>
+        <div className="relative mb-2">
+          <input
+            value={searchDriver}
+            onChange={(e) => setSearchDriver(e.target.value)}
+            placeholder="Search drivers by name, phone or employee no..."
+            className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 pr-8 text-[12px] text-[#111B21] placeholder:text-[#667781] outline-none focus:border-[var(--brand)]"
+          />
+          {searchDriver && (
+            <button
+              onClick={() => setSearchDriver("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#667781] text-[11px] border-none bg-transparent cursor-pointer"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <div className="border border-[#E9EDEF] rounded-lg max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {driversLoading ? (
+            <div className="flex items-center justify-center py-6 text-[12px] text-[#667781]">
+              <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin mr-2" />
+              Loading drivers...
+            </div>
+          ) : driversError ? (
+            <div className="py-6 text-center text-[12px] text-[#EF4444]">{driversError}</div>
+          ) : filteredDrivers.length === 0 ? (
+            <div className="py-6 text-center text-[12px] text-[#667781]">
+              {drivers.length === 0 ? "No drivers registered yet." : "No matching drivers."}
+            </div>
+          ) : (
+            filteredDrivers.map((d) => {
+              const checked = selectedDrivers.includes(d.driver_uid);
+              return (
+                <label
+                  key={d.driver_uid}
+                  className={`flex items-center gap-2.5 px-3 py-2 border-b border-[#E9EDEF] last:border-0 cursor-pointer hover:bg-[#F0F2F5] transition-colors ${
+                    checked ? "bg-[var(--brand)]/5" : ""
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleDriver(d.driver_uid)}
+                    className="accent-[var(--brand)] shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-black text-[#111B21] truncate">{d.full_name}</div>
+                    <div className="text-[10px] text-[#667781] capitalize">
+                      {[d.phone, d.status].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                </label>
+              );
+            })
+          )}
+        </div>
+        <p className="text-[10px] text-[#667781] mt-1">Leave all unticked to include every driver.</p>
+      </div>
+      )}
 
       {/* Device Selection */}
+      {!driverReport && (
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-[12px] font-black text-[#111B21]">
@@ -739,6 +869,7 @@ function GenerateForm({
           )}
         </div>
       </div>
+      )}
 
       {/* Export Format */}
       <div>
@@ -766,6 +897,7 @@ function GenerateForm({
           >
             Excel
           </button>
+          {!driverReport && (
           <button
             type="button"
             onClick={() => setFormat("summary")}
@@ -777,11 +909,12 @@ function GenerateForm({
           >
             Summary
           </button>
+          )}
         </div>
       </div>
 
       {/* Summary Report Customization — shown only when format is "summary" */}
-      {format === "summary" && (
+      {format === "summary" && !driverReport && (
         <div className="flex flex-col gap-3 p-3 rounded-xl border border-[#8B5CF6]/20 bg-[#8B5CF6]/5">
           <div className="text-[12px] font-black text-[#8B5CF6]">Customize Summary Report</div>
 
@@ -893,7 +1026,7 @@ function GenerateForm({
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={generating || selectedDevices.length === 0}
+        disabled={generating || (!driverReport && selectedDevices.length === 0)}
         className="w-full h-11 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         {generating ? (
@@ -1067,6 +1200,8 @@ function ReportHistory({
         IDILING: "IDILING", PARKING: "PARKING",
         FUEL_ISSUANCE: "fuel_issuance", FUEL_CONSUMPTION: "fuel_consumption",
         FUEL_EXCEPTIONS: "fuel_exceptions",
+        DRIVER_REGISTRY: "driver_registry", DRIVER_ASSIGNMENTS: "driver_assignments",
+        DRIVER_COMPLIANCE: "driver_compliance", DRIVER_FUEL: "driver_fuel",
       };
       const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
 
@@ -1374,9 +1509,10 @@ export function ReportsPage() {
       try {
         const res = await getAvailableReportTypes();
         if (Array.isArray(res?.data) && res.data.length > 0) {
-          // The server's list does not include the FuelMath reports yet.
+          // The server's list does not include the FuelMath or driver reports yet.
           const keys = new Set(res.data.map((t) => t.key));
-          setReportTypes([...res.data, ...FUEL_REPORT_TYPES.filter((t) => !keys.has(t.key))]);
+          setReportTypes([...res.data,
+            ...[...FUEL_REPORT_TYPES, ...DRIVER_REPORT_TYPES].filter((t) => !keys.has(t.key))]);
         }
       } catch {
         // Backend endpoint not available yet — keep fallback types

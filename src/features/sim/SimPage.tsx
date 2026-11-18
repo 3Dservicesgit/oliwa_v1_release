@@ -272,6 +272,32 @@ function getPkgBillingScope(pkg: TokenPackage): string {
   return pkg.billing_scope || "—";
 }
 
+/** What a package pays for, used by the Buy tab's "Token type" filter. */
+function getPkgKind(pkg: TokenPackage): string {
+  const unit = (pkg.billing_unit || "").toLowerCase();
+  switch ((pkg.token_type || "").toLowerCase()) {
+    case "time":        return "Tracking";
+    case "event":       return unit === "inference" ? "AI Safety" : "Events";
+    case "action":      return "Commands";
+    case "compliance":  return "Reports";
+    case "conditional": return "Security & Roaming";
+    case "":            return "Other";
+    default:            return pkg.token_type.charAt(0).toUpperCase() + pkg.token_type.slice(1);
+  }
+}
+
+/** Search across name, product, SKU, description, type, unit and currency.
+ *  Every word must match, so "oliwa 30-day" narrows to Oliwa 30-day packages. */
+function pkgMatches(pkg: TokenPackage, query: string): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = [
+    pkg.token_name, pkg.product?.product_name, pkg.token_sku, pkg.token_description,
+    pkg.token_type, getPkgKind(pkg), pkg.billing_unit, getPkgCurrency(pkg),
+  ].map((v) => String(v || "").toLowerCase()).join(" ");
+  return words.every((w) => hay.includes(w));
+}
+
 // ── Explorer "View" menu config for token packages ──────────────────────────
 type PkgView = "xl" | "large" | "medium" | "small" | "list" | "details" | "tiles" | "content";
 
@@ -321,6 +347,55 @@ const PKG_TYPE_META: Record<string, { icon: string; tint: string; text: string }
 };
 function pkgMeta(type?: string) {
   return PKG_TYPE_META[(type || "").toLowerCase()] || { icon: "🎫", tint: "bg-[#E9EDEF]", text: "text-[#667781]" };
+}
+
+/** A token package as a tile — icon, name, type · product, price, type badge,
+ *  description, then `footer` (Buy button, Select button, …). Shared by the
+ *  Buy Tokens tab ("Tiles" view) and the Buy by Budget token picker so both
+ *  show packages the same way. */
+function PackageTile({
+  pkg, footer, selected = false, onClick, onDoubleClick,
+}: {
+  pkg: TokenPackage;
+  footer?: React.ReactNode;
+  selected?: boolean;
+  onClick?: () => void;
+  onDoubleClick?: () => void;
+}) {
+  const meta = pkgMeta(pkg.token_type);
+  const sz = PKG_ICON_SIZE.tiles;
+  const product = pkg.product?.product_name;
+  return (
+    <div
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      title={pkg.token_description || undefined}
+      className={[
+        "group flex flex-col gap-2 rounded-xl border bg-white p-3 transition-all",
+        onClick ? "cursor-pointer" : "cursor-default",
+        selected
+          ? "border-[var(--brand)] ring-1 ring-[var(--brand)]/30 bg-[var(--brand)]/5"
+          : "border-[#E9EDEF] hover:border-[var(--brand)]/40 hover:shadow-sm",
+      ].join(" ")}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`${sz.box} rounded-xl ${meta.tint} ${meta.text} grid place-items-center ${sz.text} shrink-0`}>{meta.icon}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
+          <div className="text-[10px] text-[#667781] truncate capitalize">{pkg.token_type || "—"}{product ? ` · ${product.toUpperCase()}` : ""}</div>
+          <div className="text-[13px] mt-0.5 truncate">
+            <span className="font-black text-[var(--brand)]">{getPkgCurrency(pkg)} {getPkgPrice(pkg).toLocaleString()}</span>{" "}
+            <span className="text-[10px] text-[#9AA5AD] font-normal">{getPkgBillingUnitLabel(pkg)}</span>
+          </div>
+        </div>
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 shrink-0">{getPkgKind(pkg)}</span>
+      </div>
+      {pkg.token_description && (
+        <p className="text-[11px] text-[#667781] leading-snug line-clamp-2">{pkg.token_description}</p>
+      )}
+      {footer}
+    </div>
+  );
 }
 
 // ── Sorting (Explorer "Sort by" menu) ───────────────────────────────────────
@@ -1035,44 +1110,31 @@ function BudgetTab({
                   No {currency} tokens found for this product. Try a different currency or product.
                 </p>
               ) : !productTokensLoading && productTokens.length > 0 ? (
-                <div className="grid gap-2">
+                // Same tiles as the Buy Tokens tab; click a tile to pick it.
+                <div className={`grid gap-2.5 ${PKG_VIEW_GRID.tiles}`}>
                   {productTokens.map((pkg) => {
-                    const price = getPkgPrice(pkg);
                     const isSelected = pkg.token_id === selectedPkgId;
+                    const select = () => { setSelectedPkgId(pkg.token_id); setBudgetStr(""); };
                     return (
-                      <button
+                      <PackageTile
                         key={pkg.token_id}
-                        onClick={() => { setSelectedPkgId(pkg.token_id); setBudgetStr(""); }}
-                        className={[
-                          "w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer",
-                          isSelected
-                            ? "bg-[var(--brand)]/5 border-[var(--brand)] ring-1 ring-[var(--brand)]/30"
-                            : "bg-white border-[#E9EDEF] hover:bg-[#F8F9FA]",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={[
-                              "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
-                              isSelected ? "border-[var(--brand)]" : "border-[#CCC]",
-                            ].join(" ")}>
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-[var(--brand)]" />}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[13px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
-                              <div className="text-[10px] text-[#667781] mt-0.5 capitalize">
-                                {pkg.token_type}{pkg.billing_unit ? ` · per ${pkg.billing_unit}` : ""}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-[13px] font-black text-[var(--brand)]">
-                              {currency} {price.toLocaleString()}
-                            </div>
-                            <div className="text-[10px] text-[#667781]">{getPkgBillingUnitLabel(pkg)}</div>
-                          </div>
-                        </div>
-                      </button>
+                        pkg={pkg}
+                        selected={isSelected}
+                        onClick={select}
+                        footer={
+                          <button
+                            onClick={(e) => { e.stopPropagation(); select(); }}
+                            className={[
+                              "w-full h-8 rounded-lg text-[12px] font-black cursor-pointer transition-all",
+                              isSelected
+                                ? "bg-[var(--brand)] text-white border-none"
+                                : "bg-white text-[var(--brand)] border border-[var(--brand)] hover:bg-[var(--brand)]/5",
+                            ].join(" ")}
+                          >
+                            {isSelected ? "✓ Selected" : "Select"}
+                          </button>
+                        }
+                      />
                     );
                   })}
                 </div>
@@ -1315,6 +1377,13 @@ export function SimPage() {
     setPkgSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   const pkgSortArrow = (key: string) => (pkgSort.key === key ? (pkgSort.dir === "asc" ? "▲" : "▼") : "");
 
+  // ── Buy tab: type + currency filters ──────────────────────────────────
+  const [pkgTypeFilter, setPkgTypeFilter] = useState("");             // "" = all types
+  // null = not chosen yet (defaults to UGX when offered); "" = all currencies.
+  // Each SKU is priced once per currency, so showing one avoids every package twice.
+  const [pkgCurrencyFilter, setPkgCurrencyFilter] = useState<string | null>(null);
+  const [pkgFilterMenuOpen, setPkgFilterMenuOpen] = useState(false);
+
   // ── Buy tab: product filter ───────────────────────────────────────────
   const [buyProductFilter, setBuyProductFilter] = useState<string | null>(null);
   const [buyProducts, setBuyProducts] = useState<TokenProduct[]>([]);
@@ -1366,7 +1435,11 @@ export function SimPage() {
     const buyMini = (
       <button onClick={(e) => { e.stopPropagation(); setBuyTarget(pkg); }} title="Buy" className="h-7 px-2.5 rounded-md bg-[var(--brand)] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all shrink-0">Buy</button>
     );
-    const common = { key: pkg.token_id, onDoubleClick: () => setBuyTarget(pkg) };
+    const common = {
+      key: pkg.token_id,
+      onDoubleClick: () => setBuyTarget(pkg),
+      title: pkg.token_description || undefined,
+    };
 
     // Icon views — centered tile with a Buy button
     if (pkgView === "xl" || pkgView === "large" || pkgView === "medium") {
@@ -1400,18 +1473,12 @@ export function SimPage() {
     // Tiles — icon + meta + price + Buy
     if (pkgView === "tiles") {
       return (
-        <div {...common} className="group flex flex-col gap-2 rounded-xl border border-[#E9EDEF] bg-white p-3 cursor-default hover:border-[var(--brand)]/40 hover:shadow-sm transition-all">
-          <div className="flex items-start gap-3">
-            {iconEl}
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] font-black text-[#111B21] truncate">{pkg.token_name}</div>
-              <div className="text-[10px] text-[#667781] truncate capitalize">{pkg.token_type || "—"}{product ? ` · ${product.toUpperCase()}` : ""}</div>
-              <div className="text-[13px] mt-0.5 truncate">{priceEl} <span className="text-[10px] text-[#9AA5AD] font-normal">{getPkgBillingUnitLabel(pkg)}</span></div>
-            </div>
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 capitalize shrink-0">{pkg.token_type}</span>
-          </div>
-          {buyBtn("w-full h-8 text-[12px]")}
-        </div>
+        <PackageTile
+          key={pkg.token_id}
+          pkg={pkg}
+          onDoubleClick={() => setBuyTarget(pkg)}
+          footer={buyBtn("w-full h-8 text-[12px]")}
+        />
       );
     }
 
@@ -1425,8 +1492,10 @@ export function SimPage() {
             <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30 capitalize shrink-0">{pkg.token_type}</span>
           </div>
           <div className="text-[10px] text-[#667781] truncate mt-0.5">
-            {product ? `Product ${product.toUpperCase()}` : "No product"} · {getPkgBillingUnitLabel(pkg)} · {getPkgBillingTrigger(pkg)}
-          </div>
+            {product ? `Product ${product.toUpperCase()}` : "No product"} · {getPkgBillingUnitLabel(pkg)} · {getPkgBillingTrigger(pkg)}          </div>
+          {pkg.token_description && (
+            <div className="text-[11px] text-[#667781] truncate mt-0.5">{pkg.token_description}</div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <div className="text-[12px]">{priceEl}</div>
@@ -1749,18 +1818,24 @@ export function SimPage() {
           {tab === "buy" && (() => {
             // Use product-filtered tokens when a product is selected, else all packages
             const source = buyProductFilter ? buyProductTokens : packages;
-            const q = pkgSearch.toLowerCase();
-            const filtered = q
-              ? source.filter((p) =>
-                  p.token_name?.toLowerCase().includes(q) ||
-                  p.token_type?.toLowerCase().includes(q) ||
-                  (p.product?.product_name || "").toLowerCase().includes(q) ||
-                  (p.billing_unit || "").toLowerCase().includes(q) ||
-                  getPkgCurrency(p).toLowerCase().includes(q)
-                )
-              : source;
+            const pkgKinds = [...new Set(source.map(getPkgKind))].sort();
+            const pkgCurrencies = [...new Set(source.map(getPkgCurrency).filter((c) => c !== "—"))].sort();
+            const currencyFilter = pkgCurrencyFilter ?? (pkgCurrencies.includes("UGX") ? "UGX" : "");
+            const filtered = source.filter((p) =>
+              (!pkgTypeFilter || getPkgKind(p) === pkgTypeFilter) &&
+              (!currencyFilter || getPkgCurrency(p) === currencyFilter) &&
+              pkgMatches(p, pkgSearch)
+            );
             const sorted = sortPackages(filtered, pkgSort.key, pkgSort.dir);
             const isLoadingTokens = buyProductFilter ? buyProductTokensLoading : pkgLoading;
+            const activeFilterCount = (pkgTypeFilter ? 1 : 0) + (currencyFilter ? 1 : 0);
+            const anyFilter = !!(pkgSearch.trim() || pkgTypeFilter || currencyFilter || buyProductFilter);
+            const clearFilters = () => {
+              setPkgSearch("");
+              setPkgTypeFilter("");
+              setPkgCurrencyFilter("");
+              setBuyProductFilter(null);
+            };
 
             return (
             <div className="bg-white border border-[#E9EDEF] rounded-xl p-4">
@@ -1775,7 +1850,7 @@ export function SimPage() {
                 ) : (
                   <select
                     value={buyProductFilter ?? ""}
-                    onChange={(e) => { setBuyProductFilter(e.target.value || null); setPkgSearch(""); }}
+                    onChange={(e) => setBuyProductFilter(e.target.value || null)}
                     className="w-full max-w-xs h-10 px-3 rounded-xl bg-[#F8F9FA] border border-[#E9EDEF] text-[13px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all cursor-pointer capitalize"
                   >
                     <option value="">All Products</option>
@@ -1793,6 +1868,69 @@ export function SimPage() {
                   {!isLoadingTokens && <span className="text-[12px] text-[#667781] font-normal ml-2">({filtered.length})</span>}
                 </h3>
                 <div className="flex items-center gap-2">
+                  {/* Filter menu: token type + currency */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setPkgFilterMenuOpen((o) => !o)}
+                      title="Filter packages"
+                      className={`h-8 px-3 rounded-lg border text-[12px] font-black cursor-pointer flex items-center gap-1.5 transition-all ${pkgFilterMenuOpen ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-[#F0F2F5] border-[#E9EDEF] text-[#667781] hover:bg-[#E9EDEF]"}`}
+                    >
+                      <span className="text-[12px] leading-none">⛃</span>
+                      Filter
+                      {activeFilterCount > 0 && (
+                        <span className="min-w-[16px] h-4 px-1 rounded-full bg-[var(--brand)] text-white text-[10px] leading-4 text-center border border-white">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                      <span className="text-[8px]">▾</span>
+                    </button>
+                    {pkgFilterMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[40]" onClick={() => setPkgFilterMenuOpen(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-white rounded-xl shadow-xl border border-[#E9EDEF] py-1">
+                          <div className="px-3 pt-1.5 pb-1 text-[10px] font-black text-[#667781] uppercase tracking-wide">Token type</div>
+                          {["", ...pkgKinds].map((k) => (
+                            <button
+                              key={k || "all-types"}
+                              onClick={() => setPkgTypeFilter(k)}
+                              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                            >
+                              <span className="w-3 text-[var(--brand)] text-[10px]">{pkgTypeFilter === k ? "●" : ""}</span>
+                              <span className={pkgTypeFilter === k ? "font-black text-[#111B21]" : "text-[#111B21]"}>{k || "All types"}</span>
+                            </button>
+                          ))}
+                          {pkgCurrencies.length > 1 && (
+                            <>
+                              <div className="my-1 border-t border-[#E9EDEF]" />
+                              <div className="px-3 pt-1.5 pb-1 text-[10px] font-black text-[#667781] uppercase tracking-wide">Currency</div>
+                              {["", ...pkgCurrencies].map((c) => (
+                                <button
+                                  key={c || "all-currencies"}
+                                  onClick={() => setPkgCurrencyFilter(c)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[12px] text-left hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                                >
+                                  <span className="w-3 text-[var(--brand)] text-[10px]">{currencyFilter === c ? "●" : ""}</span>
+                                  <span className={currencyFilter === c ? "font-black text-[#111B21]" : "text-[#111B21]"}>{c || "All currencies"}</span>
+                                </button>
+                              ))}
+                            </>
+                          )}
+                          {anyFilter && (
+                            <>
+                              <div className="my-1 border-t border-[#E9EDEF]" />
+                              <button
+                                onClick={() => { clearFilters(); setPkgFilterMenuOpen(false); }}
+                                className="w-full px-3 py-2 text-[12px] text-left text-[var(--brand)] font-black hover:bg-[#F0F2F5] cursor-pointer border-none bg-transparent"
+                              >
+                                Clear all filters
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   {/* Sort menu (Explorer-style) */}
                   <div className="relative">
                     <button
@@ -1875,14 +2013,24 @@ export function SimPage() {
               </div>
 
               {/* Search bar */}
-              <div className="mb-3">
+              <div className="mb-3 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#667781] pointer-events-none">🔍</span>
                 <input
-                  type="text"
+                  type="search"
                   value={pkgSearch}
                   onChange={(e) => setPkgSearch(e.target.value)}
-                  placeholder="Search tokens by name, type, or currency..."
-                  className="w-full h-9 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all"
+                  placeholder="Search tokens: name, SKU, type or description, e.g. 30-day, VEBA, AI safety…"
+                  className="w-full h-9 pl-9 pr-9 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all"
                 />
+                {pkgSearch && (
+                  <button
+                    onClick={() => setPkgSearch("")}
+                    title="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full text-[12px] text-[#667781] bg-transparent border-none cursor-pointer hover:bg-[#E9EDEF]"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
 
               {isLoadingTokens ? (
@@ -1894,23 +2042,25 @@ export function SimPage() {
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="text-[28px] mb-2">{pkgSearch ? "🔍" : "🛒"}</div>
+                  <div className="text-[28px] mb-2">{source.length ? "🔍" : "🛒"}</div>
                   <p className="text-[13px] font-black text-[#111B21] mb-1">
-                    {pkgSearch ? "No Matching Packages" : buyProductFilter ? "No Tokens for This Product" : "No Packages Available"}
+                    {source.length ? "No Matching Packages" : buyProductFilter ? "No Tokens for This Product" : "No Packages Available"}
                   </p>
                   <p className="text-[12px] text-[#667781]">
-                    {pkgSearch
-                      ? `No packages match "${pkgSearch}". Try a different search.`
+                    {source.length
+                      ? pkgSearch
+                        ? `No packages match "${pkgSearch}" with the current filters.`
+                        : "No packages match the current filters."
                       : buyProductFilter
                         ? "No tokens found for the selected product. Try a different product."
                         : "Token packages are not configured yet. Contact support."}
                   </p>
-                  {pkgSearch && (
+                  {anyFilter && (
                     <button
-                      onClick={() => setPkgSearch("")}
+                      onClick={clearFilters}
                       className="mt-2 h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all"
                     >
-                      Clear Search
+                      Clear Filters
                     </button>
                   )}
                 </div>
@@ -1946,10 +2096,9 @@ export function SimPage() {
                         const productName = pkg.product?.product_name;
                         return (
                           <tr key={pkg.token_id} className="border-b border-[#F0F2F5] hover:bg-[#F8F9FA] transition-colors">
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5" title={pkg.token_description || undefined}>
                               <div className="font-black text-[12px] text-[#111B21]">{pkg.token_name}</div>
-                              {productName && <div className="text-[10px] text-[#667781] uppercase tracking-wide">{productName}</div>}
-                            </td>
+                              {productName && <div className="text-[10px] text-[#667781] uppercase tracking-wide">{productName}</div>}                            </td>
                             <td className="px-3 py-2.5">
                               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30">
                                 {pkg.token_type}

@@ -22,7 +22,8 @@ import { post, get, del } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
 import { ApiError } from "../types";
-import { isFuelReport } from "../types/reports.types";
+import { isDriverReport, isFuelReport } from "../types/reports.types";
+import type { DriverReportType } from "../types/reports.types";
 import type {
   ReportType,
   ReportFormat,
@@ -74,6 +75,8 @@ export async function generateReport(
 ): Promise<ApiResponse<GenerateReportResponse>> {
   // ── FuelMath reports: their own route and generator ─────────────────────
   if (isFuelReport(type)) return generateFuelReport(type, format, payload, opts);
+  // ── Driver reports: chosen by driver, their own route and generator ─────
+  if (isDriverReport(type)) return generateDriverReport(type, format, payload, opts);
 
   // ── Client-side report types ─────────────────────────────────────────────
   // These fetch data from lightweight JSON endpoints, then generate PDF/Excel
@@ -380,6 +383,72 @@ async function generateFuelReport(
     });
   } catch (logErr) {
     console.warn("[Reports] Failed to log fuel report download (non-blocking):", logErr);
+  }
+  return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
+}
+
+// ── Driver reports ──────────────────────────────────────────────────────────
+
+const DRIVER_NO_DATA_HINTS: Record<DriverReportType, string> = {
+  driver_registry: "No drivers are registered yet. Register drivers under Drivers first.",
+  driver_assignments: "None of these drivers held a vehicle in this period.",
+  driver_compliance: "No drivers are registered yet. Register drivers under Drivers first.",
+  driver_fuel: "No fuel was issued to these drivers in this period.",
+};
+
+/**
+ * The driver reports (registry, assignments, compliance, fuel): rows from
+ * POST /data-stream/reports/drivers/{kind}/generate-data, made into a PDF or
+ * Excel workbook in the browser, then logged like the others. Drivers come
+ * from payload.report_drivers (all of them when empty); report_devices is
+ * not used.
+ */
+async function generateDriverReport(
+  type: DriverReportType,
+  format: ReportFormat,
+  payload: GenerateReportRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<GenerateReportResponse>> {
+  const gen = await import("../../utils/driverReportGenerator");
+  const label = gen.DRIVER_REPORTS[type].title;
+  const noData = `NO_DATA::${label}::${DRIVER_NO_DATA_HINTS[type]}`;
+
+  let rows: unknown;
+  try {
+    const resp = await post<unknown>(
+      `/data-stream/reports/drivers/${gen.driverReportKind(type)}/generate-data`,
+      { data: { report_drivers: payload.report_drivers ?? [], start_date: payload.start_date, end_date: payload.end_date } },
+      opts,
+    );
+    rows = resp?.data;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      throw new Error("Driver reports are not available on the server yet.");
+    }
+    const msg = e instanceof Error ? e.message : `Failed to fetch the ${label} report.`;
+    if (msg.includes("No ") && msg.includes("Found")) throw new Error(noData);
+    throw new Error(msg);
+  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(noData);
+
+  try {
+    // Driver reports have no Summary workbook; Summary falls back to Excel.
+    if (format === "pdf") {
+      gen.generateDriverReportPDF(type, rows as never, payload.start_date, payload.end_date);
+    } else {
+      gen.generateDriverReportExcel(type, rows as never, payload.start_date, payload.end_date);
+    }
+  } catch (genErr) {
+    console.error("[Reports] Driver report generation failed:", genErr);
+    throw new Error("Failed to generate the report file. Please try again.");
+  }
+
+  try {
+    await post(ENDPOINTS.REPORTS.LOG_DOWNLOAD, {
+      data: { report_caller: payload.origin_user, report_type: type, format: format === "pdf" ? "pdf" : "excel" },
+    });
+  } catch (logErr) {
+    console.warn("[Reports] Failed to log driver report download (non-blocking):", logErr);
   }
   return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
 }

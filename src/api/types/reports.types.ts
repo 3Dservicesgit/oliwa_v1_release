@@ -21,7 +21,12 @@ export type ReportType =
   // FuelMath (navas-core-apis fuel_report.py), as in the OLIWA mobile app.
   | "fuel_issuance"
   | "fuel_consumption"
-  | "fuel_exceptions";
+  | "fuel_exceptions"
+  // Driver reports (navas-core-apis driver_report.py).
+  | "driver_registry"
+  | "driver_assignments"
+  | "driver_compliance"
+  | "driver_fuel";
 
 export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   trips:          "Trips",
@@ -34,6 +39,10 @@ export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   fuel_issuance:    "Fuel Issuance & Expenditure",
   fuel_consumption: "Fuel Consumption & Performance",
   fuel_exceptions:  "Fuel Exceptions",
+  driver_registry:    "Driver Registry",
+  driver_assignments: "Driver Assignments",
+  driver_compliance:  "Driver Compliance",
+  driver_fuel:        "Driver Fuel",
 };
 
 export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
@@ -47,6 +56,10 @@ export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
   fuel_issuance:    "🧾",
   fuel_consumption: "📈",
   fuel_exceptions:  "⚠️",
+  driver_registry:    "🪪",
+  driver_assignments: "🔁",
+  driver_compliance:  "✅",
+  driver_fuel:        "⛽",
 };
 
 /** The FuelMath reports. Built from fuel recorded in FuelMath, so they work
@@ -57,6 +70,27 @@ export const FUEL_REPORT_TYPES: AvailableReportType[] = [
   { key: "fuel_consumption", label: "Fuel Consumption & Performance", icon: "📈", category: "fuel" },
   { key: "fuel_exceptions",  label: "Fuel Exceptions",                icon: "⚠️", category: "fuel" },
 ];
+
+/** The driver reports: chosen by driver rather than vehicle. Registry and
+ *  compliance describe drivers as they are today, so they take no dates. */
+export const DRIVER_REPORT_TYPES: AvailableReportType[] = [
+  { key: "driver_registry",    label: "Driver Registry",    icon: "🪪", category: "drivers" },
+  { key: "driver_assignments", label: "Driver Assignments", icon: "🔁", category: "drivers" },
+  { key: "driver_compliance",  label: "Driver Compliance",  icon: "✅", category: "drivers" },
+  { key: "driver_fuel",        label: "Driver Fuel",        icon: "⛽", category: "drivers" },
+];
+
+export type DriverReportType = "driver_registry" | "driver_assignments" | "driver_compliance" | "driver_fuel";
+
+export function isDriverReport(type: string): type is DriverReportType {
+  return type === "driver_registry" || type === "driver_assignments"
+    || type === "driver_compliance" || type === "driver_fuel";
+}
+
+/** Driver reports that cover a period (the others are "as of today"). */
+export function driverReportUsesDates(type: string): boolean {
+  return type === "driver_assignments" || type === "driver_fuel";
+}
 
 export function isFuelReport(type: string): type is "fuel_issuance" | "fuel_consumption" | "fuel_exceptions" {
   return type === "fuel_issuance" || type === "fuel_consumption" || type === "fuel_exceptions";
@@ -84,6 +118,8 @@ export interface GenerateReportRequest {
   end_date: string;              // DD-MM-YYYY
   origin_user: string;           // Account UID of the requester
   report_state?: string;         // Only for state reports: "IDILING" | "PARKING"
+  /** Driver reports only: driver_uids to include; all drivers when empty. */
+  report_drivers?: string[];
   /** Summary report config — which sections & columns to include */
   summary_config?: {
     sections: { cover: boolean; statistics: boolean; detail: boolean };
