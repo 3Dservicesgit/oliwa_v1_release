@@ -19,6 +19,7 @@ import {
   normaliseIbutton, normalisePhone, permitClasses, statusLabel, validNin,
   validPermit,
 } from "./driverRules";
+import { ScorecardSection } from "./DriverScoring";
 
 export function StatusBadge({ status }: { status: string }) {
   const tone = status === "active" ? "green" : status === "suspended" ? "amber" : status === "blacklisted" ? "red" : "grey";
@@ -406,6 +407,8 @@ export function DriverDetailsPanel({ driverUid, units, canManage, onClose, onCha
               </div>
             )}
           </section>
+
+          <ScorecardSection driverUid={driver.driver_uid} />
 
           {canManage && (
             <section>

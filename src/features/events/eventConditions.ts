@@ -14,6 +14,8 @@ export const CONDITION_GROUPS: { label: string; conditions: EventCondition[] }[]
   { label: "Device health", conditions: ["device_offline", "low_battery"] },
   // Checked when fuel is recorded in FuelMath: no fuel sensor needed.
   { label: "Fuel · all vehicles", conditions: ["fuel_issue_flagged", "high_fuel_consumption"] },
+  // Client-wide: cover every driver, never attached to vehicles.
+  { label: "Drivers · all drivers", conditions: ["driver_permit_expiry", "driver_unauthorised"] },
 ];
 
 /** One line saying what the condition watches. */
@@ -25,7 +27,37 @@ export const CONDITION_SUMMARY: Record<EventCondition, string> = {
   low_battery: "Battery readings don't reach the server yet",
   fuel_issue_flagged: "A Fuel Refill receipt doesn't add up",
   high_fuel_consumption: "More fuel than expected between full tanks",
+  driver_permit_expiry: "A driver's permit is about to expire",
+  driver_unauthorised: "A driver who may not drive has, or nearly gets, a vehicle",
 };
+
+/** Rules about the client's drivers rather than a vehicle: the server covers
+ *  every driver and refuses to attach them to units, so the form asks for no
+ *  vehicles. Mirrors navas-core-apis alert_conditions.CLIENT_WIDE. */
+export function isClientWide(c: EventCondition | string): boolean {
+  return c === "driver_permit_expiry" || c === "driver_unauthorised";
+}
+
+/** What an Unauthorised Driver rule can watch (alert_conditions.UNAUTHORISED_CHECKS). */
+export const UNAUTHORISED_LABELS: Record<string, string> = {
+  expired_while_assigned: "Keeps a vehicle after their permit expired",
+  blocked_assignment: "Someone tried to assign them and was refused",
+};
+
+export const UNAUTHORISED_CODES = Object.keys(UNAUTHORISED_LABELS);
+
+/** The checks an Unauthorised Driver rule's value names; all for "all". */
+export function unauthorisedCodes(value: string): string[] {
+  const text = value.trim().toLowerCase();
+  if (!text || text === "all" || text === "any") return [...UNAUTHORISED_CODES];
+  return text.split(",").map((c) => c.trim()).filter((c) => UNAUTHORISED_LABELS[c]);
+}
+
+/** The value for the chosen checks: "all", or them comma-separated. */
+export function unauthorisedValue(codes: string[]): string {
+  const known = UNAUTHORISED_CODES.filter((c) => codes.includes(c));
+  return known.length === 0 || known.length === UNAUTHORISED_CODES.length ? "all" : known.join(",");
+}
 
 /** The server refuses new rules for these: they would never fire. */
 export function isAvailable(c: EventCondition): boolean {
@@ -73,6 +105,8 @@ export function ignitionDirection(value: string): "on" | "off" | "both" {
 export function defaultValue(c: EventCondition): string {
   if (c === "ignition_change") return "both";
   if (c === "fuel_issue_flagged") return "all";
+  if (c === "driver_permit_expiry") return "30";
+  if (c === "driver_unauthorised") return "all";
   return "";
 }
 
@@ -80,6 +114,7 @@ export function defaultValue(c: EventCondition): string {
 export function valueForForm(c: EventCondition, saved: string): string {
   if (c === "ignition_change") return ignitionDirection(saved);
   if (c === "fuel_issue_flagged") return fuelValue(fuelCodes(saved));
+  if (c === "driver_unauthorised") return unauthorisedValue(unauthorisedCodes(saved));
   if (c === "high_fuel_consumption") {
     const t = saved.trim().toLowerCase();
     return t === "profile" || t === "default" ? "" : saved.trim().replace(/%$/, "");
@@ -94,6 +129,7 @@ export function valueToSend(c: EventCondition, value: string): string {
   if (c === "high_fuel_consumption") return v ? v.replace(/%$/, "") : "profile";
   if (c === "ignition_change") return ignitionDirection(v);
   if (c === "fuel_issue_flagged") return fuelValue(fuelCodes(v));
+  if (c === "driver_unauthorised") return unauthorisedValue(unauthorisedCodes(v));
   return v;
 }
 
@@ -118,6 +154,11 @@ export function valueError(c: EventCondition, value: string): string | null {
         ? "Enter a percentage between 5 and 100, or leave it empty." : null;
     case "fuel_issue_flagged":
       return fuelCodes(value).length === 0 ? "Choose at least one fuel check." : null;
+    case "driver_permit_expiry":
+      return n === null || !Number.isInteger(n) || n < 0 || n > 90
+        ? "Enter the days before expiry to warn, 0 to 90." : null;
+    case "driver_unauthorised":
+      return unauthorisedCodes(value).length === 0 ? "Choose at least one thing to watch." : null;
     default:
       return null;
   }
@@ -141,6 +182,15 @@ export function valueText(c: EventCondition | string, saved: string): string {
     case "high_fuel_consumption": {
       const v = valueForForm("high_fuel_consumption", saved);
       return v ? `${v}% over expected` : "Over each vehicle's tolerance";
+    }
+    case "driver_permit_expiry": {
+      const d = Number(saved);
+      return d === 0 ? "When it expires" : `${saved} day${d === 1 ? "" : "s"} before expiry`;
+    }
+    case "driver_unauthorised": {
+      const codes = unauthorisedCodes(saved);
+      return codes.length === UNAUTHORISED_CODES.length ? "Expired permit or refused assignment"
+        : UNAUTHORISED_LABELS[codes[0]] ?? saved;
     }
     case "low_battery": return "Not available yet";
     default: return saved;

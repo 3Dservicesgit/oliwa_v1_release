@@ -61,5 +61,71 @@ export interface DriverAssignment {
   end_reason: string | null;
 }
 
-/** A driver-behaviour scoring rule (GET /drivers/score/list). */
-export type DriverScoreRule = Record<string, unknown>;
+/** A driver scoring rule (GET /drivers/score/list, navas-core-apis
+ *  driver_scoring.py). Every driver starts a period at 100 and each
+ *  violation takes off `points_denomination`, at most `max_deduction` per
+ *  period. The list has one rule per violation: the client's own, or the
+ *  built-in default (is_default, score_uid "default:<violation>"). */
+export interface DriverScoreRule {
+  score_uid: string;
+  score_name: string;
+  violation_parameter: string;
+  violation_label: string;
+  points_denomination: number | null;
+  max_deduction: number | null;
+  /** False for violations the server cannot see yet (harsh driving, night
+   *  driving): a rule can be saved but deducts nothing. */
+  measured: boolean;
+  is_default: boolean;
+}
+
+export interface ScoreBreakdown {
+  violation: string;
+  label: string;
+  count: number;
+  points_each: number;
+  deducted: number;
+}
+
+export interface ScoreViolation {
+  code: string;
+  label: string;
+  at: string;          // "YYYY-MM-DD HH:MM"
+  vehicle: string;
+  detail: string;
+}
+
+/** One driver's scorecard for a period. score is null when they neither
+ *  drove nor had a violation ("No driving"). */
+export interface DriverScorecard {
+  driver_uid: string;
+  full_name: string;
+  status: string;
+  score: number | null;
+  grade: "A" | "B" | "C" | "D" | null;
+  grade_label: string;
+  deducted: number;
+  violation_count: number;
+  breakdown: ScoreBreakdown[];
+  rank: number | null;
+  /** Only on the single-driver scorecard. */
+  violations?: ScoreViolation[];
+}
+
+/** GET /drivers/scorecards */
+export interface ScorecardList {
+  start_date: string;  // DD-MM-YYYY
+  end_date: string;
+  start_score: number;
+  rules: DriverScoreRule[];
+  drivers: DriverScorecard[];
+}
+
+/** GET /drivers/registry/<uid>/scorecard */
+export interface DriverScorecardDetail extends DriverScorecard {
+  start_date: string;
+  end_date: string;
+  start_score: number;
+  rules: DriverScoreRule[];
+  ranked_drivers: number;
+}

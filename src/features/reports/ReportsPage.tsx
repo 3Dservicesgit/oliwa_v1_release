@@ -313,6 +313,7 @@ function ReportDetailsDrawer({
         FUEL_EXCEPTIONS: "fuel_exceptions",
         DRIVER_REGISTRY: "driver_registry", DRIVER_ASSIGNMENTS: "driver_assignments",
         DRIVER_COMPLIANCE: "driver_compliance", DRIVER_FUEL: "driver_fuel",
+        DRIVER_SCORECARD: "driver_scorecard",
       };
       const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
       const allImeis = devices.map((d) => d.device_imei);
@@ -628,7 +629,7 @@ function GenerateForm({
 
       const clientSideTypes = ["trips", "fuel", "night_driving", "PARKING", "IDILING", "overspeeding", "geozone",
         "fuel_issuance", "fuel_consumption", "fuel_exceptions",
-        "driver_registry", "driver_assignments", "driver_compliance", "driver_fuel"];
+        "driver_registry", "driver_assignments", "driver_compliance", "driver_fuel", "driver_scorecard"];
       if (format === "summary") {
         onToast(`${currentTypeLabel} summary report downloaded!`, "success");
       } else if (clientSideTypes.includes(reportType)) {
@@ -1202,6 +1203,7 @@ function ReportHistory({
         FUEL_EXCEPTIONS: "fuel_exceptions",
         DRIVER_REGISTRY: "driver_registry", DRIVER_ASSIGNMENTS: "driver_assignments",
         DRIVER_COMPLIANCE: "driver_compliance", DRIVER_FUEL: "driver_fuel",
+        DRIVER_SCORECARD: "driver_scorecard",
       };
       const reportType: ReportType = typeMap[report.report_type.toUpperCase()] || "trips";
 

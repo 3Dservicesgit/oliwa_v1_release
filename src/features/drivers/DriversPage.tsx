@@ -1,15 +1,15 @@
 /**
  * DriversPage — the client's drivers, as in the OLIWA mobile app: register
- * and edit drivers, change their status, put them in a vehicle, and see the
- * scoring rules driver conduct is measured by.
+ * and edit drivers, change their status, put them in a vehicle, rank them by
+ * scorecard, and set the scoring rules driver conduct is measured by.
  *
  * Backend: navas-core-apis endpoints/driver_registry.py. Everything is
  * limited to the signed-in customer's own drivers by the server.
  * Viewers see the drivers; Operators and Administrators also change them.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getDriverScoreRules, getDrivers } from "../../api/services/drivers.service";
-import type { Driver, DriverScoreRule } from "../../api/types/drivers.types";
+import { getDrivers } from "../../api/services/drivers.service";
+import type { Driver } from "../../api/types/drivers.types";
 import { usePermissions } from "../../auth/PermissionsContext";
 import { useClientUnits } from "../../hooks/useClientUnits";
 import {
@@ -18,55 +18,13 @@ import {
 import { errText } from "../../components/ui/recordUtils";
 import { DriverAvatar, DriverDetailsPanel, DriverFormPanel, PermitBadge, StatusBadge } from "./DriverPanels";
 import { STATUSES, permitClasses, statusLabel } from "./driverRules";
+import { Scorecards, ScoringRules } from "./DriverScoring";
 
-type Tab = "drivers" | "scoring";
+type Tab = "drivers" | "scorecards" | "scoring";
 
 function notFound(e: unknown): string {
   const msg = errText(e);
   return /404|not found|no such endpoint/i.test(msg) ? "Drivers are not available on the server yet." : msg;
-}
-
-function ScoringRules() {
-  const [rules, setRules] = useState<DriverScoreRule[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    getDriverScoreRules()
-      .then((r) => { if (alive) { setRules(r); setError(null); } })
-      .catch((e) => { if (alive) setError(notFound(e)); });
-    return () => { alive = false; };
-  }, [version]);
-  const load = () => setVersion((v) => v + 1);
-  const v = (r: DriverScoreRule, k: string) => String(r[k] ?? "").trim();
-  return (
-    <div className={`${CARD} overflow-hidden`}>
-      <div className="px-4 py-3 border-b border-[#E9EDEF] text-[12px] text-[#667781]">
-        How driver conduct is scored: each violation takes points away from the driver.
-      </div>
-      {error ? <div className="p-4"><ErrorBanner text={error} onRetry={load} /></div>
-        : rules === null ? <div className="p-8 text-center text-[13px] text-[#667781]">Loading…</div>
-        : rules.length === 0 ? <div className="p-8 text-center text-[13px] text-[#667781]">No scoring rules set up.</div>
-        : (
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-[11px] font-extrabold text-[#667781] bg-[#F8F9FA]">
-                <th className="px-4 py-2">Rule</th><th className="px-4 py-2">Violation</th><th className="px-4 py-2 text-right">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((r, i) => (
-                <tr key={i} className="border-t border-[#E9EDEF]">
-                  <td className="px-4 py-2.5 font-extrabold text-[#111B21]">{v(r, "score_name") || "Rule"}</td>
-                  <td className="px-4 py-2.5 text-[#667781]">{v(r, "violation_parameter") || "—"}</td>
-                  <td className="px-4 py-2.5 text-right font-black text-[#B91C1C]">{v(r, "points_denomination") || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-    </div>
-  );
 }
 
 export function DriversPage() {
@@ -128,7 +86,7 @@ export function DriversPage() {
       </div>
 
       <div className="flex gap-1.5">
-        {([["drivers", "Drivers"], ["scoring", "Scoring rules"]] as [Tab, string][]).map(([t, label]) => (
+        {([["drivers", "Drivers"], ["scorecards", "Scorecards"], ["scoring", "Scoring rules"]] as [Tab, string][]).map(([t, label]) => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`h-8 px-3 rounded-full text-[12px] font-extrabold cursor-pointer border ${tab === t ? "bg-[var(--brand-dark)] border-[var(--brand-dark)] text-white" : "bg-white border-[#E9EDEF] text-[#111B21]"}`}>
             {label}
@@ -136,7 +94,8 @@ export function DriversPage() {
         ))}
       </div>
 
-      {tab === "scoring" ? <ScoringRules /> : (
+      {tab === "scoring" ? <ScoringRules canManage={canManage} />
+        : tab === "scorecards" ? <Scorecards onOpen={setOpen} /> : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[["Drivers", counts.total], ["Active", counts.active], ["In a vehicle", counts.assigned], ["Permits expiring or expired", counts.permits]].map(([label, n]) => (

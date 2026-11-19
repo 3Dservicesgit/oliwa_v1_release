@@ -8,6 +8,8 @@
  *   driver_compliance   permit expiry, missing details and status, grouped
  *                       by verdict (Non-compliant first)
  *   driver_fuel         fuel issued to each driver, with cost and flags
+ *   driver_scorecard    each driver's score for the period (100 less their
+ *                       violations), ranked
  *
  * Rows come from POST /data-stream/reports/drivers/<kind>/generate-data
  * (navas-core-apis driver_report.py), already formatted, in the shape every
@@ -160,6 +162,34 @@ export const DRIVER_REPORTS: Record<DriverReportType, DriverReportDef> = {
       ];
     },
   },
+  driver_scorecard: {
+    title: "Driver Scorecard",
+    short: "Driver_Scorecard",
+    sectionLabel: "",
+    sectionColumn: "Group",
+    color: [11, 122, 75],
+    landscape: true,
+    columns: [
+      { key: "rank", label: "Rank", width: 6 },
+      { key: "driver", label: "Driver", width: 22 },
+      { key: "score", label: "Score", width: 7 },
+      { key: "grade", label: "Grade", width: 14 },
+      { key: "violations", label: "Violations", width: 9 },
+      { key: "points_deducted", label: "Points off", width: 9 },
+      { key: "breakdown", label: "Breakdown", width: 45 },
+      { key: "status", label: "Status", width: 10 },
+    ],
+    stats: (rows) => {
+      const scored = rows.filter((r) => r.score !== "");
+      const avg = scored.length ? Math.round(scored.reduce((s, r) => s + num(r.score), 0) / scored.length) : 0;
+      return [
+        ["Drivers scored", scored.length],
+        ["Average score", avg],
+        ["Poor (below 60)", scored.filter((r) => num(r.score) < 60).length],
+        ["Did not drive", rows.length - scored.length],
+      ];
+    },
+  },
 };
 
 /** Each section's rows, in the order the server sent them. */
@@ -174,14 +204,14 @@ function sections(data: DriverReportData): [string, DriverRow[]][] {
 }
 
 function periodText(type: DriverReportType, startDate: string, endDate: string): string {
-  return type === "driver_assignments" || type === "driver_fuel"
+  return type === "driver_assignments" || type === "driver_fuel" || type === "driver_scorecard"
     ? `Period: ${startDate} to ${endDate}`
     : `As of ${new Date().toLocaleDateString()}`;
 }
 
 function fileStem(type: DriverReportType, startDate: string, endDate: string): string {
   const def = DRIVER_REPORTS[type];
-  if (type === "driver_assignments" || type === "driver_fuel") {
+  if (type === "driver_assignments" || type === "driver_fuel" || type === "driver_scorecard") {
     return `${def.short}_Report_${startDate}_to_${endDate}`;
   }
   const d = new Date();

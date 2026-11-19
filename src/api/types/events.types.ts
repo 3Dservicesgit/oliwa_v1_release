@@ -15,7 +15,10 @@ export type EventCondition =
   | "device_offline"
   // Checked when fuel is recorded in FuelMath (no fuel sensor needed).
   | "fuel_issue_flagged"
-  | "high_fuel_consumption";
+  | "high_fuel_consumption"
+  // Client-wide: about the client's drivers, never attached to vehicles.
+  | "driver_permit_expiry"
+  | "driver_unauthorised";
 
 export const EVENT_CONDITION_LABELS: Record<EventCondition, string> = {
   speed_threshold:  "Speed Threshold",
@@ -25,6 +28,8 @@ export const EVENT_CONDITION_LABELS: Record<EventCondition, string> = {
   device_offline:   "Device Offline",
   fuel_issue_flagged:    "Fuel Issue Flagged",
   high_fuel_consumption: "High Fuel Consumption",
+  driver_permit_expiry:  "Driver Permit Expiry",
+  driver_unauthorised:   "Unauthorised Driver",
 };
 
 export const EVENT_CONDITION_DESCRIPTIONS: Record<EventCondition, string> = {
@@ -36,6 +41,8 @@ export const EVENT_CONDITION_DESCRIPTIONS: Record<EventCondition, string> = {
   device_offline:   "Triggers once when a device has sent nothing for the minutes you set, and not again until it reports.",
   fuel_issue_flagged:    "Triggers when fuel recorded in Fuel Refill for the vehicle does not match the tracker or the vehicle, e.g. it was not stopped at the pump. Works without a fuel sensor.",
   high_fuel_consumption: "Triggers when a full tank shows the vehicle used more fuel than its expected km/L allows since the last full tank (at least 100 km). Needs a fuel profile; works without a fuel sensor.",
+  driver_permit_expiry:  "Covers all your drivers. Triggers once when a driver's permit comes within the days you set of expiring, and once more when it expires. Replaces the built-in permit reminders for your account.",
+  driver_unauthorised:   "Covers all your drivers. Triggers when a driver keeps a vehicle after their permit has expired, or when someone tries to assign a suspended, blacklisted, inactive or expired-permit driver and is refused.",
 };
 
 // ── Event model ─────────────────────────────────────────────────────────────
@@ -100,6 +107,11 @@ export interface EventNotification {
   alert_channels: string;
   date_triggered: string;
   is_read: boolean;
+  /** The driver the alert is about (navas-core-apis migration 060): the one
+   *  assigned to the vehicle when it fired, the one fuel was issued to, or
+   *  the subject of a driver rule. "" when none. */
+  driver_uid?: string;
+  driver_name?: string;
 }
 
 export interface LogNotificationRequest {

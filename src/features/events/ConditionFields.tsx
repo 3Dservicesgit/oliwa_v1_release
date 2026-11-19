@@ -12,6 +12,7 @@ import {
 import {
   CONDITION_GROUPS, CONDITION_SUMMARY, FUEL_CODES, FUEL_DISCREPANCY_LABELS,
   fuelCodes, fuelValue, ignitionDirection, isAvailable,
+  UNAUTHORISED_CODES, UNAUTHORISED_LABELS, unauthorisedCodes, unauthorisedValue,
 } from "./eventConditions";
 
 const LABEL = "block text-[12px] font-black text-[#111B21] mb-1";
@@ -41,6 +42,12 @@ export function ConditionFields({ condition, onCondition, value, onValue, icons,
   const toggleCode = (code: string) => {
     const next = codes.includes(code) ? codes.filter((c) => c !== code) : [...codes, code];
     onValue(next.length ? fuelValue(next) : "none");
+  };
+
+  const checks = condition === "driver_unauthorised" ? unauthorisedCodes(value) : [];
+  const toggleCheck = (code: string) => {
+    const next = checks.includes(code) ? checks.filter((c) => c !== code) : [...checks, code];
+    onValue(next.length ? unauthorisedValue(next) : "none");
   };
 
   return (
@@ -131,6 +138,34 @@ export function ConditionFields({ condition, onCondition, value, onValue, icons,
             5 to 100, or empty to use the tolerance in each vehicle's fuel profile. Only vehicles with a fuel
             profile are checked (Fuel Refill → Vehicles).
           </p>
+        </div>
+      )}
+
+      {condition === "driver_permit_expiry" && (
+        <div>
+          <label className={LABEL} htmlFor="event-value">Days before expiry to warn *</label>
+          <input id="event-value" inputMode="numeric" value={value} onChange={(e) => onValue(e.target.value)}
+            placeholder="e.g. 30" className={INPUT} />
+          <p className={HINT}>
+            0 to 90; 0 alerts only when a permit expires. Active and suspended drivers are checked.
+            Covers all your drivers, so no vehicles are chosen.
+          </p>
+        </div>
+      )}
+
+      {condition === "driver_unauthorised" && (
+        <div>
+          <div className={LABEL}>Alert when a driver</div>
+          <div className="flex flex-col gap-1.5">
+            {UNAUTHORISED_CODES.map((code) => (
+              <label key={code} className={`flex items-center gap-2 border rounded-lg px-2.5 py-2 cursor-pointer text-[12px] ${
+                checks.includes(code) ? "border-[var(--brand)] bg-[var(--brand)]/5" : "border-[#E9EDEF]"}`}>
+                <input type="checkbox" checked={checks.includes(code)} onChange={() => toggleCheck(code)} className="accent-[var(--brand)]" />
+                {UNAUTHORISED_LABELS[code]}
+              </label>
+            ))}
+          </div>
+          <p className={HINT}>Covers all your drivers, so no vehicles are chosen.</p>
         </div>
       )}
 

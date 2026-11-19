@@ -26,7 +26,8 @@ export type ReportType =
   | "driver_registry"
   | "driver_assignments"
   | "driver_compliance"
-  | "driver_fuel";
+  | "driver_fuel"
+  | "driver_scorecard";
 
 export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   trips:          "Trips",
@@ -43,6 +44,7 @@ export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   driver_assignments: "Driver Assignments",
   driver_compliance:  "Driver Compliance",
   driver_fuel:        "Driver Fuel",
+  driver_scorecard:   "Driver Scorecard",
 };
 
 export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
@@ -60,6 +62,7 @@ export const REPORT_TYPE_ICONS: Record<ReportType, string> = {
   driver_assignments: "🔁",
   driver_compliance:  "✅",
   driver_fuel:        "⛽",
+  driver_scorecard:   "🏅",
 };
 
 /** The FuelMath reports. Built from fuel recorded in FuelMath, so they work
@@ -78,18 +81,20 @@ export const DRIVER_REPORT_TYPES: AvailableReportType[] = [
   { key: "driver_assignments", label: "Driver Assignments", icon: "🔁", category: "drivers" },
   { key: "driver_compliance",  label: "Driver Compliance",  icon: "✅", category: "drivers" },
   { key: "driver_fuel",        label: "Driver Fuel",        icon: "⛽", category: "drivers" },
+  { key: "driver_scorecard",   label: "Driver Scorecard",   icon: "🏅", category: "drivers" },
 ];
 
-export type DriverReportType = "driver_registry" | "driver_assignments" | "driver_compliance" | "driver_fuel";
+export type DriverReportType =
+  "driver_registry" | "driver_assignments" | "driver_compliance" | "driver_fuel" | "driver_scorecard";
 
 export function isDriverReport(type: string): type is DriverReportType {
   return type === "driver_registry" || type === "driver_assignments"
-    || type === "driver_compliance" || type === "driver_fuel";
+    || type === "driver_compliance" || type === "driver_fuel" || type === "driver_scorecard";
 }
 
 /** Driver reports that cover a period (the others are "as of today"). */
 export function driverReportUsesDates(type: string): boolean {
-  return type === "driver_assignments" || type === "driver_fuel";
+  return type === "driver_assignments" || type === "driver_fuel" || type === "driver_scorecard";
 }
 
 export function isFuelReport(type: string): type is "fuel_issuance" | "fuel_consumption" | "fuel_exceptions" {

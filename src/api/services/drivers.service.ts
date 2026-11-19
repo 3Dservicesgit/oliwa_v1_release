@@ -20,7 +20,8 @@
  */
 import { del, get, getBlobUrl, post, postMultipart, put } from "../client";
 import type {
-  Driver, DriverAssignment, DriverFields, DriverScoreRule, DriverStatus,
+  Driver, DriverAssignment, DriverFields, DriverScoreRule, DriverScorecardDetail,
+  DriverStatus, ScorecardList,
 } from "../types/drivers.types";
 
 const enc = encodeURIComponent;
@@ -93,7 +94,49 @@ export function driverPhotoUrl(uid: string): Promise<string> {
   return getBlobUrl(`${BASE}/${enc(uid)}/photo`);
 }
 
+// ── Scoring (navas-core-apis drivers.py / driver_scoring.py) ────────────────
+
+/** One rule per violation: the client's own, or the default. */
 export async function getDriverScoreRules(): Promise<DriverScoreRule[]> {
   const res = await get<DriverScoreRule[]>("/drivers/score/list");
   return Array.isArray(res.data) ? res.data : [];
+}
+
+export interface ScoreRuleFields {
+  violation_parameter: string;
+  points_denomination: number;
+  max_deduction: number | null;
+  score_name?: string;
+}
+
+/** Saves the client's rule for a violation: creates one over a default,
+ *  edits one the client already has. Returns the rules after the change. */
+export async function saveScoreRule(rule: DriverScoreRule, fields: ScoreRuleFields): Promise<DriverScoreRule[]> {
+  const res = rule.is_default
+    ? await post<DriverScoreRule[]>("/drivers/score/create", { data: fields })
+    : await put<DriverScoreRule[]>("/drivers/score/update", { data: { ...fields, score_uid: rule.score_uid } });
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+/** Removes the client's own rule: the default applies again. */
+export async function resetScoreRule(scoreUid: string): Promise<DriverScoreRule[]> {
+  const res = await del<DriverScoreRule[]>("/drivers/score/delete", { data: { score_uid: scoreUid } });
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+/** Every driver's scorecard, best first. Dates are DD-MM-YYYY; the server
+ *  uses the last 30 days when they are left out. */
+export async function getScorecards(startDate?: string, endDate?: string): Promise<ScorecardList> {
+  const params: Record<string, string> = {};
+  if (startDate) params.start_date = startDate;
+  if (endDate) params.end_date = endDate;
+  return (await get<ScorecardList>("/drivers/scorecards", { params })).data;
+}
+
+/** One driver's scorecard, with each violation. */
+export async function getDriverScorecard(uid: string, startDate?: string, endDate?: string): Promise<DriverScorecardDetail> {
+  const params: Record<string, string> = {};
+  if (startDate) params.start_date = startDate;
+  if (endDate) params.end_date = endDate;
+  return (await get<DriverScorecardDetail>(`${BASE}/${enc(uid)}/scorecard`, { params })).data;
 }

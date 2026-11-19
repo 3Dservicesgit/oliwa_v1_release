@@ -394,6 +394,7 @@ const DRIVER_NO_DATA_HINTS: Record<DriverReportType, string> = {
   driver_assignments: "None of these drivers held a vehicle in this period.",
   driver_compliance: "No drivers are registered yet. Register drivers under Drivers first.",
   driver_fuel: "No fuel was issued to these drivers in this period.",
+  driver_scorecard: "No drivers are registered yet. Register drivers under Drivers first.",
 };
 
 /**

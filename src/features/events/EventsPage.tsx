@@ -54,7 +54,7 @@ function channelLabel(ch: string): string {
 
 import { ConditionFields } from "./ConditionFields";
 import {
-  defaultValue, isAvailable, valueError, valueForForm, valueText, valueToSend,
+  defaultValue, isAvailable, isClientWide, valueError, valueForForm, valueText, valueToSend,
 } from "./eventConditions";
 
 // ── Breach type for geofence_breach condition ──────────────────────────────
@@ -93,6 +93,8 @@ const CONDITION_ICONS: Record<EventCondition, string> = {
   device_offline:   "📡",
   fuel_issue_flagged:    "🧾",
   high_fuel_consumption: "⛽",
+  driver_permit_expiry:  "🪪",
+  driver_unauthorised:   "🚫",
 };
 
 const CONDITION_COLORS: Record<EventCondition, string> = {
@@ -103,6 +105,8 @@ const CONDITION_COLORS: Record<EventCondition, string> = {
   device_offline:   "bg-[#667781]/15 text-[#667781] border-[#667781]/30",
   fuel_issue_flagged:    "bg-[#C0392B]/15 text-[#C0392B] border-[#C0392B]/30",
   high_fuel_consumption: "bg-[#C0392B]/15 text-[#C0392B] border-[#C0392B]/30",
+  driver_permit_expiry:  "bg-[#0B7A4B]/15 text-[#0B7A4B] border-[#0B7A4B]/30",
+  driver_unauthorised:   "bg-[#B91C1C]/15 text-[#B91C1C] border-[#B91C1C]/30",
 };
 
 // ── Geofence Zone Selector ──────────────────────────────────────────────────
@@ -454,7 +458,7 @@ function CreateEventDrawer({
 
       // Attach selected devices to the newly created event.
       // Backend returns the new event_uid in res.data.
-      if (selectedDevices.length > 0 && res.data) {
+      if (!isClientWide(condition) && selectedDevices.length > 0 && res.data) {
         try {
           await attachDevicesToEvent(res.data, selectedDevices);
         } catch {
@@ -604,11 +608,17 @@ function CreateEventDrawer({
           )}
 
           {/* Device Tagging */}
+          {isClientWide(condition) ? (
+            <div className="text-[12px] rounded-lg px-3 py-2 bg-[#0B7A4B]/5 border border-[#0B7A4B]/20 text-[#0B5E3A]">
+              This rule covers all your drivers, so it is not attached to vehicles.
+            </div>
+          ) : (
           <EventDeviceSelector
             selectedImeis={selectedDevices}
             onSelectionChange={setSelectedDevices}
             accountRoot={accountRoot}
           />
+          )}
         </div>
 
         {/* Footer */}
@@ -754,9 +764,11 @@ function EditEventDrawer({
       await update.mutate(event.event_uid, payload);
 
       // Diff device selections and apply changes
+      // A rule moved to a client-wide condition keeps no vehicles.
       const baseline = initialDevicesRef.current;
-      const toAttach = selectedDevices.filter((d) => !baseline.includes(d));
-      const toRemove = baseline.filter((d) => !selectedDevices.includes(d));
+      const wanted = isClientWide(condition) ? [] : selectedDevices;
+      const toAttach = wanted.filter((d) => !baseline.includes(d));
+      const toRemove = baseline.filter((d) => !wanted.includes(d));
 
       try {
         if (toAttach.length > 0) {
@@ -900,12 +912,18 @@ function EditEventDrawer({
           )}
 
           {/* Device Tagging */}
+          {isClientWide(condition) ? (
+            <div className="text-[12px] rounded-lg px-3 py-2 bg-[#0B7A4B]/5 border border-[#0B7A4B]/20 text-[#0B5E3A]">
+              This rule covers all your drivers, so it is not attached to vehicles.
+            </div>
+          ) : (
           <EventDeviceSelector
             selectedImeis={selectedDevices}
             onSelectionChange={handleDeviceChange}
             accountRoot={accountRoot}
             eventUid={event.event_uid}
           />
+          )}
         </div>
 
         {/* Footer */}
@@ -1089,7 +1107,12 @@ function EventCard({
             ))}
           </span>
         )}
-        {Number(event.device_count || 0) > 0 && (
+        {isClientWide(condKey) && (
+          <span className="bg-[#0B7A4B]/10 text-[#0B7A4B] px-1.5 py-0.5 rounded text-[10px] font-black">
+            All drivers
+          </span>
+        )}
+        {!isClientWide(condKey) && Number(event.device_count || 0) > 0 && (
           <span className="flex items-center gap-1">
             <span className="font-black">Devices:</span>
             <span className="bg-[#34B7F1]/10 text-[#34B7F1] px-1.5 py-0.5 rounded text-[10px] font-black">
@@ -1183,7 +1206,8 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
       {/* Filter bar */}
       <div className="flex items-center gap-2 flex-wrap">
         {["all", "speed_threshold", "geofence_breach", "ignition_change", "device_offline",
-          "fuel_issue_flagged", "high_fuel_consumption", "low_battery"].map(
+          "fuel_issue_flagged", "high_fuel_consumption", "driver_permit_expiry",
+          "driver_unauthorised", "low_battery"].map(
           (f) => (
             <button
               key={f}
@@ -1215,6 +1239,9 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
             // Built in on the server (permit_reminders.py), not an event rule:
             // about a driver, so no playback, and the value is a full sentence.
             const isPermit = (n.condition as string) === "permit_expiring";
+            // Driver rules: the subject is the driver and the value a sentence.
+            const isDriverRule = isClientWide(n.condition);
+            const driverName = (n.driver_name ?? "").trim();
             const icon = CONDITION_ICONS[condKey] ?? (isPermit ? "\u{1FAAA}" : "?");
             const colorClass = CONDITION_COLORS[condKey] ?? (isPermit
               ? "bg-[#B45309]/15 text-[#B45309] border-[#B45309]/30"
@@ -1248,9 +1275,14 @@ function NotificationHistoryTab({ owners }: { owners: string }) {
                       </span>
                     )}
                     {!n.geozone_name && n.trigger_value && (
-                      <span> — {isPermit ? "" : "value: "}{n.trigger_value}</span>
+                      <span> — {isPermit || isDriverRule ? "" : "value: "}{n.trigger_value}</span>
                     )}
                   </p>
+                  {driverName && !isPermit && !isDriverRule && (
+                    <p className="text-[11px] text-[#0B5E3A] mb-1">
+                      Driver: <span className="font-black">{driverName}</span>
+                    </p>
+                  )}
                   <div className="flex items-center gap-3 text-[10px] text-[#667781]">
                     <span>{n.date_triggered}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${colorClass}`}>
