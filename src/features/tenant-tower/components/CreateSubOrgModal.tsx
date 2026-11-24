@@ -100,7 +100,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
           {/* Tier badge */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-[#667781]">Tier:</span>
-            <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-[#075E54] text-white">ORG</span>
+            <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-[var(--brand-dark)] text-white">ORG</span>
           </div>
 
           {/* Name */}
@@ -110,7 +110,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
               placeholder="e.g. Kampala_Boda_Fleet"
-              className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+              className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
             />
           </Field>
 
@@ -119,7 +119,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
             <select
               value={form.parent_id}
               onChange={(e) => update("parent_id", e.target.value)}
-              className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors cursor-pointer"
+              className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors cursor-pointer"
             >
               <option value="">{parentsLoading ? "Loading..." : "Select parent..."}</option>
               {parents.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.tier})</option>)}
@@ -132,7 +132,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
               <select
                 value={form.country}
                 onChange={(e) => update("country", e.target.value)}
-                className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors cursor-pointer"
+                className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors cursor-pointer"
               >
                 {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
               </select>
@@ -141,7 +141,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
               <select
                 value={form.currency}
                 onChange={(e) => update("currency", e.target.value)}
-                className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors cursor-pointer"
+                className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors cursor-pointer"
               >
                 {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
               </select>
@@ -153,7 +153,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
             <select
               value={form.timezone}
               onChange={(e) => update("timezone", e.target.value)}
-              className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors cursor-pointer"
+              className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors cursor-pointer"
             >
               {TIMEZONES.map((tz) => <option key={tz}>{tz}</option>)}
             </select>
@@ -173,7 +173,7 @@ export function CreateSubOrgModal({ open, onClose, onCreated }: CreateSubOrgModa
           <button
             disabled={loading}
             onClick={handleSubmit}
-            className="h-8 px-4 rounded-full bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105 transition-all disabled:opacity-50"
+            className="h-8 px-4 rounded-full bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105 transition-all disabled:opacity-50"
           >
             {loading ? "Creating..." : "Create Sub-Org"}
           </button>

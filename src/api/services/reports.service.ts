@@ -21,6 +21,9 @@
 import { post, get, del } from "../client";
 import { ENDPOINTS } from "../endpoints";
 import type { ApiResponse, RequestOptions } from "../types";
+import { ApiError } from "../types";
+import { isDriverReport, isFuelReport } from "../types/reports.types";
+import type { DriverReportType } from "../types/reports.types";
 import type {
   ReportType,
   ReportFormat,
@@ -70,6 +73,11 @@ export async function generateReport(
   payload: GenerateReportRequest,
   opts?: RequestOptions,
 ): Promise<ApiResponse<GenerateReportResponse>> {
+  // ── FuelMath reports: their own route and generator ─────────────────────
+  if (isFuelReport(type)) return generateFuelReport(type, format, payload, opts);
+  // ── Driver reports: chosen by driver, their own route and generator ─────
+  if (isDriverReport(type)) return generateDriverReport(type, format, payload, opts);
+
   // ── Client-side report types ─────────────────────────────────────────────
   // These fetch data from lightweight JSON endpoints, then generate PDF/Excel
   // in the browser — no server-side WeasyPrint / GTK3 dependencies needed.
@@ -116,6 +124,9 @@ export async function generateReport(
         },
       };
       if (isState) body.data.report_state = type;
+      if (type === "overspeeding" && payload.speed_limit != null) {
+        body.data.speed_limit = payload.speed_limit;
+      }
 
       resp = await post<unknown>(endpointUrl, body, opts);
     } catch (e) {
@@ -185,7 +196,9 @@ export async function generateReport(
       trips: "This could mean no trips were recorded for these devices during the selected period. Try expanding your date range.",
       fuel: "This could mean no fuel level changes were recorded for these devices. Try a wider date range or check that fuel sensors are active.",
       night_driving: "No night driving events were detected. This is actually good news — your drivers may not have driven at night during this period!",
-      overspeeding: "No overspeeding events were detected — great news! Your drivers stayed within speed limits during this period.",
+      overspeeding: payload.speed_limit != null
+        ? `No vehicle went over ${payload.speed_limit} km/h during this period. Try a lower speed or a wider date range.`
+        : "No overspeeding events were detected — great news! Your drivers stayed within speed limits during this period.",
       geozone: "No geozone breach events found. Make sure the selected devices have geozones assigned, or try a wider date range.",
       PARKING: "No parking records found. Try expanding the date range or verify the devices were active during this period.",
       IDILING: "No idling records found. Try expanding the date range or verify the devices were active during this period.",
@@ -207,6 +220,10 @@ export async function generateReport(
       // State reports need the report_state field
       if (isState) {
         body.data.report_state = type; // "PARKING" or "IDILING"
+      }
+      // Overspeeding against a chosen speed, read from the GPS history.
+      if (type === "overspeeding" && payload.speed_limit != null) {
+        body.data.speed_limit = payload.speed_limit;
       }
 
       resp = await post<unknown>(endpointUrl, body, opts);
@@ -303,6 +320,147 @@ export async function generateReport(
   }
 
   return post<GenerateReportResponse>(url, body, opts);
+}
+
+// ── FuelMath reports ────────────────────────────────────────────────────────
+
+const FUEL_NO_DATA_HINTS: Record<string, string> = {
+  fuel_issuance: "No fuel was recorded in Fuel Refill for these vehicles in this period. Record refills under Fuel Refill first.",
+  fuel_consumption: "Consumption is measured between two full tanks: these vehicles need at least two full-tank receipts in this period.",
+  fuel_exceptions: "The checks flagged nothing for these vehicles in this period.",
+};
+
+/**
+ * The three FuelMath reports (issuance, consumption, exceptions): rows from
+ * POST /data-stream/reports/fuel/{kind}/generate-data, made into a PDF,
+ * Excel or Summary workbook in the browser, then logged like the others.
+ */
+async function generateFuelReport(
+  type: "fuel_issuance" | "fuel_consumption" | "fuel_exceptions",
+  format: ReportFormat,
+  payload: GenerateReportRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<GenerateReportResponse>> {
+  const fuelGen = await import("../../utils/fuelReportGenerator");
+  const label = fuelGen.FUEL_REPORTS[type].title;
+  const noData = `NO_DATA::${label}::${FUEL_NO_DATA_HINTS[type]}`;
+
+  let rows: unknown;
+  try {
+    const resp = await post<unknown>(
+      `/data-stream/reports/fuel/${fuelGen.fuelReportKind(type)}/generate-data`,
+      { data: { report_devices: payload.report_devices, start_date: payload.start_date, end_date: payload.end_date } },
+      opts,
+    );
+    rows = resp?.data;
+  } catch (e) {
+    // A server without FuelMath answers 404 "No such endpoint", which must
+    // not read as "no data".
+    if (e instanceof ApiError && e.status === 404) {
+      throw new Error("Fuel reports are not available on the server yet.");
+    }
+    const msg = e instanceof Error ? e.message : `Failed to fetch the ${label} report.`;
+    if (msg.includes("No ") && msg.includes("Found")) throw new Error(noData);
+    throw new Error(msg);
+  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(noData);
+
+  try {
+    if (format === "summary") {
+      const reportGen = await import("../../utils/reportGenerator");
+      const config = payload.summary_config;
+      reportGen.generateSummaryExcel(
+        rows, payload.start_date, payload.end_date, type,
+        config?.sections ?? { cover: true, statistics: true, detail: true },
+        config?.columns ?? reportGen.getSummaryColumns(type).filter((c) => c.default).map((c) => c.key),
+        config?.groupName,
+      );
+    } else if (format === "pdf") {
+      fuelGen.generateFuelReportPDF(type, rows as never, payload.start_date, payload.end_date);
+    } else {
+      fuelGen.generateFuelReportExcel(type, rows as never, payload.start_date, payload.end_date);
+    }
+  } catch (genErr) {
+    console.error("[Reports] Fuel report generation failed:", genErr);
+    throw new Error("Failed to generate the report file. Please try again.");
+  }
+
+  // Logged so it appears in Previous Reports; never blocks the download.
+  try {
+    await post(ENDPOINTS.REPORTS.LOG_DOWNLOAD, {
+      data: { report_caller: payload.origin_user, report_type: type, format },
+    });
+  } catch (logErr) {
+    console.warn("[Reports] Failed to log fuel report download (non-blocking):", logErr);
+  }
+  return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
+}
+
+// ── Driver reports ──────────────────────────────────────────────────────────
+
+const DRIVER_NO_DATA_HINTS: Record<DriverReportType, string> = {
+  driver_registry: "No drivers are registered yet. Register drivers under Drivers first.",
+  driver_assignments: "None of these drivers held a vehicle in this period.",
+  driver_compliance: "No drivers are registered yet. Register drivers under Drivers first.",
+  driver_fuel: "No fuel was issued to these drivers in this period.",
+  driver_scorecard: "No drivers are registered yet. Register drivers under Drivers first.",
+};
+
+/**
+ * The driver reports (registry, assignments, compliance, fuel): rows from
+ * POST /data-stream/reports/drivers/{kind}/generate-data, made into a PDF or
+ * Excel workbook in the browser, then logged like the others. Drivers come
+ * from payload.report_drivers (all of them when empty); report_devices is
+ * not used.
+ */
+async function generateDriverReport(
+  type: DriverReportType,
+  format: ReportFormat,
+  payload: GenerateReportRequest,
+  opts?: RequestOptions,
+): Promise<ApiResponse<GenerateReportResponse>> {
+  const gen = await import("../../utils/driverReportGenerator");
+  const label = gen.DRIVER_REPORTS[type].title;
+  const noData = `NO_DATA::${label}::${DRIVER_NO_DATA_HINTS[type]}`;
+
+  let rows: unknown;
+  try {
+    const resp = await post<unknown>(
+      `/data-stream/reports/drivers/${gen.driverReportKind(type)}/generate-data`,
+      { data: { report_drivers: payload.report_drivers ?? [], start_date: payload.start_date, end_date: payload.end_date } },
+      opts,
+    );
+    rows = resp?.data;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      throw new Error("Driver reports are not available on the server yet.");
+    }
+    const msg = e instanceof Error ? e.message : `Failed to fetch the ${label} report.`;
+    if (msg.includes("No ") && msg.includes("Found")) throw new Error(noData);
+    throw new Error(msg);
+  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(noData);
+
+  try {
+    // Driver reports have no Summary workbook; Summary falls back to Excel.
+    if (format === "pdf") {
+      gen.generateDriverReportPDF(type, rows as never, payload.start_date, payload.end_date);
+    } else {
+      gen.generateDriverReportExcel(type, rows as never, payload.start_date, payload.end_date);
+    }
+  } catch (genErr) {
+    console.error("[Reports] Driver report generation failed:", genErr);
+    throw new Error("Failed to generate the report file. Please try again.");
+  }
+
+  try {
+    await post(ENDPOINTS.REPORTS.LOG_DOWNLOAD, {
+      data: { report_caller: payload.origin_user, report_type: type, format: format === "pdf" ? "pdf" : "excel" },
+    });
+  } catch (logErr) {
+    console.warn("[Reports] Failed to log driver report download (non-blocking):", logErr);
+  }
+  return { data: { file_url: "client-generated" } } as ApiResponse<GenerateReportResponse>;
 }
 
 // ── List previous reports ───────────────────────────────────────────────────

@@ -121,7 +121,7 @@ export function OpsBriefModal({ tenant, open, onClose, onSendWhatsApp, onSavePDF
           </button>
           <button
             onClick={onSendWhatsApp}
-            className="h-7 px-3 rounded-full border-none bg-[#25D366] text-white text-[11px] font-extrabold cursor-pointer hover:brightness-105 transition-all"
+            className="h-7 px-3 rounded-full border-none bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold cursor-pointer hover:brightness-105 transition-all"
           >
             Send via WhatsApp
           </button>
@@ -178,7 +178,7 @@ export function OpsBriefModal({ tenant, open, onClose, onSendWhatsApp, onSavePDF
                     <div className="text-[11px] text-[#667781] mt-0.5">{action.meta}</div>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <button className="h-8 px-3 rounded-lg border-none bg-[#25D366] text-[#075E54] text-[12px] font-extrabold cursor-pointer hover:brightness-105 transition-all">
+                    <button className="h-8 px-3 rounded-lg border-none bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-extrabold cursor-pointer hover:brightness-105 transition-all">
                       Approve
                     </button>
                     <button className="h-8 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[#667781] text-[12px] cursor-pointer hover:bg-[#F0F2F5] transition-colors">
@@ -241,7 +241,7 @@ export function OpsBriefModal({ tenant, open, onClose, onSendWhatsApp, onSavePDF
           </button>
           <button
             onClick={onSendWhatsApp}
-            className="h-9 px-4 rounded-lg border-none bg-[#25D366] text-[#075E54] text-[12px] font-extrabold cursor-pointer hover:brightness-105 transition-all"
+            className="h-9 px-4 rounded-lg border-none bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-extrabold cursor-pointer hover:brightness-105 transition-all"
           >
             Send WhatsApp
           </button>

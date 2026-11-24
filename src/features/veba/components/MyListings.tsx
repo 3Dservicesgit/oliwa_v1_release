@@ -167,7 +167,7 @@ function ListingCardItem({
           <div
             className={[
               "w-full h-full flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors",
-              dragOver ? "bg-[#E9F7F4]" : "bg-[#F0F2F5] hover:bg-[#E9F7F4]",
+              dragOver ? "bg-[#E9F7F4]" : "bg-[#F0F2F5] hover:bg-[var(--brand-soft)]",
             ].join(" ")}
             onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -194,7 +194,7 @@ function ListingCardItem({
             "text-[10px] font-extrabold px-2 py-0.5 rounded-full",
             l.visibility === "tenant"
               ? "bg-white border border-[#E9EDEF] text-[#667781]"
-              : "bg-[#128C7E] text-white",
+              : "bg-[var(--brand)] text-white",
           ].join(" ")}>
             {l.visibility === "tenant" ? "Private" : "Public"}
           </span>
@@ -288,7 +288,7 @@ function ListingCardItem({
                 permission="can_edit_asset_listing"
                 onClick={onEdit}
                 disabled={isPending}
-                className="flex-1 min-w-[80px] px-3 py-1.5 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[#128C7E] hover:bg-[#E9F7F4] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-[80px] px-3 py-1.5 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[var(--brand)] hover:bg-[var(--brand-soft)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Edit
               </GuardedButton>
@@ -308,7 +308,7 @@ function ListingCardItem({
                 permission="can_edit_asset_listing"
                 onClick={onReactivate}
                 disabled={isPending}
-                className="flex-1 min-w-[80px] px-3 py-1.5 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-[80px] px-3 py-1.5 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPending ? "..." : "Reactivate"}
               </GuardedButton>
@@ -420,7 +420,7 @@ export function MyListings() {
   if (loading) {
     return (
       <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 flex items-center justify-center gap-3">
-        <div className="w-5 h-5 border-[3px] border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-[3px] border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
         <span className="text-[12px] text-[#667781]">Loading your listings...</span>
       </div>
     );
@@ -443,7 +443,7 @@ export function MyListings() {
           <GuardedButton
             permission="can_list_asset_on_marketplace"
             onClick={() => setCreateDrawerOpen(true)}
-            className="px-3 py-1.5 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer"
+            className="px-3 py-1.5 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer"
           >
             + New Listing
           </GuardedButton>
@@ -494,7 +494,7 @@ export function MyListings() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, IMEI, VIN, car make/model..."
-            className="h-[30px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all w-full max-w-[320px]"
+            className="h-[30px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all w-full max-w-[320px]"
           />
           <button
             type="button"
@@ -506,7 +506,7 @@ export function MyListings() {
           <GuardedButton
             permission="can_list_asset_on_marketplace"
             onClick={() => setCreateDrawerOpen(true)}
-            className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer shrink-0"
+            className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer shrink-0"
           >
             + New Listing
           </GuardedButton>
@@ -580,7 +580,7 @@ export function MyListings() {
                         permission="can_edit_asset_listing"
                         onClick={() => setEditingListing(l)}
                         disabled={isPending}
-                        className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[#128C7E] hover:bg-[#E9F7F4] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[var(--brand)] hover:bg-[var(--brand-soft)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Edit
                       </GuardedButton>
@@ -605,7 +605,7 @@ export function MyListings() {
                               : undefined,
                           )}
                           disabled={isPending}
-                          className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isPending ? "..." : l.status === "archived" ? "Unarchive" : "Reactivate"}
                         </GuardedButton>

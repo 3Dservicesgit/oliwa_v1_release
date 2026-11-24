@@ -39,7 +39,7 @@ const DOMAIN_LABELS: Partial<Record<AuditDomain, string>> = {
 };
 
 const SEVERITY_STYLES: Record<AuditSeverity, { bg: string; text: string; dot: string }> = {
-  Info:  { bg: "bg-[#128C7E]/10", text: "text-[#128C7E]", dot: "bg-[#128C7E]" },
+  Info:  { bg: "bg-[var(--brand)]/10", text: "text-[var(--brand)]", dot: "bg-[var(--brand)]" },
   Warn:  { bg: "bg-[#F97316]/10", text: "text-[#F97316]", dot: "bg-[#F97316]" },
   Alarm: { bg: "bg-[#EF4444]/10", text: "text-[#EF4444]", dot: "bg-[#EF4444]" },
   Crit:  { bg: "bg-[#7C3AED]/10", text: "text-[#7C3AED]", dot: "bg-[#7C3AED]" },
@@ -242,7 +242,7 @@ export function AuditPage() {
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={handleSearchKey}
               placeholder="Search events... (press Enter)"
-              className="h-8 flex-1 min-w-[180px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] focus:bg-white transition-all"
+              className="h-8 flex-1 min-w-[180px] px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] focus:bg-white transition-all"
             />
             <select value={domain} onChange={(e) => setDomain(e.target.value)} className="h-8 px-2 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer outline-none">
               {DOMAIN_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -265,7 +265,7 @@ export function AuditPage() {
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-6 h-6 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
                   <span className="text-[12px] text-[#667781]">Loading events...</span>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export function AuditPage() {
                                 <button
                                   onClick={() => setExpandedId(isExpanded ? null : evt.id)}
                                   title="View Details"
-                                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#F0F2F5] text-[#667781] hover:text-[#128C7E] transition-all"
+                                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#F0F2F5] text-[#667781] hover:text-[var(--brand)] transition-all"
                                 >
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     {isExpanded
@@ -478,7 +478,7 @@ function KpiCard({
   loading?: boolean;
 }) {
   const valueColor = {
-    teal:   "text-[#128C7E]",
+    teal:   "text-[var(--brand)]",
     orange: "text-[#F97316]",
     red:    "text-[#EF4444]",
     blue:   "text-[#3B82F6]",

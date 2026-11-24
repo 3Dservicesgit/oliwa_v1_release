@@ -78,11 +78,11 @@ export function AllocateModal({ open, onClose, fromClientUid, fromClientName, to
 
           {success ? (
             <div className="bg-[#EAF7F3] border border-[#25D366] rounded-xl p-4 text-center">
-              <div className="text-[14px] font-black text-[#128C7E]">Transfer Successful</div>
+              <div className="text-[14px] font-black text-[var(--brand)]">Transfer Successful</div>
               <div className="text-[12px] text-[#667781] mt-1">
                 Token transferred to {clients.find((c) => c.client_uid === toClientUid)?.client_name ?? "recipient"}
               </div>
-              <button onClick={handleClose} className="mt-3 h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer">Done</button>
+              <button onClick={handleClose} className="mt-3 h-8 px-4 rounded-full text-[11px] font-black bg-[var(--brand)] text-white border-none cursor-pointer">Done</button>
             </div>
           ) : (
             <>
@@ -91,7 +91,7 @@ export function AllocateModal({ open, onClose, fromClientUid, fromClientName, to
                 <select
                   value={toClientUid}
                   onChange={(e) => setToClientUid(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)]"
                 >
                   <option value="">— select client —</option>
                   {clients.map((c) => (
@@ -112,7 +112,7 @@ export function AllocateModal({ open, onClose, fromClientUid, fromClientName, to
               <button
                 onClick={handleSubmit}
                 disabled={loading || !tokenBillingUid}
-                className="h-8 px-4 rounded-full text-[11px] font-black bg-[#128C7E] text-white border-none cursor-pointer disabled:opacity-50"
+                className="h-8 px-4 rounded-full text-[11px] font-black bg-[var(--brand)] text-white border-none cursor-pointer disabled:opacity-50"
               >
                 {loading ? "Transferring…" : "Confirm Transfer"}
               </button>

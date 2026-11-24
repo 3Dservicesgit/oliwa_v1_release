@@ -22,6 +22,7 @@ import { ProtectedRoute } from "../auth/ProtectedRoute";
 
 // ── Waswa AI: one chat drawer + launcher shared by every page ───────────────
 import { WaswaProvider } from "../components/waswa";
+import { BrandingProvider } from "../branding/BrandingContext";
 
 // ── Feature pages ────────────────────────────────────────────────────────────
 import { AegisDashboardPage }  from "../features/aegis";
@@ -45,6 +46,8 @@ import { EventsPage }           from "../features/events";
 import { GeofencesPage } from "../features/geofences";
 import { ReportsPage }   from "../features/reports";
 import { SimPage }             from "../features/sim";
+import { DriversPage }         from "../features/drivers";
+import { FuelPage }            from "../features/fuel";
 
 import { AssetDigitalTwinPage }  from "../features/asset-digital-twin";
 
@@ -58,6 +61,7 @@ export default function App() {
   return (
     <AuthProvider>
     <PermissionsProvider>
+    <BrandingProvider>
     <WaswaProvider>
     <div className="h-dvh flex flex-col bg-[#F0F2F5] overflow-hidden w-full">
       <TopBar />
@@ -82,6 +86,8 @@ export default function App() {
           <Route path="/money"            element={<ProtectedRoute permission="money.view"><MoneyPage /></ProtectedRoute>} />
           <Route path="/protocol"         element={<ProtectedRoute permission="geofences.view"><GeofencesPage /></ProtectedRoute>} />
           <Route path="/events"           element={<ProtectedRoute permission="events.view"><EventsPage /></ProtectedRoute>} />
+          <Route path="/drivers"          element={<ProtectedRoute permission="drivers.view"><DriversPage /></ProtectedRoute>} />
+          <Route path="/fuel"             element={<ProtectedRoute permission="fuel.view"><FuelPage /></ProtectedRoute>} />
           <Route path="/reports"          element={<ProtectedRoute permission="reports.view"><ReportsPage /></ProtectedRoute>} />
           <Route path="/sim"             element={<ProtectedRoute permission="sim.view"><SimPage /></ProtectedRoute>} />
           <Route path="/asset-digital-twin" element={<ProtectedRoute permission="assets.view"><AssetDigitalTwinPage /></ProtectedRoute>} />
@@ -108,6 +114,7 @@ export default function App() {
       </footer>
     </div>
     </WaswaProvider>
+    </BrandingProvider>
     </PermissionsProvider>
     </AuthProvider>
   );

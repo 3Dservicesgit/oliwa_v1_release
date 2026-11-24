@@ -195,7 +195,7 @@ export function RoleCreatorPage() {
     return (
       <main className="flex-1 flex items-center justify-center bg-[#F0F2F5]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-[3px] border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-[3px] border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[13px] text-[#667781]">Loading role…</span>
         </div>
       </main>
@@ -242,7 +242,7 @@ export function RoleCreatorPage() {
                 value={roleName}
                 onChange={(e) => setRoleName(e.target.value)}
                 placeholder="e.g. Field Operator"
-                className="px-3 py-2 text-[13px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                className="px-3 py-2 text-[13px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 required
                 disabled={saving}
               />
@@ -255,7 +255,7 @@ export function RoleCreatorPage() {
                 value={roleDescription}
                 onChange={(e) => setRoleDescription(e.target.value)}
                 placeholder="What this role is for…"
-                className="px-3 py-2 text-[13px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                className="px-3 py-2 text-[13px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 disabled={saving}
               />
             </label>
@@ -272,7 +272,7 @@ export function RoleCreatorPage() {
               <span
                 className={
                   selectionCounter.perms > 0
-                    ? "font-extrabold text-[#128C7E]"
+                    ? "font-extrabold text-[var(--brand)]"
                     : ""
                 }
               >
@@ -295,7 +295,7 @@ export function RoleCreatorPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search permissions or modules…"
-            className="w-full px-3 py-2 text-[13px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E] mb-3"
+            className="w-full px-3 py-2 text-[13px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)] mb-3"
           />
 
           {MODULES.map((m) => {
@@ -352,7 +352,7 @@ export function RoleCreatorPage() {
             type="button"
             onClick={handleSubmit}
             disabled={saving || !roleName.trim() || selected.size === 0}
-            className="px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving
               ? "Saving…"

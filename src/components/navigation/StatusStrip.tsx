@@ -20,7 +20,7 @@ const chipVariant: Record<string, string> = {
 const btnVariant: Record<string, string> = {
   green: "bg-[#25D366] text-white",
   azure: "bg-[#34B7F1] text-white",
-  teal:  "bg-[#128C7E] text-white",
+  teal:  "bg-[var(--brand)] text-white",
   red:   "bg-[#D93025] text-white",
   ghost: "bg-[#F8F9FA] border border-[#E9EDEF] text-[#667781]",
 };

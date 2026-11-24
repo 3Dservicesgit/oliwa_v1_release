@@ -12,6 +12,7 @@
  * this is a tall aside panel fixed to the right of the workspace.
  */
 import React, { useRef, useState } from "react";
+import { useAssistantName } from "../../branding/branding";
 
 export interface WaswaInsight {
   id:    string;
@@ -62,6 +63,7 @@ export function WaswaAIPanel({
   onDetectLeakage,
   onSendChat,
 }: WaswaAIPanelProps) {
+  const assistantName = useAssistantName();
   const [aiOn, setAiOn] = useState(true);
   const [chat, setChat] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,7 +84,7 @@ export function WaswaAIPanel({
       {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#E9EDEF] shrink-0">
         <div>
-          <div className="font-black text-[14px] text-[#111B21]">Waswa AI • Co-Pilot</div>
+          <div className="font-black text-[14px] text-[#111B21]">{assistantName} AI • Co-Pilot</div>
           <div className="text-[11px] text-[#667781]">Human-in-Control • Audit-logged</div>
         </div>
         <button
@@ -91,7 +93,7 @@ export function WaswaAIPanel({
           className={`
             h-7 min-w-[46px] px-3 rounded-full border-none text-[11px] font-black
             cursor-pointer transition-all
-            ${aiOn ? "bg-[#25D366] text-white" : "bg-[#F0F2F5] text-[#667781]"}
+            ${aiOn ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[#F0F2F5] text-[#667781]"}
           `}
         >
           {aiOn ? "ON" : "OFF"}
@@ -170,18 +172,18 @@ export function WaswaAIPanel({
           value={chat}
           onChange={(e) => setChat(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Ask Waswa… e.g., 'Why did burn spike?'"
+          placeholder={`Ask ${assistantName}… e.g., 'Why did burn spike?'`}
           className="
             flex-1 min-w-0 h-9 rounded-xl border border-[#E9EDEF]
             bg-[#F8F9FA] px-3 text-[12px] outline-none
-            focus:border-[#128C7E] transition-colors
+            focus:border-[var(--brand)] transition-colors
           "
         />
         <button
           onClick={handleSend}
           className="
             h-9 px-3 rounded-xl border-none shrink-0
-            bg-[#25D366] text-[#075E54] font-black text-[12px]
+            bg-[var(--accent)] text-[var(--on-accent)] font-black text-[12px]
             cursor-pointer hover:brightness-105 active:opacity-85 transition-all
           "
         >

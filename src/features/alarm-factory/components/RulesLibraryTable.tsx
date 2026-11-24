@@ -76,7 +76,7 @@ export function RulesLibraryTable({
       <div className="px-4 py-2.5 border-b border-[#E9EDEF] flex flex-wrap items-center gap-2">
         <button
           onClick={onNewRule}
-          className="h-7 px-3 rounded-full bg-[#25D366] text-[#075E54] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
+          className="h-7 px-3 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-extrabold border-none cursor-pointer hover:brightness-105 transition-all whitespace-nowrap"
         >
           + New Rule
         </button>

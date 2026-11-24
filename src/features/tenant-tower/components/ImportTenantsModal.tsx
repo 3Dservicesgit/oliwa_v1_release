@@ -68,7 +68,7 @@ export function ImportTenantsModal({ open, onClose, onImported }: ImportTenantsM
           {/* Template download */}
           <div className="flex items-center gap-2 text-[11px]">
             <span className="text-[#667781]">Need the format?</span>
-            <button onClick={downloadImportTemplate} className="text-[#128C7E] font-black underline cursor-pointer bg-transparent border-none">
+            <button onClick={downloadImportTemplate} className="text-[var(--brand)] font-black underline cursor-pointer bg-transparent border-none">
               Download CSV template
             </button>
           </div>
@@ -128,7 +128,7 @@ export function ImportTenantsModal({ open, onClose, onImported }: ImportTenantsM
           <button
             disabled={!file || loading}
             onClick={handleUpload}
-            className="h-8 px-4 rounded-full bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105 transition-all disabled:opacity-50"
+            className="h-8 px-4 rounded-full bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105 transition-all disabled:opacity-50"
           >
             {loading ? "Uploading..." : "Upload & Import"}
           </button>

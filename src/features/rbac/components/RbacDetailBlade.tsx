@@ -69,7 +69,7 @@ export function RbacDetailBlade({ role, onClose, onEdit, onDisabled }: Props) {
       {/* Tabs */}
       <div className="flex gap-1.5 px-5 py-2.5 border-b border-[#E9EDEF] shrink-0">
         {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${tab === t ? "bg-[#128C7E] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"}`}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${tab === t ? "bg-[var(--brand)] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"}`}>{t}</button>
         ))}
       </div>
 
@@ -109,7 +109,7 @@ export function RbacDetailBlade({ role, onClose, onEdit, onDisabled }: Props) {
                 <div className="flex flex-col gap-2">
                   {permissions.map(p => (
                     <div key={p.permission_uid} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-[#128C7E]" />
+                      <span className="w-2 h-2 rounded-full bg-[var(--brand)]" />
                       <div className="flex flex-col">
                         <span className="font-black text-[12px] text-[#111B21]">{p.permission_name}</span>
                         <span className="text-[10px] text-[#667781]">{p.permission_module} &mdash; {p.permission_description || "No description"}</span>
@@ -134,7 +134,7 @@ export function RbacDetailBlade({ role, onClose, onEdit, onDisabled }: Props) {
                   {auditEvents.map(evt => (
                     <div key={evt.id} className="flex gap-3 text-[12px]">
                       <div className="flex flex-col items-center shrink-0">
-                        <span className={`w-2 h-2 rounded-full mt-1.5 ${evt.severity === "Crit" ? "bg-[#EF4444]" : evt.severity === "Alarm" ? "bg-[#F97316]" : evt.severity === "Warn" ? "bg-[#EAB308]" : "bg-[#128C7E]"}`} />
+                        <span className={`w-2 h-2 rounded-full mt-1.5 ${evt.severity === "Crit" ? "bg-[#EF4444]" : evt.severity === "Alarm" ? "bg-[#F97316]" : evt.severity === "Warn" ? "bg-[#EAB308]" : "bg-[var(--brand)]"}`} />
                       </div>
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-2">
@@ -155,7 +155,7 @@ export function RbacDetailBlade({ role, onClose, onEdit, onDisabled }: Props) {
 
       {/* Actions */}
       <div className="flex items-center gap-2 px-5 py-3 border-t border-[#E9EDEF] shrink-0">
-        <button onClick={() => onEdit(role)} className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105">Edit Role</button>
+        <button onClick={() => onEdit(role)} className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer hover:brightness-105">Edit Role</button>
         <button
           onClick={handleDelete}
           disabled={deleting}

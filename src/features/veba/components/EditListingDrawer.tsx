@@ -155,7 +155,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 <input type="number" min="0" step="any" value={dailyRate}
                   onChange={(e) => setDailyRate(e.target.value)}
                   disabled={updateMut.isRunning}
-                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -163,7 +163,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 <input value={currency} maxLength={4}
                   onChange={(e) => setCurrency(e.target.value)}
                   disabled={updateMut.isRunning}
-                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -171,7 +171,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 <select value={pricingBasis}
                   onChange={(e) => setPricingBasis(e.target.value as PricingBasis)}
                   disabled={updateMut.isRunning}
-                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 >
                   <option value="per_day">Per day</option>
                   <option value="per_hour">Per hour</option>
@@ -184,7 +184,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 <input type="number" min="0" step="any" value={hourlyRate}
                   onChange={(e) => setHourlyRate(e.target.value)}
                   disabled={updateMut.isRunning}
-                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </label>
             </div>
@@ -199,7 +199,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 <input type="date" value={availabilityStart}
                   onChange={(e) => setAvailabilityStart(e.target.value)}
                   disabled={updateMut.isRunning}
-                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -207,7 +207,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 <input type="date" value={availabilityEnd}
                   onChange={(e) => setAvailabilityEnd(e.target.value)}
                   disabled={updateMut.isRunning}
-                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </label>
             </div>
@@ -217,7 +217,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 onChange={(e) => setGeographicScope(e.target.value)}
                 placeholder="e.g. Uganda, Kampala only, EAC region"
                 disabled={updateMut.isRunning}
-                className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+                className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
               />
             </label>
             <label className="flex items-center gap-2 mt-3 text-[12px] text-[#111B21] cursor-pointer">
@@ -257,7 +257,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
                 rows={3}
                 placeholder="Condition, certifications, what's included..."
                 disabled={updateMut.isRunning}
-                className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E] resize-y font-[inherit]"
+                className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)] resize-y font-[inherit]"
               />
             </label>
           </div>
@@ -279,7 +279,7 @@ export function EditListingDrawer({ listing, open, onClose, onUpdated }: EditLis
               permission="can_edit_asset_listing"
               onClick={handleSubmit}
               disabled={updateMut.isRunning}
-              className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+              className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
             >
               {updateMut.isRunning ? "Saving..." : "Save changes"}
             </GuardedButton>

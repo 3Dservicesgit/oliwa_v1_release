@@ -11,6 +11,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { fuelStatsByKey, isFuelReportType } from "./fuelReportGenerator";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,9 +63,15 @@ type StateDataResponse = Record<string, StateRecord[]>[];
 interface OverspeedingEvent {
   date_logged: string;
   location_point: string;
-  moving_speed: string;
-  event_triggered: string;
+  moving_speed: string;           // the top speed, e.g. "52KM/H"
+  event_triggered: string;        // the limit, e.g. "Over 43 km/h"
   gps_coordinates: string;
+  // Sent when the report is run against a speed limit (one row per stretch
+  // above it); absent on the alert-based report.
+  start_time?: string;
+  end_time?: string;
+  duration?: string;
+  over_by?: string;
 }
 
 type OverspeedingDataResponse = Record<string, OverspeedingEvent[]>[];
@@ -709,15 +716,18 @@ export function generateOverspeedingPDF(
       const rows = events.map((e, i) => [
         String(i + 1),
         e.date_logged || "—",
+        e.start_time || "—",
+        e.end_time || "—",
+        e.duration || "—",
         e.moving_speed || "—",
-        e.location_point || "—",
         e.event_triggered || "—",
+        e.location_point || "—",
         e.gps_coordinates || "—",
       ]);
 
       autoTable(doc, {
         startY: yOffset,
-        head: [["#", "Date", "Speed", "Location", "Speed Limit", "GPS Coordinates"]],
+        head: [["#", "Date", "Start", "End", "Duration", "Top Speed", "Speed Limit", "Location", "GPS Coordinates"]],
         body: rows,
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: {
@@ -764,15 +774,20 @@ export function generateOverspeedingExcel(
       const rows = events.map((e, i) => ({
         "#": i + 1,
         "Date": e.date_logged || "",
-        "Speed": e.moving_speed || "",
-        "Location": e.location_point || "",
+        "Start": e.start_time || "",
+        "End": e.end_time || "",
+        "Duration": e.duration || "",
+        "Top Speed": e.moving_speed || "",
+        "Over By": e.over_by || "",
         "Speed Limit": e.event_triggered || "",
+        "Location": e.location_point || "",
         "GPS Coordinates": e.gps_coordinates || "",
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [
-        { wch: 5 }, { wch: 14 }, { wch: 12 }, { wch: 35 }, { wch: 16 }, { wch: 25 },
+        { wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 11 },
+        { wch: 10 }, { wch: 16 }, { wch: 35 }, { wch: 25 },
       ];
 
       const sheetName = deviceName.length > 31 ? deviceName.slice(0, 31) : deviceName;
@@ -976,8 +991,12 @@ export const SUMMARY_COLUMNS_BY_TYPE: Record<string, SummaryColumn[]> = {
     { key: "max_speed_stat", label: "Max Speed Recorded",  section: "statistics", default: true },
     { key: "avg_speed_stat", label: "Avg Overspeed",       section: "statistics", default: true },
     { key: "date_logged",    label: "Date",           section: "detail", default: true },
-    { key: "moving_speed",   label: "Speed",          section: "detail", default: true },
-    { key: "event_triggered",label: "Event",          section: "detail", default: true },
+    { key: "start_time",     label: "Start",          section: "detail", default: true },
+    { key: "end_time",       label: "End",            section: "detail", default: true },
+    { key: "duration",       label: "Duration",       section: "detail", default: true },
+    { key: "moving_speed",   label: "Top Speed",      section: "detail", default: true },
+    { key: "over_by",        label: "Over By",        section: "detail", default: false },
+    { key: "event_triggered",label: "Speed Limit",    section: "detail", default: true },
     { key: "location_point", label: "Location",       section: "detail", default: true },
     { key: "gps_coordinates",label: "GPS",            section: "detail", default: false },
   ],
@@ -1007,6 +1026,57 @@ export const SUMMARY_COLUMNS_BY_TYPE: Record<string, SummaryColumn[]> = {
     { key: "start_gps",      label: "Start GPS",      section: "detail", default: false },
     { key: "end_gps",        label: "End GPS",        section: "detail", default: false },
   ],
+
+  // -- FuelMath (rows from /data-stream/reports/fuel/<kind>/generate-data,
+  //    columns as the mobile app's summary_config.dart) --
+  fuel_issuance: [
+    { key: "issue_count",     label: "Fuel Issues",           section: "statistics", default: true },
+    { key: "total_litres",    label: "Total Litres",          section: "statistics", default: true },
+    { key: "total_cost_stat", label: "Total Cost (UGX)",      section: "statistics", default: true },
+    { key: "avg_price",       label: "Average Price/L (UGX)", section: "statistics", default: true },
+    { key: "date_logged",     label: "Date",          section: "detail", default: true },
+    { key: "time_logged",     label: "Time",          section: "detail", default: true },
+    { key: "driver",          label: "Driver",        section: "detail", default: true },
+    { key: "fuel_type",       label: "Fuel",          section: "detail", default: false },
+    { key: "litres",          label: "Vol",           section: "detail", default: true },
+    { key: "unit_price",      label: "Price/L",       section: "detail", default: true },
+    { key: "total_cost",      label: "Cost",          section: "detail", default: true },
+    { key: "payment_method",  label: "Paid by",       section: "detail", default: true },
+    { key: "receipt_number",  label: "Receipt",       section: "detail", default: true },
+    { key: "voucher_number",  label: "Voucher",       section: "detail", default: true },
+    { key: "station_name",    label: "Location",      section: "detail", default: true },
+    { key: "review",          label: "Review",        section: "detail", default: false },
+  ],
+  fuel_consumption: [
+    { key: "fills_measured",      label: "Full Tanks Measured", section: "statistics", default: true },
+    { key: "total_km",            label: "Total Distance (km)", section: "statistics", default: true },
+    { key: "total_litres_used",   label: "Total Litres",        section: "statistics", default: true },
+    { key: "avg_km_per_l",        label: "Average km/L",        section: "statistics", default: true },
+    { key: "total_excess_litres", label: "Excess Litres",       section: "statistics", default: true },
+    { key: "total_excess_cost",   label: "Excess Cost (UGX)",   section: "statistics", default: true },
+    { key: "date_logged",       label: "Full tank on",      section: "detail", default: true },
+    { key: "driver",            label: "Driver",            section: "detail", default: true },
+    { key: "km_since_full",     label: "Distance (km)",     section: "detail", default: true },
+    { key: "litres_since_full", label: "Litres",            section: "detail", default: true },
+    { key: "km_per_l",          label: "km/L",              section: "detail", default: true },
+    { key: "expected_km_per_l", label: "Expected km/L",     section: "detail", default: true },
+    { key: "excess_litres",     label: "Excess (L)",        section: "detail", default: true },
+    { key: "excess_cost",       label: "Excess cost (UGX)", section: "detail", default: true },
+    { key: "cost_per_km",       label: "UGX/km",            section: "detail", default: false },
+  ],
+  fuel_exceptions: [
+    { key: "exception_count", label: "Exceptions",       section: "statistics", default: true },
+    { key: "open_count",      label: "Needing Review",   section: "statistics", default: true },
+    { key: "loss_count",      label: "Confirmed Losses", section: "statistics", default: true },
+    { key: "date_logged",  label: "Date",           section: "detail", default: true },
+    { key: "time_logged",  label: "Time",           section: "detail", default: true },
+    { key: "driver",       label: "Driver",         section: "detail", default: true },
+    { key: "litres",       label: "Litres",         section: "detail", default: true },
+    { key: "total_cost",   label: "Cost (UGX)",     section: "detail", default: true },
+    { key: "problems",     label: "What was found", section: "detail", default: true },
+    { key: "review",       label: "Review",         section: "detail", default: true },
+    { key: "review_note",  label: "Review note",    section: "detail", default: false },
+  ],
 };
 // Idling shares the same columns as Parking
 SUMMARY_COLUMNS_BY_TYPE.IDILING = SUMMARY_COLUMNS_BY_TYPE.PARKING;
@@ -1024,12 +1094,16 @@ const DETAIL_SHEET_NAMES: Record<string, string> = {
   trips: "Trips", fuel: "Fuel Details", night_driving: "Night Driving",
   overspeeding: "Overspeeding", geozone: "Geozone Events",
   PARKING: "Parking", IDILING: "Idling",
+  fuel_issuance: "Fuel Issues", fuel_consumption: "Fuel Consumption",
+  fuel_exceptions: "Fuel Exceptions",
 };
 
 const REPORT_TITLE_LABELS: Record<string, string> = {
   trips: "Trip", fuel: "Fuel", night_driving: "Night Driving",
   overspeeding: "Overspeeding", geozone: "Geozone",
   PARKING: "Parking", IDILING: "Idling",
+  fuel_issuance: "Fuel Issuance", fuel_consumption: "Fuel Consumption",
+  fuel_exceptions: "Fuel Exceptions",
 };
 
 /**
@@ -1181,6 +1255,12 @@ export function generateSummaryExcel(
         }
       }
 
+      // ── FuelMath statistics (the same totals as the PDF/Excel reports) ──
+      else if (isFuelReportType(reportType)) {
+        const stats = fuelStatsByKey(reportType, records);
+        for (const col of statCols) row[col.label] = stats[col.key] ?? "";
+      }
+
       // ── Parking / Idling statistics ─────────────────────────────────────
       else if (reportType === "PARKING" || reportType === "IDILING") {
         const durations = records.map((r) => r.duration_minutes || 0);
@@ -1255,7 +1335,7 @@ export function generateSummaryExcel(
               row[col.label] = sf2 > 0 && ef2 > 0 ? Math.round((sf2 - ef2) * 100) / 100 : "";
               break;
             }
-            case "driver":     row[col.label] = rec.driver_id || ""; break;
+            case "driver":     row[col.label] = rec.driver_id || rec.driver || ""; break;
             case "start_gps":  row[col.label] = rec.start_gps_cords || rec.start_gps || ""; break;
             case "end_gps":    row[col.label] = rec.end_gps_cords || rec.end_gps || ""; break;
 
@@ -1267,6 +1347,9 @@ export function generateSummaryExcel(
             case "gps_coordinates": row[col.label] = rec.gps_coordinates || ""; break;
             case "moving_speed":    row[col.label] = rec.moving_speed || ""; break;
             case "geozone_name":    row[col.label] = rec.geozone_name || ""; break;
+
+            // ── Anything else (the FuelMath rows) is a field of its own name ─
+            default:                row[col.label] = rec[col.key] ?? ""; break;
           }
         }
         allRows.push(row);

@@ -50,7 +50,7 @@ export function GeofenceList({
           placeholder="Search geofences…"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full h-8 pl-8 pr-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[#128C7E]"
+          className="w-full h-8 pl-8 pr-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)]"
         />
       </div>
 
@@ -70,8 +70,8 @@ export function GeofenceList({
               className={[
                 "bg-white border rounded-xl p-3 cursor-pointer transition-all",
                 isSelected
-                  ? "border-[#128C7E] shadow-sm ring-1 ring-[#128C7E]/20"
-                  : "border-[#E9EDEF] hover:border-[#128C7E]/40",
+                  ? "border-[var(--brand)] shadow-sm ring-1 ring-[var(--brand)]/20"
+                  : "border-[#E9EDEF] hover:border-[var(--brand)]/40",
               ].join(" ")}
             >
               {/* Header row */}

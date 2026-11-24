@@ -123,6 +123,9 @@ export interface TokenPackage {
   billing_unit?:    string | null;   // hour, unit, event, km, mb, image, ...
   billing_trigger?: string | null;   // continuous, on_read, on_event, ...
   billing_scope?:   string | null;   // asset, driver, fleet, shipment
+  // Catalogue (backend migration 059) - null on older tokens
+  token_sku?:         string | null;   // e.g. NVS.TKN.OLI.T30
+  token_description?: string | null;   // client-facing eShop description
   // Legacy / deprecated
   token_product_variant_uid?: string;
   variant?:         TokenVariant;

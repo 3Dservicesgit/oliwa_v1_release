@@ -75,7 +75,7 @@ export function CreateSimDialog({ open, onClose, onCreated }: CreateSimDialogPro
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#075E54] text-white px-5 py-4 flex items-center justify-between shrink-0">
+        <div className="bg-[var(--brand-dark)] text-white px-5 py-4 flex items-center justify-between shrink-0">
           <span className="font-black text-[15px]">Register New SIM Card</span>
           <button
             onClick={resetAndClose}
@@ -96,7 +96,7 @@ export function CreateSimDialog({ open, onClose, onCreated }: CreateSimDialogPro
                 value={form.telecom}
                 onChange={(e) => update("telecom", e.target.value)}
                 disabled={submitting}
-                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors cursor-pointer"
+                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors cursor-pointer"
               >
                 {TELECOM_OPTIONS.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -113,7 +113,7 @@ export function CreateSimDialog({ open, onClose, onCreated }: CreateSimDialogPro
                 onChange={(e) => update("simcard_number", e.target.value)}
                 placeholder="e.g. 256776497380"
                 disabled={submitting}
-                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
               />
             </div>
 
@@ -126,7 +126,7 @@ export function CreateSimDialog({ open, onClose, onCreated }: CreateSimDialogPro
                 onChange={(e) => update("simcard_owner", e.target.value)}
                 placeholder="Owner UID"
                 disabled={submitting}
-                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
               />
             </div>
 
@@ -139,7 +139,7 @@ export function CreateSimDialog({ open, onClose, onCreated }: CreateSimDialogPro
                 onChange={(e) => update("simcard_owner_parent", e.target.value)}
                 placeholder="e.g. sentinel"
                 disabled={submitting}
-                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                className="w-full h-10 px-3 rounded-lg border border-[#E9EDEF] bg-white text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
               />
             </div>
 
@@ -164,7 +164,7 @@ export function CreateSimDialog({ open, onClose, onCreated }: CreateSimDialogPro
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
+            className="h-10 px-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {submitting ? "Registering…" : "Register SIM"}
           </button>

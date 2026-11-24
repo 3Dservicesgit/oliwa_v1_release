@@ -15,8 +15,8 @@ import type { ActiveSubscriptionsResponse, HighSubClientsResponse, PausedSubscri
 
 // ─── Status colors ───────────────────────────────────────────────────────────
 const stColor: Record<string, string> = {
-  BILLED:  "text-[#128C7E]",
-  SUCCESS: "text-[#128C7E]",
+  BILLED:  "text-[var(--brand)]",
+  SUCCESS: "text-[var(--brand)]",
   PENDING: "text-[#F97316]",
   FAILED:  "text-[#EF4444]",
   REVIEW:  "text-[#F97316]",
@@ -156,13 +156,13 @@ export function BillingPage() {
 
           {/* ── Header ─────────────────────────────────────────────────── */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">
-            {/* <div className="text-[10px] font-black text-[#128C7E] bg-[#EAF7F3] border border-[#128C7E] px-2 py-0.5 rounded-full inline-block mb-1">SCREEN 10</div> */}
+            {/* <div className="text-[10px] font-black text-[var(--brand)] bg-[#EAF7F3] border border-[var(--brand)] px-2 py-0.5 rounded-full inline-block mb-1">SCREEN 10</div> */}
             <div className="text-[11px] text-[#667781] mb-0.5">Token Engine ▸ Usage Event Metering (US-03)</div>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-black text-[16px] text-[#111B21]">The Irrefutable Metering Ledger</span>
-                  <span className="text-[10px] font-black bg-[#128C7E] text-white px-2 py-0.5 rounded-full">HIC / HITL</span>
+                  <span className="text-[10px] font-black bg-[var(--brand)] text-white px-2 py-0.5 rounded-full">HIC / HITL</span>
                 </div>
                 <div className="text-[11px] text-[#667781] mt-0.5">Single source of truth for billable events • Immutable log • Kafka-aligned • Odoo-ready</div>
               </div>
@@ -193,9 +193,9 @@ export function BillingPage() {
               title="High Sub Clients"
               value={highSubStats ? String(highSubStats.count) : "—"}
               delta={highSubStats?.clients[0] ? `Top: ${highSubStats.clients[0].client_name}` : ""}
-              deltaTone="text-[#128C7E]"
+              deltaTone="text-[var(--brand)]"
               sub="ranked by subscriptions"
-              dot="bg-[#128C7E]"
+              dot="bg-[var(--brand)]"
             />
             <KpiCard
               id="PAU-01"
@@ -242,7 +242,7 @@ export function BillingPage() {
                 <select
                   value={selectedClientId ?? ""}
                   onChange={(e) => setSelectedClientId(e.target.value || null)}
-                  className="h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-[#F8FAFC] outline-none focus:border-[#128C7E] min-w-[200px]"
+                  className="h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-[#F8FAFC] outline-none focus:border-[var(--brand)] min-w-[200px]"
                 >
                   {clients.length === 0 && <option value="">Loading clients…</option>}
                   {clients.map((c) => (
@@ -285,7 +285,7 @@ export function BillingPage() {
           </div>
 
           {/* ── Waswa AI Insights (floating card in mockup, inline here)
-          <div className="bg-[#128C7E] text-white rounded-xl p-4">
+          <div className="bg-[var(--brand)] text-white rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="font-black text-[13px]">Waswa AI • Insights</span>
               <span className="text-[12px] opacity-70 cursor-pointer">···</span>
@@ -326,7 +326,7 @@ export function BillingPage() {
           </div>
           <div className="flex gap-1.5 px-5 py-2.5 border-b border-[#E9EDEF] shrink-0">
             {BLADE_TABS.map(t => (
-              <button key={t} onClick={() => setBladeTab(t)} className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${bladeTab === t ? "bg-[#128C7E] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"}`}>{t}</button>
+              <button key={t} onClick={() => setBladeTab(t)} className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${bladeTab === t ? "bg-[var(--brand)] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"}`}>{t}</button>
             ))}
           </div>
           <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-5 py-4">
@@ -351,7 +351,7 @@ export function BillingPage() {
               </BSection>
               {/* <BSection title="HITL Actions">
                 <div className="p-4 flex gap-2 flex-wrap">
-                  <button className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-black border-none cursor-pointer">Replay to Kafka</button>
+                  <button className="h-8 px-3 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black border-none cursor-pointer">Replay to Kafka</button>
                   <button className="h-8 px-3 rounded-lg bg-[#EF4444] text-white text-[11px] font-black border-none cursor-pointer">Mark disputed</button>
                   <button className="h-8 px-3 rounded-lg bg-[#34B7F1] text-white text-[11px] font-black border-none cursor-pointer">Open booking</button>
                 </div>
@@ -366,7 +366,7 @@ export function BillingPage() {
       {modalOpen && (
         <div className="fixed inset-0 bg-black/35 z-50 grid place-items-center" onClick={() => setModalOpen(false)}>
           <div className="w-[min(900px,calc(100vw-24px))] max-h-[calc(100vh-24px)] bg-white rounded-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="bg-[#075E54] text-white px-5 py-3 flex items-center justify-between shrink-0">
+            <div className="bg-[var(--brand-dark)] text-white px-5 py-3 flex items-center justify-between shrink-0">
               <div className="font-black text-[15px]">Modal • Reconcile Run (HITL)</div>
               <button onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-lg bg-white/15 text-white font-black text-[14px] border-none cursor-pointer grid place-items-center hover:bg-white/25">✕</button>
             </div>
@@ -405,7 +405,7 @@ export function BillingPage() {
                     </div>
                   ))}
                 </div>
-                <div className="text-[12px] text-[#128C7E] font-black mb-1">Notes</div>
+                <div className="text-[12px] text-[var(--brand)] font-black mb-1">Notes</div>
                 <div className="text-[12px] text-[#667781]">Dry-run produces a signed proof report for audit and dispute resolution.</div>
               </MSection>
               <MSection title="Preview (Top mismatches)" tag={<SampleTag />}>
@@ -428,7 +428,7 @@ export function BillingPage() {
                 </table>
               </MSection>
               <div className="mb-4 border border-[#E9EDEF] rounded-xl overflow-hidden bg-[#EAF7F3]">
-                <div className="px-4 py-2.5 bg-[#EAF7F3] border-b border-[#128C7E]/20">
+                <div className="px-4 py-2.5 bg-[#EAF7F3] border-b border-[var(--brand)]/20">
                   <div className="font-black text-[13px] text-[#111B21]">Proof Bundle (Generated)</div>
                 </div>
                 <div className="p-4 text-[12px] text-[#667781] leading-relaxed">
@@ -454,7 +454,7 @@ export function BillingPage() {
               <button onClick={() => setModalOpen(false)} className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer">Cancel</button>
               <div className="flex gap-2">
                 <button className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer">Generate proof</button>
-                <button className="h-10 px-5 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Start dry-run</button>
+                <button className="h-10 px-5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Start dry-run</button>
               </div>
             </div>
           </div>
@@ -467,7 +467,7 @@ export function BillingPage() {
 // ─── Reusable components ─────────────────────────────────────────────────────
 const pillStyles: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54]",
-  dark:  "bg-[#075E54] text-white",
+  dark:  "bg-[var(--brand-dark)] text-white",
   ghost: "bg-white border border-[#E9EDEF] text-[#667781]",
 };
 

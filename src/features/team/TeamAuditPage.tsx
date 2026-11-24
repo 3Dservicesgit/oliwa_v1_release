@@ -27,7 +27,7 @@ const ACTION_LABEL: Record<string, { text: string; tone: string }> = {
   LOGIN: { text: "Signed in", tone: "bg-[#DCFCE7] text-[#166534]" },
   LOGOUT: { text: "Signed out", tone: "bg-[#F0F2F5] text-[#667781]" },
   LOGIN_FAILED: { text: "Failed sign-in", tone: "bg-[#FEF2F2] text-[#B91C1C]" },
-  TEAM_USER_ADDED: { text: "User added", tone: "bg-[#128C7E]/10 text-[#075E54]" },
+  TEAM_USER_ADDED: { text: "User added", tone: "bg-[var(--brand)]/10 text-[var(--brand-dark)]" },
   TEAM_USER_CHANGED: { text: "User changed", tone: "bg-[#34B7F1]/10 text-[#0B6E99]" },
   TEAM_PASSWORD_RESET: { text: "Password reset", tone: "bg-[#FEF3C7] text-[#92400E]" },
   TEAM_USER_REMOVED: { text: "User removed", tone: "bg-[#FEF2F2] text-[#B91C1C]" },
@@ -90,7 +90,7 @@ export function TeamAuditPage() {
   };
 
   const chip = (on: boolean) =>
-    `h-8 px-3 rounded-full border text-[12px] font-extrabold cursor-pointer ${on ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781]"}`;
+    `h-8 px-3 rounded-full border text-[12px] font-extrabold cursor-pointer ${on ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]" : "bg-white border-[#E9EDEF] text-[#667781]"}`;
 
   return (
     <div className="flex flex-col h-full w-full bg-[#F0F2F5] p-3 gap-3 overflow-y-auto">

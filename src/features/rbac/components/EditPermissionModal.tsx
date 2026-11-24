@@ -82,7 +82,7 @@ export function EditPermissionModal({ open, permission, onClose, onUpdated }: Pr
     <div className="fixed inset-0 bg-black/35 z-50 grid place-items-center" onClick={onClose}>
       <div className="w-[min(520px,calc(100vw-24px))] max-h-[calc(100vh-24px)] bg-white rounded-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="bg-[#075E54] text-white px-5 py-3 flex items-center justify-between shrink-0">
+        <div className="bg-[var(--brand-dark)] text-white px-5 py-3 flex items-center justify-between shrink-0">
           <div>
             <div className="font-black text-[15px]">Edit Permission</div>
             <div className="text-[11px] opacity-70">Update permission details</div>
@@ -106,7 +106,7 @@ export function EditPermissionModal({ open, permission, onClose, onUpdated }: Pr
                   value={permissionName}
                   onChange={e => setPermissionName(e.target.value)}
                   placeholder="e.g. billing.view"
-                  className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]"
+                  className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]"
                 />
                 <div className="text-[10px] text-[#667781] mt-1">Use dot notation: module.action (e.g. billing.view, gps.manage)</div>
               </Field>
@@ -115,14 +115,14 @@ export function EditPermissionModal({ open, permission, onClose, onUpdated }: Pr
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   placeholder="e.g. View billing records and invoices"
-                  className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]"
+                  className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]"
                 />
               </Field>
               <Field label="Module" required>
                 {modulesLoading ? (
                   <div className="h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#667781] bg-[#F8FAFC] flex items-center">Loading modules...</div>
                 ) : (
-                  <select value={module} onChange={e => setModule(e.target.value)} className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[#128C7E]">
+                  <select value={module} onChange={e => setModule(e.target.value)} className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] bg-white outline-none focus:border-[var(--brand)]">
                     {modules.map(m => (
                       <option key={m} value={m}>{m}</option>
                     ))}
@@ -139,7 +139,7 @@ export function EditPermissionModal({ open, permission, onClose, onUpdated }: Pr
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="h-10 px-6 rounded-lg bg-[#128C7E] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-6 rounded-lg bg-[var(--brand)] text-white text-[13px] font-black border-none cursor-pointer hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? "Saving..." : "Save Changes"}
           </button>

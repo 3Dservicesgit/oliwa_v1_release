@@ -91,7 +91,7 @@ export function BookingRequestModal({ listing, onClose, onSubmitted }: BookingRe
         <div className="bg-[#F8F9FA] border-b border-[#E9EDEF] px-4 py-3">
           <div className="text-[11px] text-[#667781] uppercase tracking-wide">Request booking</div>
           <div className="font-extrabold text-[14px] text-[#111B21] truncate" title={title}>{title}</div>
-          <div className="text-[12px] text-[#128C7E] font-extrabold mt-0.5">{rateText}</div>
+          <div className="text-[12px] text-[var(--brand)] font-extrabold mt-0.5">{rateText}</div>
         </div>
 
         <div className="p-4 flex flex-col gap-3">
@@ -103,7 +103,7 @@ export function BookingRequestModal({ listing, onClose, onSubmitted }: BookingRe
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 disabled={requestMutation.isRunning}
-                className="px-2 py-1.5 text-[13px] border border-[#E9EDEF] rounded-md outline-none focus:border-[#128C7E]"
+                className="px-2 py-1.5 text-[13px] border border-[#E9EDEF] rounded-md outline-none focus:border-[var(--brand)]"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -113,7 +113,7 @@ export function BookingRequestModal({ listing, onClose, onSubmitted }: BookingRe
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 disabled={requestMutation.isRunning}
-                className="px-2 py-1.5 text-[13px] border border-[#E9EDEF] rounded-md outline-none focus:border-[#128C7E]"
+                className="px-2 py-1.5 text-[13px] border border-[#E9EDEF] rounded-md outline-none focus:border-[var(--brand)]"
               />
             </label>
           </div>
@@ -125,7 +125,7 @@ export function BookingRequestModal({ listing, onClose, onSubmitted }: BookingRe
               rows={3}
               placeholder="Pickup details, deployment context, anything the owner should know."
               disabled={requestMutation.isRunning}
-              className="px-2 py-1.5 text-[13px] border border-[#E9EDEF] rounded-md outline-none focus:border-[#128C7E] resize-y"
+              className="px-2 py-1.5 text-[13px] border border-[#E9EDEF] rounded-md outline-none focus:border-[var(--brand)] resize-y"
             />
           </label>
           <p className="text-[11px] text-[#667781]">
@@ -148,7 +148,7 @@ export function BookingRequestModal({ listing, onClose, onSubmitted }: BookingRe
               permission="can_book_asset"
               onClick={handleSubmit}
               disabled={requestMutation.isRunning}
-              className="px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-[12px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {requestMutation.isRunning ? "Sending..." : "Send request"}
             </GuardedButton>

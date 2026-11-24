@@ -89,7 +89,7 @@ export function MintModal({ open, onClose, tenantId, tenantName }: Props) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="e.g. 50000"
-                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E]"
+                  className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)]"
                 />
               </div>
 
@@ -100,7 +100,7 @@ export function MintModal({ open, onClose, tenantId, tenantName }: Props) {
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="e.g. Dispute credit for TXN-2026-1234, or Monthly quota replenishment"
                   rows={3}
-                  className="w-full rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 py-2 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] resize-none"
+                  className="w-full rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 py-2 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] resize-none"
                 />
               </div>
 

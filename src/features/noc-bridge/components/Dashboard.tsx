@@ -27,7 +27,7 @@ const sevDot: Record<Severity, string> = {
 const btn: Record<string, string> = {
   green: "bg-[#25D366] text-white",
   azure: "bg-[#34B7F1] text-white",
-  teal:  "bg-[#128C7E] text-white",
+  teal:  "bg-[var(--brand)] text-white",
   red:   "bg-[#D93025] text-white",
   ghost: "bg-[#F8F9FA] border border-[#E9EDEF] text-[#667781]",
 };
@@ -143,7 +143,7 @@ export function Dashboard() {
         ">
           {/* Blade header */}
           <div className="relative h-[42px] flex items-center px-3.5 gap-2.5 border-b border-[#E9EDEF] shrink-0">
-            <span className="absolute left-0 top-0 bottom-0 w-1 bg-[#128C7E] rounded-tl-xl" />
+            <span className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--brand)] rounded-tl-xl" />
             <span className="font-extrabold text-[#111B21] text-[13px]">System Health </span>
             <span className="ml-auto text-[11px] text-[#667781]">refresh 30s</span>
           </div>
@@ -317,9 +317,9 @@ export function Dashboard() {
               <div className="flex gap-2 mt-1">
                 <input
                   placeholder="Tell Waswa to…"
-                  className="flex-1 h-9 rounded-full border border-[#E9EDEF] px-3.5 text-[13px] outline-none focus:border-[#128C7E] transition-colors"
+                  className="flex-1 h-9 rounded-full border border-[#E9EDEF] px-3.5 text-[13px] outline-none focus:border-[var(--brand)] transition-colors"
                 />
-                <button className="w-10 h-9 rounded-full bg-[#25D366] text-white font-black cursor-pointer hover:brightness-105 shrink-0">
+                <button className="w-10 h-9 rounded-full bg-[var(--accent)] text-[var(--on-accent)] font-black cursor-pointer hover:brightness-105 shrink-0">
                   ➤
                 </button>
               </div>

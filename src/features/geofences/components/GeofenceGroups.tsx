@@ -190,7 +190,7 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
           </button>
           <button
             onClick={() => setShowCreate(!showCreate)}
-            className="h-8 px-3 rounded-lg bg-[#128C7E] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] transition-all"
+            className="h-8 px-3 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] transition-all"
           >
             + New Group
           </button>
@@ -206,26 +206,26 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
 
       {/* Create form */}
       {showCreate && (
-        <div className="bg-white border border-[#128C7E]/30 rounded-xl p-4">
-          <div className="font-black text-[13px] text-[#128C7E] mb-3">Create New Group</div>
+        <div className="bg-white border border-[var(--brand)]/30 rounded-xl p-4">
+          <div className="font-black text-[13px] text-[var(--brand)] mb-3">Create New Group</div>
           <div className="flex flex-col gap-2">
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Group name (e.g. Kampala Warehouses)"
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
             />
             <input
               type="text"
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
               placeholder="Description (optional)"
-              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] transition-all"
+              className="h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-all"
             />
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowCreate(false)} className="h-8 px-3 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[11px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all">Cancel</button>
-              <button onClick={handleCreate} disabled={!newName.trim() || creating} className="h-8 px-4 rounded-lg bg-[#128C7E] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] disabled:opacity-50 transition-all">
+              <button onClick={handleCreate} disabled={!newName.trim() || creating} className="h-8 px-4 rounded-lg bg-[var(--brand)] text-white text-[11px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] disabled:opacity-50 transition-all">
                 {creating ? "Creating..." : "Create Group"}
               </button>
             </div>
@@ -236,7 +236,7 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
       {/* Groups list */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="w-5 h-5 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : groups.length === 0 ? (
         <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 text-center">
@@ -266,9 +266,9 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="h-7 px-2 rounded border border-[#128C7E] text-[12px] outline-none w-[180px]"
+                            className="h-7 px-2 rounded border border-[var(--brand)] text-[12px] outline-none w-[180px]"
                           />
-                          <button onClick={() => handleEdit(g.group_uid)} className="h-7 px-2 rounded bg-[#128C7E] text-white text-[10px] font-black cursor-pointer border-none">Save</button>
+                          <button onClick={() => handleEdit(g.group_uid)} className="h-7 px-2 rounded bg-[var(--brand)] text-white text-[10px] font-black cursor-pointer border-none">Save</button>
                           <button onClick={() => setEditingUid(null)} className="h-7 px-2 rounded bg-[#F0F2F5] text-[#667781] text-[10px] font-black cursor-pointer border border-[#E9EDEF]">Cancel</button>
                         </div>
                       ) : (
@@ -282,14 +282,14 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-black text-[#128C7E] bg-[#128C7E]/10 px-2 py-0.5 rounded-full border border-[#128C7E]/30">
+                    <span className="text-[11px] font-black text-[var(--brand)] bg-[var(--brand)]/10 px-2 py-0.5 rounded-full border border-[var(--brand)]/30">
                       {g.geozone_count} geofence{g.geozone_count !== 1 ? "s" : ""}
                     </span>
                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => { setAssignGroupUid(g.group_uid); setSelectedForAssign([]); setAssignSearch(""); }}
                         title="Assign geofences"
-                        className="w-7 h-7 rounded-lg bg-[#128C7E]/10 border border-[#128C7E]/30 text-[#128C7E] text-[11px] cursor-pointer hover:bg-[#128C7E]/20 flex items-center justify-center transition-all"
+                        className="w-7 h-7 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/30 text-[var(--brand)] text-[11px] cursor-pointer hover:bg-[var(--brand)]/20 flex items-center justify-center transition-all"
                       >+</button>
                       <button
                         onClick={() => { setEditingUid(g.group_uid); setEditName(g.group_name); setEditDesc(g.group_description); }}
@@ -339,7 +339,7 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
                 placeholder="Search geofences..."
-                className="w-full h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] outline-none focus:border-[#128C7E] transition-all"
+                className="w-full h-9 px-3 rounded-lg bg-white border border-[#E9EDEF] text-[12px] outline-none focus:border-[var(--brand)] transition-all"
               />
             </div>
 
@@ -352,7 +352,7 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
                   return (
                     <label
                       key={gz.geozone_uid}
-                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-b border-[#F0F2F5] last:border-b-0 rounded transition-colors ${checked ? "bg-[#128C7E]/5" : "hover:bg-[#F8F9FA]"}`}
+                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-b border-[#F0F2F5] last:border-b-0 rounded transition-colors ${checked ? "bg-[var(--brand)]/5" : "hover:bg-[#F8F9FA]"}`}
                     >
                       <input
                         type="checkbox"
@@ -362,7 +362,7 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
                             prev.includes(gz.geozone_uid) ? prev.filter((u) => u !== gz.geozone_uid) : [...prev, gz.geozone_uid]
                           );
                         }}
-                        className="w-4 h-4 accent-[#128C7E] cursor-pointer"
+                        className="w-4 h-4 accent-[var(--brand)] cursor-pointer"
                       />
                       <div>
                         <div className="text-[12px] font-black text-[#111B21] capitalize">{gz.geozone_name}</div>
@@ -376,7 +376,7 @@ export function GeofenceGroups({ geozones, onGeozonesChanged }: Props) {
 
             <div className="px-5 py-3 border-t border-[#E9EDEF] flex gap-2 justify-end">
               <button onClick={() => setAssignGroupUid(null)} className="h-9 px-4 rounded-lg bg-[#F0F2F5] border border-[#E9EDEF] text-[12px] font-black text-[#667781] cursor-pointer hover:bg-[#E9EDEF] transition-all">Cancel</button>
-              <button onClick={handleAssign} disabled={selectedForAssign.length === 0} className="h-9 px-4 rounded-lg bg-[#128C7E] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[#0E7A6D] disabled:opacity-50 transition-all">
+              <button onClick={handleAssign} disabled={selectedForAssign.length === 0} className="h-9 px-4 rounded-lg bg-[var(--brand)] text-white text-[12px] font-black cursor-pointer border-none hover:bg-[var(--brand-dark)] disabled:opacity-50 transition-all">
                 Assign {selectedForAssign.length} Geofence{selectedForAssign.length !== 1 ? "s" : ""}
               </button>
             </div>

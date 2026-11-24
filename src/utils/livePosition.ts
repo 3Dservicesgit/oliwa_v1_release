@@ -24,7 +24,14 @@ export interface LivePosition {
   lng: number;
   speed: number;
   motionState: string;
+  /** What to show now, by the fleet status rule (see liveStatus). */
   status: MotionStatus;
+  /** The report is under an hour old. */
+  reporting: boolean;
+  /** Held as Parked while its tracker sleeps, quiet for over a day. */
+  quiet: boolean;
+  /** When the unit made this report (epoch ms), if the record says. */
+  fixAt: number | null;
   lastSync: string;
   geocoded: string;
   ignition: string;
@@ -39,15 +46,97 @@ export type LiveFrame =
   | { kind: "offline" }      // the unit has no data — show it as offline
   | { kind: "ignore" };      // heartbeat, or a frame we can't use
 
+/** The unit's motion state as people read it. The tracking server spells
+ *  idling "Idiling"; shown as it is, and matched as it is, an idling vehicle
+ *  read "Idiling" and, at 0 km/h, counted as Offline. */
+export function motionLabel(motionState: string): string {
+  return (motionState ?? "").replace(/idiling/gi, "Idling");
+}
+
 /** Moving / Idling / Parked / Offline from what the unit reports. */
 export function normalizeStatus(motionState: string, speed: number): MotionStatus {
-  const s = (motionState ?? "").toLowerCase();
+  const s = motionLabel(motionState).toLowerCase();
   if (s.includes("park") || s.includes("stop")) return "Parked";
   if (s.includes("idl") || s === "idle")        return "Idling";
   if (s.includes("mov") || s.includes("driv"))  return "Moving";
   if (Number.isFinite(speed) && speed >= 5)     return "Moving";
   if (Number.isFinite(speed) && speed > 0)      return "Idling";
   return "Offline";
+}
+
+/**
+ * The fleet status rule, the same as the mobile dashboard's and the backend's
+ * (FleetKpis.classify in oliwa-mobile; both run the shared cases in
+ * navas-core-apis/tests/fixtures/fleet_status_cases.json):
+ *
+ *   - a report up to an hour old is taken as it is;
+ *   - a unit last seen moving or idling that has been quiet for over an hour
+ *     is Offline: with the engine on it reports every few seconds. The feed
+ *     keeps sending a quiet unit's last report: MOROTO GENSET still sent
+ *     "Idiling", ignition on, 27 days after it last reported;
+ *   - a unit last reported parked (motion state Parked, or no motion state
+ *     with the ignition off) stays Parked for up to 7 days. Trackers sleep
+ *     with the ignition off, and the vehicle cannot move without waking it.
+ *     Quiet for over a day, it is flagged; after 7 days it is Offline.
+ *
+ * The server's device_state is not used: it says "Offline" for a parked unit
+ * whose tracker is asleep.
+ */
+export const SILENT_AFTER_MS = 60 * 60 * 1000;
+export const QUIET_AFTER_MS = 24 * 60 * 60 * 1000;
+export const PARKED_HOLD_MS = 7 * 24 * 60 * 60 * 1000;
+
+const ignitionIs = (v: string, values: string[]) => values.includes(v.trim().toLowerCase());
+
+export function liveStatus(motionState: string, speed: number, ignition: string, fixAt: number | null, now: number):
+  { status: MotionStatus; reporting: boolean; quiet: boolean } {
+  const said = normalizeStatus(motionState, speed);
+  if (fixAt == null) return { status: "Offline", reporting: false, quiet: false };
+  const age = now - fixAt;
+  if (age <= SILENT_AFTER_MS) {
+    // No motion state: still with the engine on is idling, otherwise parked.
+    const status = said !== "Offline" ? said : ignitionIs(ignition, ["1", "on", "true", "yes"]) ? "Idling" : "Parked";
+    return { status, reporting: true, quiet: false };
+  }
+  const saidParked = said === "Parked" || (said === "Offline" && ignitionIs(ignition, ["0", "off", "false", "no"]));
+  if (saidParked && age <= PARKED_HOLD_MS) return { status: "Parked", reporting: false, quiet: age > QUIET_AFTER_MS };
+  return { status: "Offline", reporting: false, quiet: false };
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** When a record was made: record_timestamp (UTC), else the local date and
+ *  time ("07-10-2026" + "12:45:38PM"). Null when it doesn't say. */
+export function fixTime(body: Record<string, unknown>): number | null {
+  const iso = text(body.record_timestamp);
+  if (iso) {
+    const t = Date.parse(iso);
+    if (Number.isFinite(t)) return t;
+  }
+  const d = /^(\d{1,4})[-/](\d{1,2})[-/](\d{1,4})/.exec(text(body.local_system_datestamp, body.device_date));
+  if (!d) return null;
+  const [y, m, day] = d[1].length === 4 ? [+d[1], +d[2], +d[3]] : [+d[3], +d[2], +d[1]];
+  const tm = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i.exec(text(body.local_system_timestamp, body.device_time));
+  let h = tm ? +tm[1] : 0;
+  const ap = tm?.[4]?.toUpperCase();
+  if (ap === "PM" && h !== 12) h += 12;
+  if (ap === "AM" && h === 12) h = 0;
+  if (m < 1 || m > 12 || day < 1 || day > 31) return null;
+  return new Date(y, m - 1, day, h, tm ? +tm[2] : 0, tm?.[3] ? +tm[3] : 0).getTime();
+}
+
+/** How a position reads: its motion state; for a parked unit whose tracker
+ *  is asleep, since when; for one that has stopped reporting, what it was
+ *  doing when last heard from. */
+export function motionText(p: LivePosition): string {
+  if (p.reporting) return p.motionState || p.status;
+  if (p.status === "Parked") {
+    if (!p.quiet || p.fixAt == null) return "Parked";
+    const d = new Date(p.fixAt);
+    return `Parked · tracker quiet since ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  }
+  const was = normalizeStatus(p.motionState, p.speed);
+  return was === "Offline" ? "Not reporting" : `Not reporting · last seen ${was.toLowerCase()}`;
 }
 
 /** The live stream URL for one unit. */
@@ -80,7 +169,7 @@ function text(...values: unknown[]): string {
  * frame without a position, malformed JSON — comes back as "ignore" rather
  * than throwing, so one bad frame never stops the stream.
  */
-export function parseLiveFrame(raw: string, imei: string): LiveFrame {
+export function parseLiveFrame(raw: string, imei: string, now = Date.now()): LiveFrame {
   let message: Record<string, unknown>;
   try {
     message = JSON.parse(raw) as Record<string, unknown>;
@@ -99,36 +188,49 @@ export function parseLiveFrame(raw: string, imei: string): LiveFrame {
     ? message.data
     : message) as Record<string, unknown>;
 
+  const position = readPosition(body, imei, now);
+  return position ? { kind: "position", position } : { kind: "ignore" };
+}
+
+/**
+ * One position record — a live frame's `data`, or a trip-history row (the
+ * same location-registry fields) — or null without a usable fix.
+ */
+export function readPosition(body: Record<string, unknown>, imei: string, now = Date.now()): LivePosition | null {
   const lat = num(body.data_latitude, body.latitude, body.lat);
   const lng = num(body.data_longitude, body.longitude, body.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { kind: "ignore" };
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   // 0,0 is in the Atlantic — the server sends it when it has no fix.
-  if (lat === 0 && lng === 0) return { kind: "ignore" };
+  if (lat === 0 && lng === 0) return null;
 
   const speedValue = num(body.speed_log, body.speed);
   const speed = Number.isFinite(speedValue) ? speedValue : 0;
-  const motionState = text(body.motion_state, body.status);
+  const motionState = motionLabel(text(body.motion_state, body.status));
   const geocodedRaw = text(body.geocoded_location, body.location);
   const date = text(body.local_system_datestamp, body.device_date);
   const time = text(body.local_system_timestamp, body.device_time, body.timestamp);
+  const fixAt = fixTime(body);
+  // The live feed sends ignition_state ("ON"/"OFF"); the others are older names.
+  const ignition = text(body.ignition_state, body.ignition_status, body.iginition, body.ignition);
+  const { status, reporting, quiet } = liveStatus(motionState, speed, ignition, fixAt, now);
 
   return {
-    kind: "position",
-    position: {
-      imei,
-      lat,
-      lng,
-      speed,
-      motionState,
-      status: normalizeStatus(motionState, speed),
-      lastSync: `${date} ${time}`.trim(),
-      // the geocoder reports its own failures in the address field
-      geocoded: geocodedRaw.toLowerCase().includes("failure") ? "" : geocodedRaw,
-      ignition: text(body.ignition_status, body.iginition, body.ignition),
-      satellites: num(body.data_connected_satelites, body.satellites) || 0,
-      hdop: text(body.data_hdop, body.hdop),
-      mileage: text(body.mileage),
-      fuelLevel: text(body.fuel_level),
-    },
+    imei,
+    lat,
+    lng,
+    speed,
+    motionState,
+    status,
+    reporting,
+    quiet,
+    fixAt,
+    lastSync: `${date} ${time}`.trim(),
+    // the geocoder reports its own failures in the address field
+    geocoded: geocodedRaw.toLowerCase().includes("failure") ? "" : geocodedRaw,
+    ignition,
+    satellites: num(body.data_connected_satelites, body.satellites) || 0,
+    hdop: text(body.data_hdop, body.hdop),
+    mileage: text(body.mileage),
+    fuelLevel: text(body.fuel_level),
   };
 }

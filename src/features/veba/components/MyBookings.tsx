@@ -83,7 +83,7 @@ export function MyBookings() {
   if (loading) {
     return (
       <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 flex items-center justify-center gap-3">
-        <div className="w-5 h-5 border-[3px] border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-[3px] border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
         <span className="text-[12px] text-[#667781]">Loading your bookings...</span>
       </div>
     );

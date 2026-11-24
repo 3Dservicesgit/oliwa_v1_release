@@ -13,7 +13,7 @@ export function NotFoundPage() {
       </p>
       <a
         href="/"
-        className="mt-2 h-9 px-5 rounded-full bg-[#128C7E] text-white text-[12px] font-bold flex items-center hover:brightness-105 transition-all"
+        className="mt-2 h-9 px-5 rounded-full bg-[var(--brand)] text-white text-[12px] font-bold flex items-center hover:brightness-105 transition-all"
       >
         Go to Aegis Dashboard
       </a>

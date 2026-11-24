@@ -29,7 +29,7 @@ const ROLES: { role: TeamRole; label: string; hint: string }[] = [
 
 const INPUT =
   "w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[13px] text-[#111B21] " +
-  "placeholder:text-[#8696A0] outline-none focus:border-[#128C7E] bg-white";
+  "placeholder:text-[#8696A0] outline-none focus:border-[var(--brand)] bg-white";
 const LABEL = "block text-[11px] font-extrabold text-[#667781] mb-1";
 
 function errText(e: unknown): string {
@@ -52,7 +52,7 @@ function newPassword(): string {
 
 function RoleBadge({ member }: { member: TeamMember }) {
   const tone = member.is_admin
-    ? "bg-[#128C7E]/10 text-[#075E54]"
+    ? "bg-[var(--brand)]/10 text-[var(--brand-dark)]"
     : member.role === "client_operator"
       ? "bg-[#34B7F1]/10 text-[#0B6E99]"
       : "bg-[#F0F2F5] text-[#667781]";
@@ -130,7 +130,7 @@ function AddUserPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (msg
             <div className={LABEL}>What can they do? *</div>
             <div className="flex flex-col gap-2" role="radiogroup" aria-label="Role">
               {ROLES.map((r) => (
-                <label key={r.role} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${role === r.role ? "border-[#128C7E] bg-[#E9F7F4]" : "border-[#E9EDEF]"}`}>
+                <label key={r.role} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${role === r.role ? "border-[var(--brand)] bg-[#E9F7F4]" : "border-[#E9EDEF]"}`}>
                   <input type="radio" name="tm-role" checked={role === r.role} onChange={() => setRole(r.role)} className="mt-0.5" />
                   <span>
                     <span className="block text-[13px] font-extrabold text-[#111B21]">{r.label}</span>
@@ -144,7 +144,7 @@ function AddUserPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (msg
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#E9EDEF]">
           <button type="button" onClick={onClose} className="h-10 px-4 rounded-lg border border-[#E9EDEF] bg-white text-[13px] font-extrabold cursor-pointer">Cancel</button>
-          <button type="button" onClick={save} disabled={busy} className="h-10 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[13px] font-extrabold cursor-pointer disabled:opacity-50">
+          <button type="button" onClick={save} disabled={busy} className="h-10 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[13px] font-extrabold cursor-pointer disabled:opacity-50">
             {busy ? "Adding…" : "Add user"}
           </button>
         </div>
@@ -182,7 +182,7 @@ function ConfirmDialog({ confirm, onClose }: { confirm: Confirm; onClose: () => 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border border-[#E9EDEF] bg-white text-[12px] font-extrabold cursor-pointer">Cancel</button>
           <button type="button" onClick={go} disabled={busy}
-            className={`h-9 px-4 rounded-lg border-0 text-white text-[12px] font-extrabold cursor-pointer disabled:opacity-50 ${confirm.danger ? "bg-[#B00020]" : "bg-[#128C7E]"}`}>
+            className={`h-9 px-4 rounded-lg border-0 text-white text-[12px] font-extrabold cursor-pointer disabled:opacity-50 ${confirm.danger ? "bg-[#B00020]" : "bg-[var(--brand)]"}`}>
             {busy ? "Working…" : confirm.action}
           </button>
         </div>
@@ -247,7 +247,7 @@ export function TeamPage() {
           <div className="text-[12px] text-[#667781] mt-0.5">The people in your account who help monitor your fleet.</div>
         </div>
         <button type="button" onClick={() => { setNotice(null); setAdding(true); }}
-          className="shrink-0 h-9 px-4 rounded-lg border-0 bg-[#128C7E] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[#0D7466]">
+          className="shrink-0 h-9 px-4 rounded-lg border-0 bg-[var(--brand)] text-white text-[12px] font-extrabold cursor-pointer hover:bg-[var(--brand-dark)]">
           + Add user
         </button>
       </div>

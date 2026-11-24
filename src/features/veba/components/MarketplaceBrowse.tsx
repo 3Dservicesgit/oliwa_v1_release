@@ -202,8 +202,8 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
           <div className="text-[20px] font-black text-[#111B21] leading-tight">{listings.length}</div>
         </div>
         <div className="bg-white border border-[#E9EDEF] rounded-xl px-3 py-2.5">
-          <div className="text-[10px] font-medium text-[#075E54] uppercase tracking-wide">Active</div>
-          <div className="text-[20px] font-black text-[#075E54] leading-tight">{statusCounts["active"] ?? 0}</div>
+          <div className="text-[10px] font-medium text-[var(--brand-dark)] uppercase tracking-wide">Active</div>
+          <div className="text-[20px] font-black text-[var(--brand-dark)] leading-tight">{statusCounts["active"] ?? 0}</div>
         </div>
         <div className="bg-white border border-[#E9EDEF] rounded-xl px-3 py-2.5">
           <div className="text-[10px] font-medium text-[#9A6700] uppercase tracking-wide">Paused</div>
@@ -223,7 +223,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
             value={filters.search}
             onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
             placeholder="Asset UID, owner, location..."
-            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
           />
         </div>
 
@@ -232,7 +232,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
           <select
             value={filters.status}
             onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
           >
             <option value="">All</option>
             <option value="active">Active</option>
@@ -247,7 +247,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
           <select
             value={filters.assetClass}
             onChange={(e) => setFilters((f) => ({ ...f, assetClass: e.target.value }))}
-            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
           >
             <option value="">All</option>
             {assetClasses.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -259,7 +259,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
           <select
             value={filters.visibility}
             onChange={(e) => setFilters((f) => ({ ...f, visibility: e.target.value }))}
-            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]"
+            className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]"
           >
             <option value="">All</option>
             <option value="public">Public</option>
@@ -281,7 +281,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
       {/* ── States ───────────────────────────────────────────────────── */}
       {loading && (
         <div className="bg-white border border-[#E9EDEF] rounded-xl p-8 flex items-center justify-center gap-3">
-          <div className="w-5 h-5 border-[3px] border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-[3px] border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[12px] text-[#667781]">Loading all marketplace listings...</span>
         </div>
       )}
@@ -371,7 +371,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
                       <td className="px-3 py-2.5">
                         {l.visibility === "tenant"
                           ? <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#667781]">Tenant</span>
-                          : <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#128C7E]/10 text-[#128C7E]">Public</span>
+                          : <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[var(--brand)]/10 text-[var(--brand)]">Public</span>
                         }
                       </td>
                       <td className="px-3 py-2.5"><StatusPill status={l.status} /></td>
@@ -381,7 +381,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
                             permission="can_edit_asset_listing"
                             onClick={() => setEditingListing(l)}
                             disabled={isPending}
-                            className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[#128C7E] hover:bg-[#E9F7F4] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-2 py-1 text-[11px] font-extrabold rounded-md border border-[#E9EDEF] bg-white text-[var(--brand)] hover:bg-[var(--brand-soft)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Edit
                           </GuardedButton>
@@ -406,7 +406,7 @@ export function MarketplaceBrowse({ onRequestBooking }: MarketplaceBrowseProps =
                                   : undefined,
                               )}
                               disabled={isPending}
-                              className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-2 py-1 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isPending ? "..." : l.status === "archived" ? "Unarchive" : "Reactivate"}
                             </GuardedButton>

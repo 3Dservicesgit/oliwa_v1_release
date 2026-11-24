@@ -1,6 +1,6 @@
 /**
- * WaswaProvider — mounts the one Waswa chat drawer and the floating "W"
- * launcher for the whole OLIWA tracking console, and shares them through
+ * WaswaProvider — mounts the one Waswa chat drawer and the floating launcher (the first letter of
+ * the assistant's name) for the whole OLIWA console, and shares them through
  * useWaswa().
  *
  * ON/OFF is remembered per browser. When Waswa is OFF the launcher stays
@@ -11,6 +11,7 @@ import { useLocation } from "react-router-dom";
 import { MODULES } from "../../auth/modules";
 import { WaswaContext, type WaswaApi } from "./WaswaContext";
 import { WaswaDrawer } from "./WaswaDrawer";
+import { useAssistantName } from "../../branding/branding";
 
 const STORAGE_KEY = "waswa_on";
 
@@ -41,6 +42,7 @@ export function WaswaProvider({ children }: { children: React.ReactNode }) {
   const moduleName = useMemo(() => moduleFor(location.pathname), [location.pathname]);
 
   const [on, setOnState] = useState<boolean>(readOn);
+  const assistantName = useAssistantName();
   const [isOpen, setIsOpen] = useState(false);
   const [pending, setPending] = useState<{ text: string; nonce: number } | null>(null);
 
@@ -78,19 +80,20 @@ export function WaswaProvider({ children }: { children: React.ReactNode }) {
       {!isOpen && (
         <button
           onClick={() => open()}
-          aria-label="Open Waswa AI"
-          title={on ? "Ask Waswa" : "Waswa is off — open to switch it on"}
+          aria-label={`Open ${assistantName}`}
+          title={on ? `Ask ${assistantName}` : `${assistantName} is off — open to switch it on`}
           className={`
             fixed right-5 bottom-5 z-40
             w-12 h-12 rounded-full border-none
-            text-white font-black text-[20px]
+            font-black text-[20px]
             shadow-[0_12px_30px_rgba(0,0,0,0.18)]
             cursor-pointer hover:brightness-105 active:scale-95 transition-all
             grid place-items-center
-            ${on ? "bg-[#25D366]" : "bg-[#9CA3AF]"}
+            ${on ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[#9CA3AF] text-white"}
           `}
         >
-          W
+          {/* The first letter of the assistant's name ("W" for Waswa). */}
+          {(assistantName.trim()[0] || "W").toUpperCase()}
         </button>
       )}
 

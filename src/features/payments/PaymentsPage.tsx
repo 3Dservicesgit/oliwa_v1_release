@@ -111,7 +111,7 @@ export function PaymentsPage() {
 
           {/* ── Page Header ────────────────────────────────────────────────────── */}
           <div className="bg-white border border-[#E9EDEF] rounded-xl px-4 py-3">
-            <div className="text-[10px] font-black text-[#128C7E] bg-[#EAF7F3] border border-[#128C7E] px-2 py-0.5 rounded-full inline-block mb-1">SCREEN 08 • Tokenomics &amp; Revenue</div>
+            <div className="text-[10px] font-black text-[var(--brand)] bg-[#EAF7F3] border border-[var(--brand)] px-2 py-0.5 rounded-full inline-block mb-1">SCREEN 08 • Tokenomics &amp; Revenue</div>
             <div className="font-black text-[16px] text-[#111B21]">Monetization Switchboard</div>
             <nav className="text-[11px] text-[#667781] mt-0.5">Tokenomics &amp; Revenue &rsaquo; Payments &amp; Mobile Money Gateways</nav>
           </div>
@@ -132,7 +132,7 @@ export function PaymentsPage() {
               { k:"Pool Balance",     v:"12,450,900" },
               { k:"Burn Rate",        v:"2.4 tok/s"  },
               { k:"Run-out Forecast", v:"3d 4h",       tone:"text-[#F97316]" },
-              { k:"Unbilled Backlog", v:"UGX 4.2M",    tone:"text-[#128C7E]" },
+              { k:"Unbilled Backlog", v:"UGX 4.2M",    tone:"text-[var(--brand)]" },
             ]} chart />
             <StatCard id="PAY-01" title="Gateway Health" dotColor="bg-[#F97316]" rows={[
               { k:"Success Rate (24h)",  v:"96.8%"  },
@@ -410,7 +410,7 @@ export function PaymentsPage() {
 
           <div className="flex gap-1.5 px-5 py-2.5 border-b border-[#E9EDEF] shrink-0">
             {BLADE_TABS.map(t => (
-              <button key={t} onClick={() => setBladeTab(t)} className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${bladeTab === t ? "bg-[#128C7E] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"}`}>{t}</button>
+              <button key={t} onClick={() => setBladeTab(t)} className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${bladeTab === t ? "bg-[var(--brand)] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"}`}>{t}</button>
             ))}
           </div>
 
@@ -521,7 +521,7 @@ export function PaymentsPage() {
 // ─── Reusable components ─────────────────────────────────────────────────────
 const pillStyles: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54]",
-  dark:  "bg-[#075E54] text-white",
+  dark:  "bg-[var(--brand-dark)] text-white",
   ghost: "bg-white border border-[#E9EDEF] text-[#667781]",
 };
 
@@ -552,7 +552,7 @@ function StatCard({ id, title, dotColor, rows, chart }: {
       {chart && (
         <div className="mt-2 h-[30px] flex items-end gap-[2px]">
           {[40,35,42,38,45,50,48,52,46,55,58,52,60,55,48,52,58,62].map((h, i) => (
-            <div key={i} className="flex-1 bg-[#128C7E]/30 rounded-sm" style={{height:`${h}%`}} />
+            <div key={i} className="flex-1 bg-[var(--brand)]/30 rounded-sm" style={{height:`${h}%`}} />
           ))}
         </div>
       )}
@@ -575,14 +575,14 @@ function BField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="text-[10px] font-black text-[#667781] mb-1">{label}</div>
-      <input defaultValue={value} className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E]" />
+      <input defaultValue={value} className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)]" />
     </div>
   );
 }
 
 function Toggle({ on }: { on: boolean }) {
   return (
-    <div className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors shrink-0 ${on ? "bg-[#128C7E]" : "bg-[#D1D5DB]"}`}>
+    <div className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors shrink-0 ${on ? "bg-[var(--brand)]" : "bg-[#D1D5DB]"}`}>
       <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${on ? "left-[22px]" : "left-0.5"}`} />
     </div>
   );

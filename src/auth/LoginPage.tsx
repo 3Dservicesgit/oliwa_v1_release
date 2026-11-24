@@ -82,7 +82,7 @@ export function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="Enter your username"
-                  className="h-11 w-full rounded-xl border border-[#E9EDEF] bg-white px-4 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                  className="h-11 w-full rounded-xl border border-[#E9EDEF] bg-white px-4 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -93,12 +93,12 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="Enter your password"
-                  className="h-11 w-full rounded-xl border border-[#E9EDEF] bg-white px-4 text-[13px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                  className="h-11 w-full rounded-xl border border-[#E9EDEF] bg-white px-4 text-[13px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
                 />
               </div>
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-[12px] text-[#667781] cursor-pointer">
-                  <input type="checkbox" defaultChecked className="accent-[#128C7E]" />
+                  <input type="checkbox" defaultChecked className="accent-[var(--brand)]" />
                   Remember device (30 days)
                 </label>
                 <button
@@ -114,13 +114,13 @@ export function LoginPage() {
               <button
                 onClick={handleLogin}
                 disabled={busy}
-                className="w-full h-12 rounded-xl border-none bg-[#25D366] text-[#075E54] font-black text-[15px] cursor-pointer hover:brightness-105 active:opacity-85 transition-all disabled:opacity-50"
+                className="w-full h-12 rounded-xl border-none bg-[var(--accent)] text-[var(--on-accent)] font-black text-[15px] cursor-pointer hover:brightness-105 active:opacity-85 transition-all disabled:opacity-50"
               >
                 {busy ? "Signing in..." : "Login"}
               </button>
               <div className="bg-[#E8F5F2] border border-[#BFE7E0] rounded-xl px-4 py-3">
-                <div className="font-black text-[12px] text-[#128C7E]">Security</div>
-                <ul className="mt-1.5 text-[11px] text-[#128C7E] flex flex-col gap-1 list-disc pl-4">
+                <div className="font-black text-[12px] text-[var(--brand)]">Security</div>
+                <ul className="mt-1.5 text-[11px] text-[var(--brand)] flex flex-col gap-1 list-disc pl-4">
                   <li>MFA required for SYS_ADMIN</li>
                   <li>Suspicious logins trigger step-up auth</li>
                   <li>All actions audit-logged (Irrefutable)</li>
@@ -147,12 +147,12 @@ export function LoginPage() {
                   value={mfa}
                   onChange={(e) => setMfa(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleVerify()}
-                  className="h-11 w-full rounded-xl border border-[#E9EDEF] bg-white px-4 text-center tracking-[0.3em] font-black text-[18px] text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+                  className="h-11 w-full rounded-xl border border-[#E9EDEF] bg-white px-4 text-center tracking-[0.3em] font-black text-[18px] text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
                 />
               </div>
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-[12px] text-[#667781] cursor-pointer">
-                  <input type="checkbox" defaultChecked className="accent-[#128C7E]" />
+                  <input type="checkbox" defaultChecked className="accent-[var(--brand)]" />
                   Trust this device (30d)
                 </label>
                 <button
@@ -169,7 +169,7 @@ export function LoginPage() {
               <button
                 onClick={handleVerify}
                 disabled={busy}
-                className="w-full h-12 rounded-xl border-none bg-[#25D366] text-[#075E54] font-black text-[15px] cursor-pointer hover:brightness-105 active:opacity-85 transition-all disabled:opacity-50"
+                className="w-full h-12 rounded-xl border-none bg-[var(--accent)] text-[var(--on-accent)] font-black text-[15px] cursor-pointer hover:brightness-105 active:opacity-85 transition-all disabled:opacity-50"
               >
                 {busy ? "Verifying..." : "Verify & Enter"}
               </button>

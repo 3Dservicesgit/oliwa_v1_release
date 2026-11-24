@@ -86,7 +86,7 @@ export function InvoicingPage() {
           {/* Tabs */}
           <div className="flex gap-2">
             {TABS.map(t => (
-              <button key={t} onClick={() => setActiveTab(t)} className={`h-8 px-3.5 rounded-full text-[12px] font-black border cursor-pointer transition-all ${activeTab === t ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781] hover:bg-[#F8FAFC]"}`}>{t}</button>
+              <button key={t} onClick={() => setActiveTab(t)} className={`h-8 px-3.5 rounded-full text-[12px] font-black border cursor-pointer transition-all ${activeTab === t ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]" : "bg-white border-[#E9EDEF] text-[#667781] hover:bg-[#F8FAFC]"}`}>{t}</button>
             ))}
           </div>
 
@@ -102,14 +102,14 @@ export function InvoicingPage() {
           <div className="bg-white border border-[#E9EDEF] rounded-xl overflow-hidden">
             <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <table className="w-full text-[12px] min-w-[800px]">
-              <thead><tr className="border-b-2 border-[#128C7E]/30">
+              <thead><tr className="border-b-2 border-[var(--brand)]/30">
                 {["Invoice","Tenant","Plan","Period","Amount","Status","Delivery"].map(h => (
-                  <th key={h} className="text-left px-3 py-2.5 font-black text-[#128C7E]">{h}</th>
+                  <th key={h} className="text-left px-3 py-2.5 font-black text-[var(--brand)]">{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {INVOICES.map(inv => (
-                  <tr key={inv.id} onClick={() => setSelectedId(inv.id)} className={`border-b border-[#E9EDEF] last:border-0 cursor-pointer transition-colors ${selectedId === inv.id ? "bg-[#128C7E]/5" : "hover:bg-[#F8FAFC]"}`}>
+                  <tr key={inv.id} onClick={() => setSelectedId(inv.id)} className={`border-b border-[#E9EDEF] last:border-0 cursor-pointer transition-colors ${selectedId === inv.id ? "bg-[var(--brand)]/5" : "hover:bg-[#F8FAFC]"}`}>
                     <td className="px-3 py-2.5 font-black text-[#111B21]">{inv.id}</td>
                     <td className="px-3 py-2.5 text-[#111B21]">{inv.tenant}</td>
                     <td className="px-3 py-2.5 text-[#667781]">{inv.plan}</td>
@@ -270,15 +270,15 @@ export function InvoicingPage() {
               {/* Reason / Notes */}
               <div className="border border-[#E9EDEF] rounded-xl p-4">
                 <div className="font-black text-[14px] text-[#111B21] mb-2">Reason / Notes (logged)</div>
-                <input placeholder="e.g., customer confirmed payment date; proceed with 24h grace…" className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[#128C7E]/50" />
+                <input placeholder="e.g., customer confirmed payment date; proceed with 24h grace…" className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)]/50" />
               </div>
             </div>
 
             {/* Footer */}
             <div className="flex items-center justify-center gap-3 px-6 py-3 border-t border-[#E9EDEF] bg-white shrink-0">
               <button onClick={() => setModalOpen(false)} className="h-10 px-5 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer hover:bg-[#F8FAFC]">Cancel</button>
-              <button className="h-10 px-5 rounded-lg bg-white border border-[#128C7E]/30 text-[13px] font-black text-[#128C7E] cursor-pointer hover:bg-[#128C7E]/5">Request Co-Approve</button>
-              <button onClick={() => setModalOpen(false)} className="h-10 px-5 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Approve</button>
+              <button className="h-10 px-5 rounded-lg bg-white border border-[var(--brand)]/30 text-[13px] font-black text-[var(--brand)] cursor-pointer hover:bg-[var(--brand)]/5">Request Co-Approve</button>
+              <button onClick={() => setModalOpen(false)} className="h-10 px-5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Approve</button>
             </div>
           </div>
         </div>
@@ -290,7 +290,7 @@ export function InvoicingPage() {
 // ─── Reusable Components ─────────────────────────────────────────────────────
 const pillStyles: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54]",
-  dark:  "bg-[#075E54] text-white",
+  dark:  "bg-[var(--brand-dark)] text-white",
   ghost: "bg-white border border-[#E9EDEF] text-[#667781]",
 };
 

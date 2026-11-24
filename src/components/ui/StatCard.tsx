@@ -9,7 +9,7 @@ import React from "react";
 export type StatBadge = "ok" | "success" | "warn" | "info" | "critical";
 
 const badgeStyles: Record<StatBadge, string> = {
-  ok:       "bg-[#E8F5F2] border-[#BFE7E0] text-[#128C7E]",
+  ok:       "bg-[#E8F5F2] border-[#BFE7E0] text-[var(--brand)]",
   success:  "bg-[#EAFBEF] border-[#C7F2D4] text-[#1A7A3A]",
   warn:     "bg-[#FFF8E1] border-[#FFE08A] text-[#7A5E00]",
   info:     "bg-[#E3F2FD] border-[#BBDEFB] text-[#1565C0]",
@@ -28,7 +28,7 @@ interface StatCardProps {
 
 const ctaStyles: Record<string, string> = {
   green: "bg-[#25D366] text-[#075E54] hover:brightness-105",
-  teal:  "bg-[#128C7E] text-white hover:brightness-105",
+  teal:  "bg-[var(--brand)] text-white hover:brightness-105",
   azure: "bg-[#34B7F1] text-white hover:brightness-105",
   dark:  "bg-[#111B21] text-white hover:brightness-105",
 };

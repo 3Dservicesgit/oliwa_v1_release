@@ -22,7 +22,7 @@ import { AllocateModal } from "./components/AllocateModal";
 const okBg   = "bg-[#25D366] text-[#053B33]";
 const alarmBg= "bg-[#F97316] text-white";
 //const critBg = "bg-[#EF4444] text-white";
-// const darkBg = "bg-[#075E54] text-white";
+// const darkBg = "bg-[var(--brand-dark)] text-white";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 
@@ -466,7 +466,7 @@ export function TenantTowerPage() {
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                     placeholder="Search by name or email…"
-                    className="flex-1 h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#9CA3AF] outline-none focus:border-[#128C7E] transition-colors bg-[#F8FAFC]"
+                    className="flex-1 h-8 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] placeholder:text-[#9CA3AF] outline-none focus:border-[var(--brand)] transition-colors bg-[#F8FAFC]"
                   />
                   <div className="relative">
                     <Pill onClick={() => setClientFilterOpen((v) => !v)}>Filter: {clientFilter} ▾</Pill>
@@ -477,7 +477,7 @@ export function TenantTowerPage() {
                             key={f}
                             onClick={() => { setClientFilter(f); setClientFilterOpen(false); }}
                             className={`w-full text-left px-4 py-2 text-[11px] font-black border-none cursor-pointer transition-colors ${
-                              clientFilter === f ? "bg-[#EAF7F3] text-[#128C7E]" : "bg-white text-[#111B21] hover:bg-[#F8FAFC]"
+                              clientFilter === f ? "bg-[#EAF7F3] text-[var(--brand)]" : "bg-white text-[#111B21] hover:bg-[#F8FAFC]"
                             }`}
                           >{f === "ALL" ? "All Clients" : f === "billing" ? "Billing Active" : "Subscribed"}</button>
                         ))}
@@ -500,14 +500,14 @@ export function TenantTowerPage() {
                     return (
                       <tr key={c.client_uid} onClick={() => setSelectedClientId(c.client_uid)} className={`border-b border-[#E9EDEF] last:border-0 hover:bg-[#F8FAFC] cursor-pointer ${isSelected ? "bg-[#EAF7F3]" : ""}`}>
                         <td className="px-3 py-2.5 text-[#667781]">{i + 1}</td>
-                        <td className={`px-3 py-2.5 font-extrabold ${isSelected ? "text-[#128C7E]" : "text-[#111B21]"}`}>{c.client_name}</td>
+                        <td className={`px-3 py-2.5 font-extrabold ${isSelected ? "text-[var(--brand)]" : "text-[#111B21]"}`}>{c.client_name}</td>
                         <td className="px-3 py-2.5 text-[#667781]">{c.client_email}</td>
                         <td className="px-3 py-2.5 text-[#667781] font-mono text-[10px] truncate">{c.client_uid}</td>
                         <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => { setEditingClient(c); setEditName(c.client_name); setEditEmail(c.client_email); }}
-                              className="h-6 px-2 rounded-md text-[10px] font-black border border-[#E9EDEF] bg-white text-[#128C7E] cursor-pointer hover:bg-[#EAF7F3] transition-colors"
+                              className="h-6 px-2 rounded-md text-[10px] font-black border border-[#E9EDEF] bg-white text-[var(--brand)] cursor-pointer hover:bg-[#EAF7F3] transition-colors"
                             >Edit</button>
                             <button
                               onClick={() => setDeletingClient(c)}
@@ -730,7 +730,7 @@ export function TenantTowerPage() {
                 <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] last:border-0">
                   <span className="text-[14px] text-[#667781]">☐</span>
                   <span className="text-[12px] font-mono text-[#667781] w-[60px] shrink-0">{a.timestamp ? new Date(a.timestamp).toLocaleTimeString("en-GB", { hour12: false }) : "—"}</span>
-                  <span className="text-[11px] font-black text-[#128C7E] w-[40px] shrink-0">{a.tag}</span>
+                  <span className="text-[11px] font-black text-[var(--brand)] w-[40px] shrink-0">{a.tag}</span>
                   <span className="text-[12px] text-[#111B21] flex-1">{a.title}</span>
                   <span className="text-[11px] text-[#667781] font-mono">{a.actor}</span>
                   <span className="text-[10px] text-[#9CA3AF] font-mono" title={`prev: ${a.hash_prev}\nthis: ${a.hash_this}`}>#{a.hash_this.slice(0, 8)}</span>
@@ -796,11 +796,11 @@ export function TenantTowerPage() {
             <div className="flex flex-col gap-3">
               <div>
                 <label className="text-[11px] font-black text-[#667781] mb-1 block">Client Name</label>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8FAFC]" />
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] bg-[#F8FAFC]" />
               </div>
               <div>
                 <label className="text-[11px] font-black text-[#667781] mb-1 block">Client Email</label>
-                <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[#128C7E] bg-[#F8FAFC]" />
+                <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full h-9 px-3 rounded-lg border border-[#E9EDEF] text-[12px] text-[#111B21] outline-none focus:border-[var(--brand)] bg-[#F8FAFC]" />
               </div>
               <div className="text-[10px] text-[#667781] font-mono">UID: {editingClient.client_uid}</div>
             </div>
@@ -818,7 +818,7 @@ export function TenantTowerPage() {
                     alert(msg);
                   }
                 }}
-                className="h-8 px-4 rounded-lg text-[12px] font-black border-none bg-[#128C7E] text-white cursor-pointer hover:brightness-105"
+                className="h-8 px-4 rounded-lg text-[12px] font-black border-none bg-[var(--brand)] text-white cursor-pointer hover:brightness-105"
               >Save</button>
             </div>
           </div>
@@ -877,7 +877,7 @@ export function TenantTowerPage() {
                   key={t}
                   onClick={() => setBladeTab(t)}
                   className={`h-8 px-3 rounded-full text-[11px] font-black border-none cursor-pointer transition-all ${
-                    bladeTab === t ? "bg-[#128C7E] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"
+                    bladeTab === t ? "bg-[var(--brand)] text-white" : "bg-[#F0F2F5] text-[#667781] hover:bg-[#E9EDEF]"
                   }`}
                 >{t}</button>
               ))}
@@ -1045,7 +1045,7 @@ export function TenantTowerPage() {
                 {/* Summary of what will be created */}
                 <BladeSection title="Summary" sub="Review the tenant details before submitting">
                   <div className="p-4 text-[12px] text-[#111B21] space-y-1.5">
-                    <div className="font-black text-[11px] text-[#128C7E] mb-1">Basics</div>
+                    <div className="font-black text-[11px] text-[var(--brand)] mb-1">Basics</div>
                     <div><span className="text-[#667781] w-24 inline-block">Name:</span> <span className="font-black">{bladeName || "—"}</span></div>
                     <div><span className="text-[#667781] w-24 inline-block">Email:</span> <span className="font-black">{bladeEmail || "—"}</span></div>
                     <div><span className="text-[#667781] w-24 inline-block">Tier:</span> <span className="font-black">{bladeTier}</span></div>
@@ -1054,16 +1054,16 @@ export function TenantTowerPage() {
                     <div><span className="text-[#667781] w-24 inline-block">Currency:</span> <span className="font-black">{bladeCurrency}</span></div>
                     <div><span className="text-[#667781] w-24 inline-block">Timezone:</span> <span className="font-black">{bladeTimezone}</span></div>
 
-                    <div className="font-black text-[11px] text-[#128C7E] mt-3 mb-1">Billing & Tokens</div>
+                    <div className="font-black text-[11px] text-[var(--brand)] mt-3 mb-1">Billing & Tokens</div>
                     <div><span className="text-[#667781] w-24 inline-block">Plan:</span> <span className="font-black">{bladePlan}</span></div>
                     <div><span className="text-[#667781] w-24 inline-block">Retention:</span> <span className="font-black">{bladeRetention} days</span></div>
                     <div><span className="text-[#667781] w-24 inline-block">Daily cap:</span> <span className="font-black">{parseInt(bladeDailyCap, 10).toLocaleString()} tokens/day</span></div>
                     <div><span className="text-[#667781] w-24 inline-block">Channels:</span> <span className="font-black">{Object.entries(bladeChannels).filter(([,v]) => v).map(([k]) => k).join(", ") || "None"}</span></div>
 
-                    <div className="font-black text-[11px] text-[#128C7E] mt-3 mb-1">Modules</div>
+                    <div className="font-black text-[11px] text-[var(--brand)] mt-3 mb-1">Modules</div>
                     <div><span className="text-[#667781] w-24 inline-block">Enabled:</span> <span className="font-black">{Object.entries(bladeModules).filter(([,v]) => v).map(([k]) => k).join(", ") || "None"}</span></div>
 
-                    <div className="font-black text-[11px] text-[#128C7E] mt-3 mb-1">RBAC Roles</div>
+                    <div className="font-black text-[11px] text-[var(--brand)] mt-3 mb-1">RBAC Roles</div>
                     <div><span className="text-[#667781] w-24 inline-block">Assigned:</span> <span className="font-black">{Object.entries(bladeRoles).filter(([,v]) => v).map(([k]) => k).join(", ") || "None"}</span></div>
                   </div>
                 </BladeSection>
@@ -1164,7 +1164,7 @@ function FormField({ label, value, onChange, placeholder }: { label: string; val
         onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         readOnly={!onChange}
         placeholder={placeholder}
-        className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors"
+        className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors"
       />
     </div>
   );
@@ -1177,7 +1177,7 @@ function SelectField({ label, value, onChange, options }: { label: string; value
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[#128C7E] transition-colors appearance-none cursor-pointer"
+        className="w-full h-9 rounded-lg border border-[#E9EDEF] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] transition-colors appearance-none cursor-pointer"
       >
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -1189,7 +1189,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle?: () => void }) {
   return (
     <div
       onClick={onToggle}
-      className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${on ? "bg-[#128C7E]" : "bg-[#D1D5DB]"}`}
+      className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${on ? "bg-[var(--brand)]" : "bg-[#D1D5DB]"}`}
     >
       <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${on ? "left-[22px]" : "left-0.5"}`} />
     </div>

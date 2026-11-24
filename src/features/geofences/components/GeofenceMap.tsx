@@ -162,7 +162,7 @@ export function GeofenceMap({
     return (
       <div className="w-full h-full flex items-center justify-center bg-[#F0F2F5]">
         <div className="flex items-center gap-2 text-[12px] text-[#667781]">
-          <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
           Loading map…
         </div>
       </div>
@@ -238,7 +238,10 @@ export function GeofenceMap({
           if (gz.geozone_shape === "line" && params && "width_m" in params) {
             return (
               <React.Fragment key={gz.geozone_uid}>
-                <Polygon paths={gz.path} options={{ ...style, strokeWeight: 1 }} onClick={select} />
+                {/* The corridor; a line drawn in the mobile app has no width. */}
+                {params.width_m > 0 && gz.path.length >= 3 && (
+                  <Polygon paths={gz.path} options={{ ...style, strokeWeight: 1 }} onClick={select} />
+                )}
                 <Polyline
                   path={params.points}
                   options={{ strokeColor: color, strokeOpacity: 1, strokeWeight: isSelected ? 4 : 3, clickable: !drawing, zIndex: 3 }}
@@ -247,6 +250,9 @@ export function GeofenceMap({
               </React.Fragment>
             );
           }
+          // A polygon with no area throws inside Google Maps and blanks the
+          // whole page; a zone whose points could not be read is left off.
+          if (gz.path.length < 3) return null;
           return <Polygon key={gz.geozone_uid} paths={gz.path} options={style} onClick={select} />;
         })}
 

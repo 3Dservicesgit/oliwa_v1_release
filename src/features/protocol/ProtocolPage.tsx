@@ -18,7 +18,7 @@ const sBadge: Record<string, string> = {
   OFF:   "bg-[#EF4444]/15 text-[#EF4444] border border-[#EF4444]/30",
 };
 const jobBadge: Record<string, string> = {
-  Running:"border-[#128C7E] text-[#128C7E]",
+  Running:"border-[var(--brand)] text-[var(--brand)]",
   Queued: "border-[#F97316] text-[#F97316]",
   Paused: "border-[#667781] text-[#667781]",
 };
@@ -230,7 +230,7 @@ export function ProtocolPage() {
                     <span className="w-[140px] shrink-0 text-[#111B21] font-mono">{portNames[port] || port}</span>
                     <div className="flex-1 h-5 bg-[#F0F2F5] rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-[#128C7E] rounded-full" 
+                        className="h-full bg-[var(--brand)] rounded-full" 
                         style={{ width: `${Math.min((data.tcp_threads / 100) * 100, 100)}%` }} 
                       />
                     </div>
@@ -340,7 +340,7 @@ export function ProtocolPage() {
           <>
             <div className="flex items-center justify-between px-5 py-3 border-b border-[#E9EDEF] shrink-0">
               <div>
-                <span className="text-[10px] font-black bg-[#128C7E] text-white px-2 py-0.5 rounded">BLADE</span>
+                <span className="text-[10px] font-black bg-[var(--brand)] text-white px-2 py-0.5 rounded">BLADE</span>
                 <span className="font-black text-[14px] text-[#111B21] ml-2">{selectedPort ? portNames[selectedPort] || selectedPort : "Protocol"}</span>
                 <div className="text-[10px] text-[#667781] mt-0.5">Live data • {selectedPort && portData && portData[selectedPort]?.active ? "Active" : "Inactive"}</div>
               </div>
@@ -349,7 +349,7 @@ export function ProtocolPage() {
             {/* Tabs */}
             <div className="flex gap-1.5 px-4 py-2 border-b border-[#E9EDEF] shrink-0">
               {["Overview","Connections","Traffic","Technical"].map(t => (
-                <button key={t} onClick={() => setBladeTab(t)} className={`h-7 px-3 rounded-lg text-[11px] font-black cursor-pointer border ${bladeTab === t ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{t}</button>
+                <button key={t} onClick={() => setBladeTab(t)} className={`h-7 px-3 rounded-lg text-[11px] font-black cursor-pointer border ${bladeTab === t ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{t}</button>
               ))}
             </div>
             <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-5 py-4">
@@ -368,9 +368,9 @@ export function ProtocolPage() {
                 </BSection>
                 <BSection title="Thread Information">
                   <div className="p-4 text-[12px] text-[#111B21] leading-relaxed">
-                    <div>TCP Threads: <span className="font-black text-[#128C7E]">{portData[selectedPort].tcp_threads}</span></div>
+                    <div>TCP Threads: <span className="font-black text-[var(--brand)]">{portData[selectedPort].tcp_threads}</span></div>
                     <div className="mt-2 h-3 bg-[#F0F2F5] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#128C7E]" style={{ width: `${Math.min((portData[selectedPort].tcp_threads / 100) * 100, 100)}%` }}></div>
+                      <div className="h-full bg-[var(--brand)]" style={{ width: `${Math.min((portData[selectedPort].tcp_threads / 100) * 100, 100)}%` }}></div>
                     </div>
                   </div>
                 </BSection>
@@ -445,8 +445,8 @@ export function ProtocolPage() {
             <div className="border border-[#E9EDEF] rounded-xl p-4">
               <div className="font-black text-[13px] text-[#111B21]">Waswa AI Co-Pilot</div>
               <div className="text-[11px] text-[#667781] mt-0.5">HIC: suggestions need approval</div>
-              <div className="mt-3 bg-[#128C7E]/10 border border-[#128C7E]/20 rounded-xl p-3">
-                <div className="font-black text-[12px] text-[#128C7E] mb-1">Insight</div>
+              <div className="mt-3 bg-[var(--brand)]/10 border border-[var(--brand)]/20 rounded-xl p-3">
+                <div className="font-black text-[12px] text-[var(--brand)] mb-1">Insight</div>
                 <div className="text-[11px] text-[#111B21] leading-relaxed">
                   Schema drift spike detected in GT06 (KE) — unknown.field_91 …<br/>
                   Suggested action: enable safe-mode masking + ship parser ho…<br/>
@@ -456,13 +456,13 @@ export function ProtocolPage() {
             </div>
 
             <div className="font-black text-[13px] text-[#111B21]">Recommended Actions</div>
-            <button className="w-full h-9 rounded-lg bg-[#25D366] text-[#075E54] text-[12px] font-black border-none cursor-pointer">Approve Hotfix (HITL)</button>
+            <button className="w-full h-9 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[12px] font-black border-none cursor-pointer">Approve Hotfix (HITL)</button>
             <div className="font-black text-[12px] text-[#111B21] px-1">Open Evidence Pack</div>
             <button className="w-full h-9 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-[12px] font-black cursor-pointer">Kill-Switch (HIC)</button>
 
             <div className="font-black text-[13px] text-[#111B21] mt-1">Quick Links</div>
-            <div className="border border-[#128C7E]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[#128C7E] cursor-pointer hover:bg-[#128C7E]/5">Token Top-Up (MoMo / Card)</div>
-            <div className="border border-[#128C7E]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[#128C7E] cursor-pointer hover:bg-[#128C7E]/5">VEBA Leakage Monitor</div>
+            <div className="border border-[var(--brand)]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[var(--brand)] cursor-pointer hover:bg-[var(--brand)]/5">Token Top-Up (MoMo / Card)</div>
+            <div className="border border-[var(--brand)]/20 rounded-lg px-3 py-2.5 text-[12px] font-black text-[var(--brand)] cursor-pointer hover:bg-[var(--brand)]/5">VEBA Leakage Monitor</div>
 
             <input placeholder="Ask Waswa... (e.g., 'why decoder p95 spiked?')" className="w-full h-8 rounded-lg border border-[#E9EDEF] px-3 text-[11px] text-[#111B21] placeholder:text-[#667781] outline-none mt-auto" />
           </div>
@@ -485,7 +485,7 @@ export function ProtocolPage() {
               {/* Wizard steps */}
               <div className="flex gap-2 mb-5">
                 {["1  Metadata","2  Schema","3  Metering","4  Test","5  Deploy"].map((s,i) => (
-                  <span key={s} className={`flex-1 h-9 rounded-lg text-[12px] font-black flex items-center justify-center border cursor-pointer ${i === 2 ? "bg-[#128C7E]/10 border-[#128C7E]/30 text-[#128C7E]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{s}</span>
+                  <span key={s} className={`flex-1 h-9 rounded-lg text-[12px] font-black flex items-center justify-center border cursor-pointer ${i === 2 ? "bg-[var(--brand)]/10 border-[var(--brand)]/30 text-[var(--brand)]" : "bg-white border-[#E9EDEF] text-[#667781]"}`}>{s}</span>
                 ))}
               </div>
 
@@ -521,8 +521,8 @@ export function ProtocolPage() {
               </div>
 
               {/* Metering (US-03) */}
-              <div className="bg-[#128C7E]/10 border border-[#128C7E]/20 rounded-xl p-4 mb-4">
-                <div className="font-black text-[12px] text-[#128C7E] mb-1">Metering (US-03)</div>
+              <div className="bg-[var(--brand)]/10 border border-[var(--brand)]/20 rounded-xl p-4 mb-4">
+                <div className="font-black text-[12px] text-[var(--brand)] mb-1">Metering (US-03)</div>
                 <div className="text-[12px] text-[#111B21] leading-relaxed">
                   <strong>Emit usage_events for every billable ingest / parameter / AI inference</strong><br/>
                   Token scope: Type A + VEBA (optional) • FIFO per asset
@@ -541,7 +541,7 @@ export function ProtocolPage() {
 
             <div className="flex items-center justify-center gap-3 px-5 py-3 border-t border-[#E9EDEF] bg-white shrink-0">
               <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-white border border-[#E9EDEF] text-[13px] font-black text-[#111B21] cursor-pointer">Cancel</button>
-              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[#25D366] text-[#075E54] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Save &amp; Continue</button>
+              <button onClick={() => setModalOpen(false)} className="h-10 px-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[13px] font-black border-none cursor-pointer hover:brightness-105">Save &amp; Continue</button>
             </div>
           </div>
         </div>

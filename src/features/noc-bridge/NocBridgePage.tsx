@@ -17,7 +17,9 @@
  * Security: scoped to customer's account_root from cookies.
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Link }               from "react-router-dom";
 import { getCookie }          from "../../utils/cookies";
+import { useCan }             from "../../auth/guards";
 import { getStoredAuthToken } from "../../api/client";
 import { ENDPOINTS }          from "../../api/endpoints";
 import { getGeozones, getDeviceGeozones } from "../../api/services/geozones.service";
@@ -25,8 +27,9 @@ import { getClientDevices }   from "../../api/services/clients.service";
 import { parseGeozonePoints } from "../../api/types/geozones.types";
 import type { Geozone } from "../../api/types";
 import { checkGeozoneTransitions } from "../../utils/geofenceUtils";
-import { parseLiveFrame, liveStreamUrl } from "../../utils/livePosition";
-import type { MotionStatus } from "../../utils/livePosition";
+import { motionText, readPosition } from "../../utils/livePosition";
+import type { LiveFrame, LivePosition, MotionStatus } from "../../utils/livePosition";
+import { LiveFleet, limiter } from "../../utils/liveFleet";
 import type { Point }              from "../../utils/geofenceUtils";
 
 // ─── Fleet env config ─────────────────────────────────────────────────────────
@@ -43,6 +46,13 @@ const ICONS: Record<string, string> = {
 };
 
 const DEFAULT_CENTER = { lat: 1.3733, lng: 32.2903 };
+
+/** A unit's status here: its motion, or, with nothing live, Offline (it has
+ *  reported before) or No data (it never has), as the Dashboard counts them. */
+type UnitStatus = MotionStatus | "No data";
+
+/** How often the server is asked which quiet units have never reported. */
+const UNIT_STATES_EVERY_MS = 120_000;
 
 // InfoWindow CSS — strips Google's default padding/background
 const IW_CSS = `
@@ -75,7 +85,7 @@ interface VehicleUnit {
   imei:                string;
   name:                string;
   subscription_status: string;
-  status:              MotionStatus;
+  status:              UnitStatus;
   speed:               number;
   motion_state:        string;
   geocoded_location:   string;
@@ -100,11 +110,12 @@ interface VehicleUnit {
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
-const STATUS_META: Record<MotionStatus, { bg: string; dim: string; text: string; dot: string; badge: string; badgeText: string }> = {
+const STATUS_META: Record<UnitStatus, { bg: string; dim: string; text: string; dot: string; badge: string; badgeText: string }> = {
   Moving:  { bg: "#2E7D32", dim: "rgba(46,125,50,0.88)",   text: "Moving",  dot: "#2E7D32", badge: "#E8F5E9", badgeText: "#2E7D32" },
   Parked:  { bg: "#C62828", dim: "rgba(198,40,40,0.88)",   text: "Parked",  dot: "#C62828", badge: "#FFEBEE", badgeText: "#C62828" },
   Idling:  { bg: "#1565C0", dim: "rgba(21,101,192,0.88)",  text: "Idling",  dot: "#1565C0", badge: "#E3F2FD", badgeText: "#1565C0" },
   Offline: { bg: "#455A64", dim: "rgba(69,90,100,0.85)",   text: "Offline", dot: "#607D8B", badge: "#F1F3F4", badgeText: "#607D8B" },
+  "No data": { bg: "#78909C", dim: "rgba(120,144,156,0.85)", text: "No data", dot: "#B0BEC5", badge: "#F5F7F8", badgeText: "#8696A0" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -120,9 +131,14 @@ async function fleetFetch(method: string, path: string, body?: unknown): Promise
   return res.json();
 }
 
-function sseUrl(imei: string): string {
-  return liveStreamUrl(FLEET_SSE, imei);
+/** dd-mm-yyyy, as the replay route takes dates. */
+function ddmmyyyy(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 }
+
+/** Per-unit API calls (subscription checks, last-known positions), a few at a
+ *  time so they don't hold up the rest of the console's requests. */
+const perUnit = limiter(4);
 
 function esc(s: unknown): string {
   return String(s ?? "")
@@ -215,7 +231,7 @@ function buildWaitingHtml(name: string): string {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: MotionStatus }) {
+function StatusBadge({ status }: { status: UnitStatus }) {
   const c = STATUS_META[status] ?? STATUS_META.Offline;
   return (
     <span className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded"
@@ -232,8 +248,8 @@ function KpiChip({ label, value, active, onClick }: {
       className={[
         "flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-center transition-all cursor-pointer border",
         active
-          ? "bg-[#128C7E] text-white border-[#128C7E]"
-          : "bg-white text-[#111B21] border-[#E9EDEF] hover:border-[#128C7E]",
+          ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+          : "bg-white text-[#111B21] border-[#E9EDEF] hover:border-[var(--brand)]",
       ].join(" ")}
     >
       <span className="text-[16px] font-black leading-tight">{value}</span>
@@ -266,20 +282,31 @@ export default function NocBridgePage() {
   const [listError, setListError]     = useState<string | null>(null);
   const [searchQ, setSearchQ]         = useState("");
   const [page, setPage]               = useState(1);
-  const [statusFilter, setStatusFilter] = useState<MotionStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<UnitStatus | "">("");
   const [selectedImei, setSelectedImei] = useState<string | null>(null);
+  const canPlayback = useCan("track.playback.view");
 
   const mapDivRef    = useRef<HTMLDivElement>(null);
   const gMap         = useRef<unknown>(null);
   const infoWin      = useRef<unknown>(null);
   const markers      = useRef(new Map<string, unknown>());
-  const sseConns     = useRef(new Map<string, EventSource>());
+  // The live feed: the selected unit in real time, the rest read in turn.
+  const fleet        = useRef<LiveFleet | null>(null);
   const units        = useRef(new Map<string, VehicleUnit>());
+  /** Units the live feed has given a position this visit. */
+  const liveFix      = useRef(new Set<string>());
+  /** Units whose last known position has been asked for. */
+  const seeded       = useRef(new Set<string>());
+  /** Units the server says have never reported (no position, no heartbeat).
+   *  The live feed alone cannot tell them from units that went quiet. */
+  const neverReported = useRef(new Set<string>());
   const pendingFocus = useRef<string | null>(null);
   const activePopup  = useRef<string | null>(null);
 
   // Geofence overlay state
   const [showGeofences, setShowGeofences] = useState(true);
+  const showGeoRef = useRef(showGeofences);
+  showGeoRef.current = showGeofences;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const geoPolygons = useRef<any[]>([]);
 
@@ -294,7 +321,8 @@ export default function NocBridgePage() {
   // Geofence-attached device markers (shown on map when geofences are ON)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const geoDeviceMarkers = useRef(new Map<string, any>());
-  const geoDeviceSse = useRef(new Map<string, EventSource>());
+  /** Geofence-attached units outside this fleet, read by the live feed too. */
+  const geoExtra = useRef(new Set<string>());
   const geoDeviceNames = useRef(new Map<string, string>());
 
   // RAF tick — batches SSE updates into one render frame
@@ -378,106 +406,177 @@ export default function NocBridgePage() {
     if (!fromMarker) { GM.panTo(u.coords); GM.setZoom(15); }
   }
 
-  // ── SSE ──────────────────────────────────────────────────────────────────
-  function stopAll() {
-    sseConns.current.forEach((es) => { try { es.close(); } catch { /**/ } });
-    sseConns.current.clear();
+  /** A geofence-attached unit outside this fleet, on the map. */
+  function showGeoDevice(imei: string, p: LivePosition) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google?.maps; const GM = gMap.current as any;
+    if (!G || !GM || !showGeoRef.current) return;
+    const { lat, lng, status } = p;
+    const iconKey = status === "Moving" ? "moving" : status === "Parked" ? "parked"
+                  : status === "Idling" ? "idling" : "unknown";
+    const icon = { url: ICONS[iconKey], scaledSize: new G.Size(28, 28), anchor: new G.Point(14, 14) };
+    const devName = geoDeviceNames.current.get(imei) ?? imei;
+
+    let m = geoDeviceMarkers.current.get(imei);
+    if (!m) {
+      m = new G.Marker({
+        position: { lat, lng },
+        map: GM,
+        title: `${devName} (geofence device)`,
+        icon,
+        zIndex: 1,
+      });
+      geoDeviceMarkers.current.set(imei, m);
+    } else {
+      m.setPosition({ lat, lng });
+      m.setIcon(icon);
+    }
+    // The popup reads the latest status, not the first one seen.
+    G.event.clearListeners(m, "click");
+    m.addListener("click", () => {
+      const iwDev = new G.InfoWindow({
+        content: `<div style="font-family:system-ui;padding:8px 12px;min-width:160px">
+          <div style="font-weight:800;font-size:13px;color:#111B21">${esc(devName)}</div>
+          <div style="font-size:11px;color:#667781;margin-top:2px">IMEI: ${esc(imei)}</div>
+          <div style="font-size:11px;color:#667781;margin-top:2px">Status: ${status}</div>
+          <div style="font-size:10px;color:#128C7E;margin-top:4px;font-weight:700">Geofence-attached device</div>
+        </div>`,
+      });
+      iwDev.open({ map: GM, anchor: m });
+    });
   }
 
-  function openStream(imei: string) {
-    let es: EventSource;
-    try { es = new EventSource(sseUrl(imei)); } catch { return; }
-    sseConns.current.set(imei, es);
+  // ── Live feed ────────────────────────────────────────────────────────────
+  /** Every unit the feed reads: the fleet, and geofence units outside it. */
+  function syncFeedUnits() {
+    fleet.current?.setUnits([...units.current.keys(), ...geoExtra.current]);
+  }
 
-    es.onmessage = (ev) => {
-      const u = units.current.get(imei);
-      if (!u) return;
-      const frame = parseLiveFrame(ev.data, imei);
-      if (frame.kind === "ignore") return;
+  function onFrame(imei: string, frame: Exclude<LiveFrame, { kind: "ignore" }>) {
+    const u = units.current.get(imei);
+    if (!u) {
+      if (frame.kind === "position" && geoExtra.current.has(imei)) showGeoDevice(imei, frame.position);
+      return;
+    }
 
-      if (frame.kind === "offline") {
-        u.status = "Offline";
-        tick();
-        const m = ensureMarker(u);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const IW = infoWin.current as any; const GM = gMap.current as any;
-        if (activePopup.current === imei && IW && GM) {
-          if (m) { IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m }); }
-          else   { IW.setContent(buildWaitingHtml(u.name || imei)); IW.open(GM); }
-        }
-        if (pendingFocus.current === imei && IW && GM) {
-          IW.setContent(buildWaitingHtml(u.name || imei));
-          IW.open(GM);
-          pendingFocus.current = null;
-        }
-        return;
-      }
-
-      const p = frame.position;
-      const { lat, lng } = p;
-
-      u.speed             = p.speed;
-      u.motion_state      = p.motionState;
-      u.status            = p.status;
-      u.coords            = { lat, lng };
-      u.geocoded_location = p.geocoded || u.geocoded_location || "";
-      u.last_sync         = p.lastSync;
-      u.satellites        = p.satellites;
-      u.hdop              = p.hdop;
-      u.ignition          = p.ignition;
-      u.mileage           = p.mileage;
-      u.fuel_level        = p.fuelLevel;
-
-      // ── Geofence entry/exit detection ──
-      if (geozonePathsRef.current.length > 0 && showGeofences) {
-        if (!deviceInsideRef.current.has(imei)) {
-          deviceInsideRef.current.set(imei, new Map());
-        }
-        const prevMap = deviceInsideRef.current.get(imei)!;
-        const events = checkGeozoneTransitions({ lat, lng }, geozonePathsRef.current, prevMap);
-        if (events.length > 0) {
-          const now = new Date().toLocaleTimeString();
-          const newAlerts: GeoAlert[] = events.map((e) => ({
-            id: ++alertIdRef.current,
-            type: e.type,
-            deviceName: u.name || imei,
-            zoneName: e.name,
-            time: now,
-          }));
-          setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
-          // Alerts themselves are sent by the server (endpoints/alert_engine.py):
-          // it remembers where each unit was between sessions, only alerts on
-          // units attached to the rule, and works whether or not this screen
-          // is open. What is shown here is this screen's own live view.
-        }
-      }
-
+    if (frame.kind === "offline") {
+      u.status = quietStatus(imei);
       tick();
       const m = ensureMarker(u);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const IW = infoWin.current as any; const GM = gMap.current as any;
-      if (activePopup.current === imei && IW && GM && m) {
-        IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m });
+      if (activePopup.current === imei && IW && GM) {
+        if (m) { IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m }); }
+        else   { IW.setContent(buildWaitingHtml(u.name || imei)); IW.open(GM); }
       }
+      if (pendingFocus.current === imei && IW && GM) {
+        IW.setContent(buildWaitingHtml(u.name || imei));
+        IW.open(GM);
+        pendingFocus.current = null;
+      }
+      // Nothing live: show where it was last seen, as the mobile app does.
+      seedLastKnown(imei);
+      return;
+    }
+
+    const p = frame.position;
+    const { lat, lng } = p;
+    liveFix.current.add(imei);
+
+    // p.status follows the fleet status rule (liveStatus): a quiet unit is
+    // Offline, or Parked while its tracker sleeps; the text says which, and
+    // since when. A speed from an old report is not current.
+    u.speed             = p.reporting ? p.speed : 0;
+    u.motion_state      = motionText(p);
+    u.status            = p.status;
+    u.coords            = { lat, lng };
+    u.geocoded_location = p.geocoded || u.geocoded_location || "";
+    u.last_sync         = p.lastSync;
+    u.satellites        = p.satellites;
+    u.hdop              = p.hdop;
+    u.ignition          = p.ignition;
+    u.mileage           = p.mileage;
+    u.fuel_level        = p.fuelLevel;
+
+    // ── Geofence entry/exit detection ──
+    if (geozonePathsRef.current.length > 0 && showGeoRef.current) {
+      if (!deviceInsideRef.current.has(imei)) {
+        deviceInsideRef.current.set(imei, new Map());
+      }
+      const prevMap = deviceInsideRef.current.get(imei)!;
+      const events = checkGeozoneTransitions({ lat, lng }, geozonePathsRef.current, prevMap);
+      if (events.length > 0) {
+        const now = new Date().toLocaleTimeString();
+        const newAlerts: GeoAlert[] = events.map((e) => ({
+          id: ++alertIdRef.current,
+          type: e.type,
+          deviceName: u.name || imei,
+          zoneName: e.name,
+          time: now,
+        }));
+        setGeoAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
+        // Alerts themselves are sent by the server (endpoints/alert_engine.py):
+        // it remembers where each unit was between sessions, only alerts on
+        // units attached to the rule, and works whether or not this screen
+        // is open. What is shown here is this screen's own live view.
+      }
+    }
+
+    tick();
+    const m = ensureMarker(u);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const IW = infoWin.current as any; const GM = gMap.current as any;
+    if (activePopup.current === imei && IW && GM && m) {
+      IW.setContent(buildPopupHtml(u)); IW.open({ map: GM, anchor: m });
+    }
+    if (pendingFocus.current === imei) {
+      pendingFocus.current = null;
+      openPopup(imei, false);
+    }
+  }
+
+  /**
+   * The unit's last reported position, from trip history: today, else the
+   * last 30 days. The live feed has nothing for a unit that isn't reporting,
+   * which used to leave it off the map entirely. Asked once per unit; a live
+   * position always wins.
+   */
+  function seedLastKnown(imei: string) {
+    const u = units.current.get(imei);
+    if (!u || u.coords || seeded.current.has(imei) || liveFix.current.has(imei)) return;
+    seeded.current.add(imei);
+    const now = new Date();
+    const ask = (from: Date) => perUnit(async () => {
+      const res = await fleetFetch("POST", ENDPOINTS.TRACKING.TRIPS_REPLAY, {
+        data: { device_imei: imei, from_date: ddmmyyyy(from), to_date: ddmmyyyy(now), offset_log: "0", record_count: "1" },
+      }) as { status?: string; data?: unknown } | null;
+      const row = res?.status === "success" && Array.isArray(res.data) ? res.data[0] : null;
+      return row && typeof row === "object" ? readPosition(row as Record<string, unknown>, imei) : null;
+    }).catch(() => null);
+    (async () => {
+      const p: LivePosition | null = (await ask(now)) ?? (await ask(new Date(now.getTime() - 30 * 86_400_000)));
+      const unit = units.current.get(imei);
+      if (!p || !unit || liveFix.current.has(imei) || unit.coords) return;
+      unit.coords            = { lat: p.lat, lng: p.lng };
+      unit.status            = "Offline";
+      unit.motion_state      = "Not reporting · last known position";
+      unit.speed             = 0;
+      unit.last_sync         = p.lastSync;
+      unit.geocoded_location = p.geocoded || unit.geocoded_location;
+      unit.ignition          = p.ignition || unit.ignition;
+      tick();
+      ensureMarker(unit);
       if (pendingFocus.current === imei) {
         pendingFocus.current = null;
         openPopup(imei, false);
       }
-    };
-
-    es.onerror = () => {
-      try { es.close(); } catch { /**/ }
-      sseConns.current.delete(imei);
-      setTimeout(() => openStream(imei), 4000);
-    };
+    })();
   }
-
-  function startAll() { stopAll(); units.current.forEach((_, i) => openStream(i)); }
 
   // ── Subscription enrichment ──────────────────────────────────────────────
   async function enrichSubs() {
     await Promise.all(
-      Array.from(units.current.entries()).map(async ([imei, u]) => {
+      Array.from(units.current.entries()).map(([imei, u]) => perUnit(async () => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const j = await fleetFetch("GET", `${ENDPOINTS.FLEET.CHECK_IMEI}/${encodeURIComponent(imei)}`) as any;
@@ -487,8 +586,9 @@ export default function NocBridgePage() {
           const valid   = d.is_valid   === true || String(d.is_valid).toLowerCase()   === "true" || String(d.is_valid)   === "1";
           u.subscription_status = expired ? "expired" : valid ? "running"
             : String(d.validity_status || d.subscription_status || "unknown").toLowerCase();
+          if (u.subscription_status === "expired") ensureMarker(u);
         } catch { /**/ }
-      })
+      }))
     );
   }
 
@@ -522,6 +622,8 @@ export default function NocBridgePage() {
         return;
       }
       units.current.clear();
+      liveFix.current.clear();
+      seeded.current.clear();
       setPage(1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       resp.data.forEach((u: any) => {
@@ -554,8 +656,11 @@ export default function NocBridgePage() {
       });
       tick();
       setLoading(false);
-      try { await enrichSubs(); tick(); } catch { /**/ }
-      startAll();
+      // The live feed starts now; the subscription checks run beside it (they
+      // used to hold it up until every one had answered).
+      syncFeedUnits();
+      fleet.current?.start();
+      enrichSubs().then(tick, () => {});
     } catch (err) {
       console.error("[LiveMonitoring] loadUnits error:", err);
       setListError("Failed to load devices. Please try again.");
@@ -563,8 +668,55 @@ export default function NocBridgePage() {
     }
   }
 
+  /** A unit with nothing live: No data if it has never reported, else Offline. */
+  function quietStatus(imei: string): UnitStatus {
+    return neverReported.current.has(imei) ? "No data" : "Offline";
+  }
+
+  /** Which units have never reported, from the fleet summary (the Dashboard's
+   *  counts): the feed says only "no data" for them and for quiet ones alike.
+   *  A server without the summary, or without unit_states, leaves all of
+   *  them Offline, as before. */
+  async function loadUnitStates(clientUid: string) {
+    try {
+      const res = await fleetFetch("GET", `/fleet/${encodeURIComponent(clientUid)}/summary`) as
+        { status?: string; data?: { unit_states?: Record<string, string> } } | null;
+      const states = res?.status === "success" ? res.data?.unit_states : undefined;
+      if (!states || typeof states !== "object") return;
+      neverReported.current = new Set(
+        Object.entries(states).filter(([, state]) => state === "never_reported").map(([imei]) => imei));
+      let changed = false;
+      units.current.forEach((u, imei) => {
+        if (u.status !== "Offline" && u.status !== "No data") return;
+        const next = quietStatus(imei);
+        if (u.status !== next) { u.status = next; changed = true; }
+      });
+      if (changed) tick();
+    } catch { /* the summary is extra: units stay Offline */ }
+  }
+
+  // The feed is made once; it calls the latest render's handlers.
+  const onFrameRef = useRef(onFrame);
+  const seedLastKnownRef = useRef(seedLastKnown);
+  const loadUnitStatesRef = useRef(loadUnitStates);
+  useEffect(() => {
+    onFrameRef.current = onFrame;
+    seedLastKnownRef.current = seedLastKnown;
+    loadUnitStatesRef.current = loadUnitStates;
+  });
+
   // ── Bootstrap ────────────────────────────────────────────────────────────
   useEffect(() => {
+    const feed = new LiveFleet({
+      base: FLEET_SSE,
+      onFrame: (imei, frame) => onFrameRef.current(imei, frame),
+      onSilent: (imei) => seedLastKnownRef.current(imei),
+      skip: (imei) => String(units.current.get(imei)?.subscription_status).toLowerCase() === "expired",
+    });
+    fleet.current = feed;
+    let stopped = false;
+    let statesTimer: number | undefined;
+
     const initMap = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const G = (window as any).google?.maps;
@@ -611,23 +763,39 @@ export default function NocBridgePage() {
       const accountUid  = (dataLevel === "client" || dataLevel === "inhouse")
         ? (getCookie("_nvxs_account_root") ?? rawUid) : rawUid;
       await loadUnits(dataLevel, accountUid);
+      // A customer's own fleet: the server says which quiet units never reported.
+      if (dataLevel === "client" && !stopped) {
+        let busy = false;
+        const ask = () => {
+          if (busy || stopped) return;
+          busy = true;
+          loadUnitStatesRef.current(accountUid).finally(() => { busy = false; });
+        };
+        ask();
+        statesTimer = window.setInterval(ask, UNIT_STATES_EVERY_MS);
+      }
     })();
 
     return () => {
-      stopAll();
+      stopped = true;
+      window.clearInterval(statesTimer);
+      feed.stop();
+      if (fleet.current === feed) fleet.current = null;
       if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The unit being looked at keeps its own stream, so it moves in real time.
+  useEffect(() => { fleet.current?.follow(selectedImei); }, [selectedImei]);
 
   // ── Geofence overlays + attached device markers (merged) ─────────────────
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google?.maps;
 
-    // Helper: clear all geofence device markers & SSE connections
+    // Helper: clear all geofence device markers, and stop reading their units
     const clearGeoDevices = () => {
-      for (const es of geoDeviceSse.current.values()) { try { es.close(); } catch { /**/ } }
-      geoDeviceSse.current.clear();
+      if (geoExtra.current.size) { geoExtra.current.clear(); syncFeedUnits(); }
       for (const m of geoDeviceMarkers.current.values()) { try { m.setMap(null); } catch { /**/ } }
       geoDeviceMarkers.current.clear();
       geoDeviceNames.current.clear();
@@ -774,52 +942,11 @@ export default function NocBridgePage() {
         }
         geozonePathsRef.current = alertPaths;
 
-        // 5. Open SSE for attached devices NOT already tracked by the fleet
-        for (const imei of allAttachedImeis) {
-          // Fleet devices already have SSE via startAll() — only open extra SSE for non-fleet devices
-          if (sseConns.current.has(imei)) continue;
-
-          const es = new EventSource(sseUrl(imei));
-          geoDeviceSse.current.set(imei, es);
-
-          es.onmessage = (ev) => {
-            if (cancelled) return;
-            const frame = parseLiveFrame(ev.data, imei);
-            if (frame.kind !== "position") return;
-
-            const { lat, lng, status } = frame.position;
-            const iconKey = status === "Moving" ? "moving" : status === "Parked" ? "parked"
-                          : status === "Idling" ? "idling" : "unknown";
-            const icon = { url: ICONS[iconKey], scaledSize: new G.Size(28, 28), anchor: new G.Point(14, 14) };
-            const devName = geoDeviceNames.current.get(imei) ?? imei;
-
-            let m = geoDeviceMarkers.current.get(imei);
-            if (!m) {
-              m = new G.Marker({
-                position: { lat, lng },
-                map: GM,
-                title: `${devName} (geofence device)`,
-                icon,
-                zIndex: 1,
-              });
-              m.addListener("click", () => {
-                const iwDev = new G.InfoWindow({
-                  content: `<div style="font-family:system-ui;padding:8px 12px;min-width:160px">
-                    <div style="font-weight:800;font-size:13px;color:#111B21">${esc(devName)}</div>
-                    <div style="font-size:11px;color:#667781;margin-top:2px">IMEI: ${esc(imei)}</div>
-                    <div style="font-size:11px;color:#667781;margin-top:2px">Status: ${status}</div>
-                    <div style="font-size:10px;color:#128C7E;margin-top:4px;font-weight:700">Geofence-attached device</div>
-                  </div>`,
-                });
-                iwDev.open({ map: GM, anchor: m });
-              });
-              geoDeviceMarkers.current.set(imei, m);
-            } else {
-              m.setPosition({ lat, lng });
-              m.setIcon(icon);
-            }
-          };
-        }
+        // 5. Attached units outside this fleet are read by the live feed too.
+        //    (Each used to get a stream of its own, on top of the fleet's,
+        //    which the browser's 6-connection limit left waiting.)
+        geoExtra.current = new Set([...allAttachedImeis].filter((imei) => !units.current.has(imei)));
+        syncFeedUnits();
       } catch (err) {
         console.error("[LiveMonitoring] Failed to load geofences:", err);
       }
@@ -879,11 +1006,13 @@ export default function NocBridgePage() {
         <div className="min-h-0 flex flex-col bg-white border border-[#E9EDEF] rounded-xl overflow-hidden shadow-sm">
 
           {/* KPI strip */}
-          <div className="shrink-0 grid grid-cols-4 gap-1.5 p-3 border-b border-[#E9EDEF]">
+          <div className="shrink-0 grid grid-cols-3 gap-1.5 p-3 border-b border-[#E9EDEF]">
             <KpiChip label="All"     value={allUnits.length}           active={statusFilter === ""} onClick={() => { setStatusFilter(""); setPage(1); }} />
             <KpiChip label="Moving"  value={statusCounts["Moving"]  ?? 0} active={statusFilter === "Moving"}  onClick={() => { setStatusFilter("Moving"); setPage(1); }} />
             <KpiChip label="Parked"  value={statusCounts["Parked"]  ?? 0} active={statusFilter === "Parked"}  onClick={() => { setStatusFilter("Parked"); setPage(1); }} />
             <KpiChip label="Idle"    value={statusCounts["Idling"]  ?? 0} active={statusFilter === "Idling"}  onClick={() => { setStatusFilter("Idling"); setPage(1); }} />
+            <KpiChip label="Offline" value={statusCounts["Offline"] ?? 0} active={statusFilter === "Offline"} onClick={() => { setStatusFilter("Offline"); setPage(1); }} />
+            <KpiChip label="No data" value={statusCounts["No data"] ?? 0} active={statusFilter === "No data"} onClick={() => { setStatusFilter("No data"); setPage(1); }} />
           </div>
 
           {/* Search */}
@@ -894,7 +1023,7 @@ export default function NocBridgePage() {
               onChange={(e) => { setSearchQ(e.target.value); setPage(1); }}
               placeholder="Search name, IMEI, location…"
               className="w-full h-9 rounded-lg border border-[#E9EDEF] px-3 text-[12px] text-[#111B21]
-                placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[#128C7E] transition-colors"
+                placeholder:text-[#667781] bg-[#F8F9FA] outline-none focus:border-[var(--brand)] transition-colors"
             />
           </div>
 
@@ -902,7 +1031,7 @@ export default function NocBridgePage() {
           <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
             {loading && (
               <div className="px-4 py-8 text-center">
-                <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[#128C7E] rounded-full animate-spin" />
+                <div className="inline-block w-6 h-6 border-2 border-[#E9EDEF] border-t-[var(--brand)] rounded-full animate-spin" />
                 <div className="text-[12px] text-[#667781] mt-2">Loading devices…</div>
               </div>
             )}
@@ -923,7 +1052,7 @@ export default function NocBridgePage() {
                   className={[
                     "flex items-center gap-3 px-3 py-2.5 cursor-pointer",
                     "border-b border-[#E9EDEF] last:border-b-0 transition-colors",
-                    selected ? "bg-[#E7F7EF] border-l-[3px] border-l-[#128C7E]" : "hover:bg-[#F8F9FA]",
+                    selected ? "bg-[#E7F7EF] border-l-[3px] border-l-[var(--brand)]" : "hover:bg-[#F8F9FA]",
                     expired ? "opacity-50" : "",
                   ].join(" ")}
                 >
@@ -997,7 +1126,7 @@ export default function NocBridgePage() {
             </button>
             {/* Status legend */}
             <div className="hidden sm:flex items-center gap-3">
-              {(["Moving", "Parked", "Idling", "Offline"] as MotionStatus[]).map((s) => (
+              {(["Moving", "Parked", "Idling", "Offline", "No data"] as UnitStatus[]).map((s) => (
                 <div key={s} className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: STATUS_META[s].dot }} />
                   <span className="text-[10px] text-[#667781]">{s}</span>
@@ -1073,7 +1202,7 @@ export default function NocBridgePage() {
             {/* Detail body */}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2" style={{ scrollbarWidth: "thin" }}>
               {/* Location section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-2 mb-1">Location</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-2 mb-1">Location</div>
               <DetailRow icon="📍" label="Address" value={selectedUnit.geocoded_location || selectedUnit.country || "Waiting for GPS…"} />
               <DetailRow icon="🧭" label="Coordinates"
                 value={selectedUnit.coords ? `${selectedUnit.coords.lat.toFixed(6)}, ${selectedUnit.coords.lng.toFixed(6)}` : "—"} mono />
@@ -1082,30 +1211,42 @@ export default function NocBridgePage() {
               <DetailRow icon="🔄" label="Motion State" value={selectedUnit.motion_state || selectedUnit.status} />
 
               {/* Vehicle section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Vehicle</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Vehicle</div>
               <DetailRow icon="🚗" label="Make / Model"
                 value={[selectedUnit.car_make, selectedUnit.car_model].filter(Boolean).join(" ") || "—"} />
               <DetailRow icon="📋" label="Vehicle Type" value={selectedUnit.car_type} />
               <DetailRow icon="🔑" label="VIN" value={selectedUnit.vin_number} mono />
 
               {/* Device section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Device</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Device</div>
               <DetailRow icon="📡" label="Hardware" value={[selectedUnit.hardware, selectedUnit.hardware_model].filter(Boolean).join(" / ") || "—"} />
               <DetailRow icon="📶" label="SIM Card" value={selectedUnit.simcard} mono />
               <DetailRow icon="🛰" label="Satellites" value={selectedUnit.satellites > 0 ? String(selectedUnit.satellites) : "—"} />
               <DetailRow icon="📊" label="HDOP (Accuracy)" value={selectedUnit.hdop || "—"} />
 
               {/* Telemetry section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Telemetry</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Telemetry</div>
               <DetailRow icon="🔥" label="Ignition" value={selectedUnit.ignition || "—"} />
               <DetailRow icon="🛣" label="Mileage" value={selectedUnit.mileage || "—"} />
               <DetailRow icon="⛽" label="Fuel Level" value={selectedUnit.fuel_level || "—"} />
 
               {/* Subscription section */}
-              <div className="text-[10px] font-bold text-[#128C7E] uppercase tracking-wider mt-4 mb-1">Subscription</div>
+              <div className="text-[10px] font-bold text-[var(--brand)] uppercase tracking-wider mt-4 mb-1">Subscription</div>
               <DetailRow icon="💳" label="Billing Status" value={selectedUnit.billing_status || "—"} />
               <DetailRow icon="📦" label="Subscription"
                 value={String(selectedUnit.subscription_status || "—").replace(/^\w/, (c) => c.toUpperCase())} />
+
+              {/* Today's trips and stops for this vehicle */}
+              {canPlayback && (
+                <Link
+                  to={`/gatehouse?imei=${encodeURIComponent(selectedUnit.imei)}`}
+                  className="flex items-center justify-center gap-2 mt-4 h-9 rounded-lg
+                    bg-white border border-[var(--brand)] text-[var(--brand)] text-[12px] font-extrabold no-underline
+                    hover:bg-[#E7F7EF] transition-all"
+                >
+                  Trip history
+                </Link>
+              )}
 
               {/* Google Maps link */}
               {selectedUnit.coords && (
@@ -1113,7 +1254,7 @@ export default function NocBridgePage() {
                   href={`https://www.google.com/maps?q=${selectedUnit.coords.lat},${selectedUnit.coords.lng}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 mt-4 mb-3 h-9 rounded-lg
-                    bg-[#128C7E] text-white text-[12px] font-extrabold no-underline
+                    bg-[var(--brand)] text-white text-[12px] font-extrabold no-underline
                     hover:brightness-110 transition-all"
                 >
                   Open in Google Maps

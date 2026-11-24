@@ -230,7 +230,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
 
   const displayError = validationError ?? (listMutation.error ? listMutation.error.message : null);
   const busy = listMutation.isRunning;
-  const inp = "px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E]";
+  const inp = "px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)]";
 
   return (
     <>
@@ -268,7 +268,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
             <div className="text-[11px] font-extrabold text-[#111B21] mb-2">Select Unit *</div>
             {loadingDevices ? (
               <div className="flex items-center justify-center py-4">
-                <div className="w-4 h-4 border-2 border-[#128C7E] border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : devices.length === 0 ? (
               <div className="text-[12px] text-[#667781] py-2">No units found</div>
@@ -327,7 +327,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
                   type="button"
                   onClick={lookupVin}
                   disabled={busy || vinLoading || vinInput.length !== 17}
-                  className="h-[30px] px-3 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  className="h-[30px] px-3 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
                   {vinLoading ? "Looking up..." : "Decode VIN"}
                 </button>
@@ -388,7 +388,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
             ) : (
               <label className={[
                 "flex flex-col items-center justify-center gap-1.5 px-4 py-6 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
-                "border-[#E9EDEF] bg-[#F8F9FA] hover:border-[#128C7E] hover:bg-[#E9F7F4]",
+                "border-[#E9EDEF] bg-[#F8F9FA] hover:border-[var(--brand)] hover:bg-[var(--brand-soft)]",
                 busy && "opacity-50 cursor-not-allowed",
               ].filter(Boolean).join(" ")}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -489,7 +489,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
                 placeholder="Condition, certifications, what's included..."
                 disabled={busy}
-                className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[#128C7E] resize-y font-[inherit]"
+                className="px-2 py-1.5 text-[12px] border border-[#E9EDEF] rounded-md bg-white text-[#111B21] outline-none focus:border-[var(--brand)] resize-y font-[inherit]"
               />
             </label>
           </div>
@@ -507,7 +507,7 @@ export function CreateListingDrawer({ open, onClose, onCreated, prefillDevice }:
               permission="can_list_asset_on_marketplace"
               onClick={handleSubmit}
               disabled={busy}
-              className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[#128C7E] text-white hover:bg-[#0D7466] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+              className="px-3 py-1 text-[11px] font-extrabold rounded-md bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
             >
               {busy ? "Publishing..." : "Publish listing"}
             </GuardedButton>
