@@ -124,6 +124,9 @@ export async function generateReport(
         },
       };
       if (isState) body.data.report_state = type;
+      if (type === "overspeeding" && payload.speed_limit != null) {
+        body.data.speed_limit = payload.speed_limit;
+      }
 
       resp = await post<unknown>(endpointUrl, body, opts);
     } catch (e) {
@@ -193,7 +196,9 @@ export async function generateReport(
       trips: "This could mean no trips were recorded for these devices during the selected period. Try expanding your date range.",
       fuel: "This could mean no fuel level changes were recorded for these devices. Try a wider date range or check that fuel sensors are active.",
       night_driving: "No night driving events were detected. This is actually good news — your drivers may not have driven at night during this period!",
-      overspeeding: "No overspeeding events were detected — great news! Your drivers stayed within speed limits during this period.",
+      overspeeding: payload.speed_limit != null
+        ? `No vehicle went over ${payload.speed_limit} km/h during this period. Try a lower speed or a wider date range.`
+        : "No overspeeding events were detected — great news! Your drivers stayed within speed limits during this period.",
       geozone: "No geozone breach events found. Make sure the selected devices have geozones assigned, or try a wider date range.",
       PARKING: "No parking records found. Try expanding the date range or verify the devices were active during this period.",
       IDILING: "No idling records found. Try expanding the date range or verify the devices were active during this period.",
@@ -215,6 +220,10 @@ export async function generateReport(
       // State reports need the report_state field
       if (isState) {
         body.data.report_state = type; // "PARKING" or "IDILING"
+      }
+      // Overspeeding against a chosen speed, read from the GPS history.
+      if (type === "overspeeding" && payload.speed_limit != null) {
+        body.data.speed_limit = payload.speed_limit;
       }
 
       resp = await post<unknown>(endpointUrl, body, opts);

@@ -63,9 +63,15 @@ type StateDataResponse = Record<string, StateRecord[]>[];
 interface OverspeedingEvent {
   date_logged: string;
   location_point: string;
-  moving_speed: string;
-  event_triggered: string;
+  moving_speed: string;           // the top speed, e.g. "52KM/H"
+  event_triggered: string;        // the limit, e.g. "Over 43 km/h"
   gps_coordinates: string;
+  // Sent when the report is run against a speed limit (one row per stretch
+  // above it); absent on the alert-based report.
+  start_time?: string;
+  end_time?: string;
+  duration?: string;
+  over_by?: string;
 }
 
 type OverspeedingDataResponse = Record<string, OverspeedingEvent[]>[];
@@ -710,15 +716,18 @@ export function generateOverspeedingPDF(
       const rows = events.map((e, i) => [
         String(i + 1),
         e.date_logged || "—",
+        e.start_time || "—",
+        e.end_time || "—",
+        e.duration || "—",
         e.moving_speed || "—",
-        e.location_point || "—",
         e.event_triggered || "—",
+        e.location_point || "—",
         e.gps_coordinates || "—",
       ]);
 
       autoTable(doc, {
         startY: yOffset,
-        head: [["#", "Date", "Speed", "Location", "Speed Limit", "GPS Coordinates"]],
+        head: [["#", "Date", "Start", "End", "Duration", "Top Speed", "Speed Limit", "Location", "GPS Coordinates"]],
         body: rows,
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: {
@@ -765,15 +774,20 @@ export function generateOverspeedingExcel(
       const rows = events.map((e, i) => ({
         "#": i + 1,
         "Date": e.date_logged || "",
-        "Speed": e.moving_speed || "",
-        "Location": e.location_point || "",
+        "Start": e.start_time || "",
+        "End": e.end_time || "",
+        "Duration": e.duration || "",
+        "Top Speed": e.moving_speed || "",
+        "Over By": e.over_by || "",
         "Speed Limit": e.event_triggered || "",
+        "Location": e.location_point || "",
         "GPS Coordinates": e.gps_coordinates || "",
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [
-        { wch: 5 }, { wch: 14 }, { wch: 12 }, { wch: 35 }, { wch: 16 }, { wch: 25 },
+        { wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 11 },
+        { wch: 10 }, { wch: 16 }, { wch: 35 }, { wch: 25 },
       ];
 
       const sheetName = deviceName.length > 31 ? deviceName.slice(0, 31) : deviceName;
@@ -977,8 +991,12 @@ export const SUMMARY_COLUMNS_BY_TYPE: Record<string, SummaryColumn[]> = {
     { key: "max_speed_stat", label: "Max Speed Recorded",  section: "statistics", default: true },
     { key: "avg_speed_stat", label: "Avg Overspeed",       section: "statistics", default: true },
     { key: "date_logged",    label: "Date",           section: "detail", default: true },
-    { key: "moving_speed",   label: "Speed",          section: "detail", default: true },
-    { key: "event_triggered",label: "Event",          section: "detail", default: true },
+    { key: "start_time",     label: "Start",          section: "detail", default: true },
+    { key: "end_time",       label: "End",            section: "detail", default: true },
+    { key: "duration",       label: "Duration",       section: "detail", default: true },
+    { key: "moving_speed",   label: "Top Speed",      section: "detail", default: true },
+    { key: "over_by",        label: "Over By",        section: "detail", default: false },
+    { key: "event_triggered",label: "Speed Limit",    section: "detail", default: true },
     { key: "location_point", label: "Location",       section: "detail", default: true },
     { key: "gps_coordinates",label: "GPS",            section: "detail", default: false },
   ],

@@ -48,6 +48,10 @@ import type {
 import type { ClientDevice } from "../../api/types";
 import { getSummaryColumns } from "../../utils/reportGenerator";
 import type { SummarySections } from "../../utils/reportGenerator";
+import {
+  SPEED_PRESETS, INITIAL_SPEED_LIMIT, LOWEST_SPEED, HIGHEST_SPEED, SPEED_LIMIT_MAX_DAYS,
+  parseSpeedLimit, speedLimitProblem, speedRangeProblem,
+} from "./speedLimit";
 
 // ── Fallback report types (used if backend endpoint is unavailable) ────────
 
@@ -507,11 +511,14 @@ function GenerateForm({
   const [endDate, setEndDate] = useState(() => toInputDate(new Date()));
   const [generating, setGenerating] = useState(false);
   const [searchDevice, setSearchDevice] = useState("");
+  // Overspeeding: the speed it measures against, typed or picked (km/h).
+  const [speedText, setSpeedText] = useState(String(INITIAL_SPEED_LIMIT));
   const [noDataInfo, setNoDataInfo] = useState<{ label: string; hint: string } | null>(null);
 
   // Driver reports are chosen by driver, not vehicle: none ticked = all.
   const driverReport = isDriverReport(reportType);
   const showDates = !driverReport || driverReportUsesDates(reportType);
+  const bySpeed = reportType === "overspeeding";
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
@@ -593,6 +600,13 @@ function GenerateForm({
       onToast("Please select a date range.", "error");
       return;
     }
+    if (bySpeed) {
+      const problem = speedLimitProblem(speedText) ?? speedRangeProblem(startDate, endDate);
+      if (problem) {
+        onToast(problem, "error");
+        return;
+      }
+    }
     if (format === "summary" && summaryColumns.length === 0) {
       onToast("Please select at least one column for the summary report.", "error");
       return;
@@ -618,6 +632,7 @@ function GenerateForm({
         origin_user: ownerUid,
       };
       if (driverReport) payload.report_drivers = selectedDrivers;
+      if (bySpeed) payload.speed_limit = parseSpeedLimit(speedText);
       if (format === "summary") {
         payload.summary_config = {
           sections: summarySections,
@@ -794,6 +809,51 @@ function GenerateForm({
           )}
         </div>
         <p className="text-[10px] text-[#667781] mt-1">Leave all unticked to include every driver.</p>
+      </div>
+      )}
+
+      {/* Speed limit (overspeeding) */}
+      {bySpeed && (
+      <div>
+        <label className="block text-[12px] font-black text-[#111B21] mb-1.5">Speed Limit</label>
+        <div className="flex flex-wrap gap-2">
+          {SPEED_PRESETS.map((v) => {
+            const on = parseSpeedLimit(speedText) === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setSpeedText(String(v))}
+                className={`h-8 px-3 rounded-full text-[12px] font-black border cursor-pointer transition-all ${
+                  on
+                    ? "bg-[#111B21] text-white border-[#111B21]"
+                    : "bg-white text-[#111B21] border-[#E9EDEF] hover:border-[var(--brand)]"
+                }`}
+              >
+                {v} km/h
+              </button>
+            );
+          })}
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="decimal"
+              min={LOWEST_SPEED}
+              max={HIGHEST_SPEED}
+              value={speedText}
+              onChange={(e) => setSpeedText(e.target.value)}
+              aria-label="Speed limit in km/h"
+              className={`h-8 w-[104px] rounded-full border px-3 pr-11 text-[12px] font-black text-[#111B21] outline-none focus:border-[var(--brand)] ${
+                speedLimitProblem(speedText) ? "border-[#E53935]" : "border-[#E9EDEF]"
+              }`}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#667781] pointer-events-none">km/h</span>
+          </div>
+        </div>
+        <p className={`text-[11px] mt-1 ${speedLimitProblem(speedText) ? "text-[#E53935]" : "text-[#667781]"}`}>
+          {speedLimitProblem(speedText) ??
+            `Lists every stretch of driving above ${parseSpeedLimit(speedText)} km/h, up to ${SPEED_LIMIT_MAX_DAYS} days at a time. Type any speed.`}
+        </p>
       </div>
       )}
 

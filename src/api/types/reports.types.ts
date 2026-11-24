@@ -123,6 +123,8 @@ export interface GenerateReportRequest {
   end_date: string;              // DD-MM-YYYY
   origin_user: string;           // Account UID of the requester
   report_state?: string;         // Only for state reports: "IDILING" | "PARKING"
+  /** Overspeeding only: km/h to measure the GPS history against (1-300). */
+  speed_limit?: number;
   /** Driver reports only: driver_uids to include; all drivers when empty. */
   report_drivers?: string[];
   /** Summary report config — which sections & columns to include */
